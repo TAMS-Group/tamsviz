@@ -22,6 +22,9 @@ public:
 
 void startOnMainThreadAsync(const std::function<void()> &fun);
 
+void startOnObjectThreadAsync(QObject *object,
+                              const std::function<void()> &fun);
+
 QIcon _createTextIcon(const QString &str);
 #define TEXT_ICON(str)                                                         \
   ([]() {                                                                      \
@@ -49,23 +52,6 @@ QIcon _create_FA_S_Icon(const QString &str, double padding = 0.1);
     static QIcon icon = _create_FA_S_Icon(__VA_ARGS__);                        \
     return icon;                                                               \
   }())
-
-/*
-class FlatButton : public QPushButton {
-  void init();
-
-public:
-  FlatButton() : QPushButton() { init(); }
-  FlatButton(const QIcon &icon) : QPushButton(icon, QString()) { init(); }
-  FlatButton(const QIcon &icon, const QString &text) : QPushButton(icon, text) {
-    init();
-  }
-  FlatButton(const QString &text) : QPushButton(text) { init(); }
-  virtual QSize minimumSizeHint() const override;
-  virtual QSize sizeHint() const override;
-  ~FlatButton();
-};
-*/
 
 class FlatButton : public QPushButton {
   void init();

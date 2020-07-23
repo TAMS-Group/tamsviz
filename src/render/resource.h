@@ -5,7 +5,6 @@
 
 #include "../core/event.h"
 
-#include <atomic>
 #include <functional>
 #include <map>
 #include <memory>

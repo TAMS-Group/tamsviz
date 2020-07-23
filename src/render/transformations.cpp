@@ -3,10 +3,10 @@
 
 #include "transformations.h"
 
-Eigen::Matrix4f projectionMatrix(double fov_y, double aspect, double near,
+Eigen::Matrix4d projectionMatrix(double fov_y, double aspect, double near,
                                  double far) {
-  float s = 1.0f / std::tan((float)fov_y * 0.5f);
-  Eigen::Matrix4f matrix = Eigen::Matrix4f::Zero();
+  double s = 1.0f / std::tan((double)fov_y * 0.5);
+  Eigen::Matrix4d matrix = Eigen::Matrix4d::Zero();
   matrix(0, 0) = s * std::sqrt(aspect);
   matrix(1, 1) = s / std::sqrt(aspect);
   matrix(2, 2) = -far / (far - near);
@@ -15,13 +15,13 @@ Eigen::Matrix4f projectionMatrix(double fov_y, double aspect, double near,
   return matrix;
 }
 
-Eigen::MatrixXf lookatMatrix(const Eigen::Vector3d &eye,
+Eigen::Matrix4d lookatMatrix(const Eigen::Vector3d &eye,
                              const Eigen::Vector3d &at,
                              const Eigen::Vector3d &up) {
   Eigen::Vector3d z = (eye - at).normalized();
   Eigen::Vector3d x = up.cross(z).normalized();
   Eigen::Vector3d y = z.cross(x).normalized();
-  Eigen::Matrix4f matrix = Eigen::Matrix4f::Identity();
+  Eigen::Matrix4d matrix = Eigen::Matrix4d::Identity();
   matrix(0, 0) = x[0];
   matrix(0, 1) = x[1];
   matrix(0, 2) = x[2];

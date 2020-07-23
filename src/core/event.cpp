@@ -3,10 +3,10 @@
 
 #include "event.h"
 
+#include "log.h"
+
 #include <QObject>
 #include <QPointer>
-
-#include "log.h"
 
 bool EventBase::listenerCheckQPointer(
     const std::shared_ptr<QPointer<const QObject>> &p) {

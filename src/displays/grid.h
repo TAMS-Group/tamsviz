@@ -4,10 +4,10 @@
 #pragma once
 
 #include "../core/document.h"
+#include "../core/watcher.h"
 #include "../render/renderer.h"
 
 #include "marker.h"
-#include "material.h"
 #include "mesh.h"
 
 struct GridDisplay : MarkerFrameDisplayBase {

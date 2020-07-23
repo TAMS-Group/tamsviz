@@ -6,12 +6,12 @@
 #include "../core/document.h"
 #include "../core/loader.h"
 #include "../core/topic.h"
+#include "../core/watcher.h"
 
 #include "../render/renderer.h"
 #include "../render/resource.h"
 
 #include "frame.h"
-#include "material.h"
 #include "mesh.h"
 
 #include <sensor_msgs/JointState.h>
@@ -49,20 +49,23 @@ protected:
   Eigen::Isometry3d pose_temp = Eigen::Isometry3d::Identity();
   EventFlag _invalidated{ResourceEvents::instance().reload};
   Watcher _watcher;
+  std::shared_ptr<MaterialOverride> _material_override =
+      std::make_shared<MaterialOverride>();
   RobotDisplayBase() {}
 
 public:
   virtual void renderSync(const RenderSyncContext &context) override;
   virtual void renderAsync(const RenderAsyncContext &context) override;
   PROPERTY(std::shared_ptr<MaterialOverride>, materialOverride,
-           std::make_shared<MaterialOverride>());
+           _material_override);
   PROPERTY(std::string, description, "/robot_description");
   PROPERTY(RobotModelImportOptions, importOptions);
+  PROPERTY(bool, doubleSided, false);
 };
 DECLARE_TYPE(RobotDisplayBase, MeshDisplayBase);
 
 class RobotStateDisplay : public GenericFrameDisplay<RobotDisplayBase> {
-  std::shared_ptr<sensor_msgs::JointState> _joint_state_message;
+  std::shared_ptr<const sensor_msgs::JointState> _joint_state_message;
 
 public:
   PROPERTY(TopicProperty<sensor_msgs::JointState>, topic, "/joint_states");

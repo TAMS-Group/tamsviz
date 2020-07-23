@@ -22,6 +22,7 @@ void LoaderThread::cancel(const std::shared_ptr<void> &owner) {
 }
 
 LoaderThread::LoaderThread() {
+  _count = 0;
   _thread = std::thread([this]() {
     while (true) {
       std::function<void()> job;
@@ -32,13 +33,16 @@ LoaderThread::LoaderThread() {
             return;
           }
           if (!_queue.empty()) {
+            _count = _queue.size();
             job = _queue.front().second;
             _queue.pop_front();
             break;
           }
+          _count = 0;
           _condition.wait(lock);
         }
       }
+      started();
       job();
       finished();
     }

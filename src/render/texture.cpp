@@ -54,49 +54,114 @@ void TextureBase::create() {
 }
 
 GLuint Texture::update(const cv::Mat &img) {
-  if (invalidated()) {
-    _loaded = false;
-    destroy();
-  }
   cv::Mat image = img;
-  if (image.channels() == 3) {
-    cv::cvtColor(image, image, CV_RGB2RGBA);
-  }
   cv::flip(image, image, 0);
   create();
   V_GL(glActiveTexture(GL_TEXTURE0));
   V_GL(glBindTexture(GL_TEXTURE_2D, _id));
-  V_GL(glPixelStorei(GL_UNPACK_ALIGNMENT, 4));
+  switch (image.elemSize()) {
+  case 1:
+    V_GL(glPixelStorei(GL_UNPACK_ALIGNMENT, 1));
+    break;
+  case 2:
+    V_GL(glPixelStorei(GL_UNPACK_ALIGNMENT, 2));
+    break;
+  case 3:
+    V_GL(glPixelStorei(GL_UNPACK_ALIGNMENT, 1));
+    break;
+  default:
+    V_GL(glPixelStorei(GL_UNPACK_ALIGNMENT, 4));
+    break;
+  }
   V_GL(glPixelStorei(GL_UNPACK_ROW_LENGTH, image.step / image.elemSize()));
-  V_GL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
-                       GL_LINEAR_MIPMAP_LINEAR));
+  if (_mipmap) {
+    V_GL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+                         GL_LINEAR_MIPMAP_LINEAR));
+  } else {
+    V_GL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR));
+  }
   V_GL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
   V_GL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT));
   V_GL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT));
-  {
-    float max_anisotropic = 0.0f;
-    V_GL(glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &max_anisotropic));
-    // LOG_DEBUG("max_anisotropic " << max_anisotropic);
-    float anisotropic = std::min(16.0f, max_anisotropic);
-    V_GL(glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT,
-                         anisotropic));
-  }
   if (_type == TextureType::Color) {
-    V_GL(glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8_ALPHA8, image.cols, image.rows,
-                      0, GL_BGRA, GL_UNSIGNED_BYTE, image.data));
+    switch (image.channels()) {
+    case 3:
+      V_GL(glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8, image.cols, image.rows, 0,
+                        GL_BGR, GL_UNSIGNED_BYTE, image.data));
+      break;
+    case 4:
+      V_GL(glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8_ALPHA8, image.cols,
+                        image.rows, 0, GL_BGRA, GL_UNSIGNED_BYTE, image.data));
+      break;
+    default:
+      LOG_ERROR("invalid channel count " << image.channels()
+                                         << " for color image " << _url);
+    }
   }
   if (_type == TextureType::Normal) {
-    V_GL(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, image.cols, image.rows, 0,
-                      GL_BGRA, GL_UNSIGNED_BYTE, image.data));
+    switch (image.channels()) {
+    case 3:
+      V_GL(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, image.cols, image.rows, 0,
+                        GL_BGR, GL_UNSIGNED_BYTE, image.data));
+      break;
+    case 4:
+      V_GL(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, image.cols, image.rows, 0,
+                        GL_BGRA, GL_UNSIGNED_BYTE, image.data));
+      break;
+    default:
+      LOG_ERROR("invalid channel count " << image.channels()
+                                         << " for normal map " << _url);
+    }
   }
-  V_GL(glGenerateMipmap(GL_TEXTURE_2D));
+  if (_type == TextureType::Linear) {
+    switch (image.channels()) {
+    case 1:
+      V_GL(glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, image.cols, image.rows, 0,
+                        GL_RED, GL_UNSIGNED_BYTE, image.data));
+      break;
+    case 3:
+      V_GL(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, image.cols, image.rows, 0,
+                        GL_BGR, GL_UNSIGNED_BYTE, image.data));
+      break;
+    case 4:
+      V_GL(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, image.cols, image.rows, 0,
+                        GL_BGRA, GL_UNSIGNED_BYTE, image.data));
+      break;
+    default:
+      LOG_ERROR("invalid channel count " << image.channels()
+                                         << " for color image " << _url);
+    }
+  }
+  if (_mipmap) {
+    V_GL(glGenerateMipmap(GL_TEXTURE_2D));
+  }
   V_GL(glBindTexture(GL_TEXTURE_2D, 0));
   return _id;
 }
 
+GLuint Texture::update(int width, int height, int format, int samples) {
+  create();
+  if (_watcher.changed(width, height, format, samples)) {
+    V_GL(glActiveTexture(GL_TEXTURE0));
+    if (samples <= 0) {
+      V_GL(glBindTexture(GL_TEXTURE_2D, _id));
+      V_GL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE));
+      V_GL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE));
+      V_GL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST));
+      V_GL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
+      V_GL(glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, GL_BGRA,
+                        GL_UNSIGNED_BYTE, nullptr));
+    } else {
+      V_GL(glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, _id));
+      V_GL(glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, samples, format,
+                                   width, height, true));
+    }
+  }
+  return _id;
+}
+
 GLuint Texture::update() {
-  if (invalidated()) {
-    // LOG_INFO("reloading texture " << _url);
+  if (!_url.empty() && invalidated()) {
     _loaded = false;
     _loader.clear();
     destroy();

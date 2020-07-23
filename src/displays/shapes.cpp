@@ -10,9 +10,8 @@
 
 ShapeDisplay::ShapeDisplay(const std::shared_ptr<Mesh> &mesh) {
   if (mesh) {
-    _mesh_renderer = std::make_shared<MeshRenderer>(this, mesh, material());
+    _mesh_renderer = node()->create<MeshRenderer>(mesh, material());
   }
-  //_mesh_renderer->options().primitive_type = GL_LINES;
 }
 
 MeshData makePlane() {
@@ -131,6 +130,30 @@ MeshData makeCylinder(size_t segments) {
   return mesh;
 }
 
+MeshData makeRing(double inner, double outer, size_t segments) {
+  MeshData mesh;
+  for (double s : {0.0, 1.0}) {
+    for (size_t i = 0; i <= segments; i++) {
+      float a = i * 1.0 / segments;
+      float x = std::sin(a * 2 * M_PI);
+      float y = std::cos(a * 2 * M_PI);
+      double f = inner + (outer - inner) * s;
+      mesh.positions.emplace_back(x * f, y * f, 0);
+      mesh.texcoords.emplace_back(a, s);
+      mesh.normals.emplace_back(0, 0, 1);
+    }
+  }
+  for (size_t i = 0; i < segments; i++) {
+    mesh.indices.emplace_back(i + 0);
+    mesh.indices.emplace_back(segments + 1 + i + 0);
+    mesh.indices.emplace_back(segments + 1 + i + 1);
+    mesh.indices.emplace_back(i + 0);
+    mesh.indices.emplace_back(segments + 1 + i + 1);
+    mesh.indices.emplace_back(i + 1);
+  }
+  return mesh;
+}
+
 MeshData makeCone(size_t segments) {
   MeshData mesh;
   mesh.positions.emplace_back(0, 0, 1);
@@ -174,8 +197,8 @@ struct DiskDisplay : ShapeDisplay {
   virtual void renderSync(const RenderSyncContext &context) override {
     if (_watcher.changed(segments())) {
       LOG_DEBUG("make sphere");
-      _mesh_renderer = std::make_shared<MeshRenderer>(
-          this, std::make_shared<Mesh>(makeDisk(segments())), material());
+      _mesh_renderer = node()->create<MeshRenderer>(
+          std::make_shared<Mesh>(makeDisk(segments())), material());
     }
     _mesh_renderer->pose(Eigen::Affine3d(Eigen::Scaling(radius())));
     ShapeDisplay::renderSync(context);
@@ -202,9 +225,8 @@ struct SphereDisplay : ShapeDisplay {
   PROPERTY(int, segments, 32, min = 3);
   virtual void renderSync(const RenderSyncContext &context) override {
     if (_watcher.changed(segments(), rings())) {
-      _mesh_renderer = std::make_shared<MeshRenderer>(
-          this, std::make_shared<Mesh>(makeSphere(segments(), rings())),
-          material());
+      _mesh_renderer = node()->create<MeshRenderer>(
+          std::make_shared<Mesh>(makeSphere(segments(), rings())), material());
     }
     _mesh_renderer->pose(Eigen::Affine3d(Eigen::Scaling(radius())));
     ShapeDisplay::renderSync(context);
@@ -219,8 +241,8 @@ struct CylinderDisplay : ShapeDisplay {
   PROPERTY(int, segments, 32, min = 3);
   virtual void renderSync(const RenderSyncContext &context) override {
     if (_watcher.changed(segments())) {
-      _mesh_renderer = std::make_shared<MeshRenderer>(
-          this, std::make_shared<Mesh>(makeCylinder(segments())), material());
+      _mesh_renderer = node()->create<MeshRenderer>(
+          std::make_shared<Mesh>(makeCylinder(segments())), material());
     }
     _mesh_renderer->pose(
         Eigen::Affine3d(Eigen::Scaling(radius(), radius(), height())));
@@ -236,8 +258,8 @@ struct ConeDisplay : ShapeDisplay {
   PROPERTY(int, segments, 32, min = 3);
   virtual void renderSync(const RenderSyncContext &context) override {
     if (_watcher.changed(segments())) {
-      _mesh_renderer = std::make_shared<MeshRenderer>(
-          this, std::make_shared<Mesh>(makeCone(segments())), material());
+      _mesh_renderer = node()->create<MeshRenderer>(
+          std::make_shared<Mesh>(makeCone(segments())), material());
     }
     _mesh_renderer->pose(
         Eigen::Affine3d(Eigen::Scaling(radius(), radius(), height())));

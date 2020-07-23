@@ -18,16 +18,6 @@ struct TypeRegistry {
   }
 };
 
-void getObjectProperties(const std::shared_ptr<Object> &v,
-                         std::vector<Property> &props) {
-  props.clear();
-  if (v) {
-    for (auto &prop : v->properties()) {
-      props.push_back(prop);
-    }
-  }
-}
-
 void Type::_registerType(const std::shared_ptr<Type> &t) {
   auto reg = TypeRegistry::instance();
   std::unique_lock<std::mutex> lock(reg->mutex);
@@ -87,57 +77,4 @@ std::vector<std::shared_ptr<Type>> Type::list() const {
     }
   }
   return ret;
-}
-
-thread_local int g_properties_unlocked_counter = 0;
-void Property::checkUnlocked() {
-  if (g_properties_unlocked_counter <= 0) {
-    throw std::runtime_error("Use LockScope to safely access properties");
-  }
-}
-void Property::unlockScope(int i) { g_properties_unlocked_counter += i; }
-
-void forEachObject(void *context,
-                   void (*f)(void *, const Object *, const Object *),
-                   const Object *parent, const Object *child) {
-  if (!child) {
-    return;
-  }
-  f(context, parent, child);
-  for (auto &property : child->objectProperties()) {
-    property.forEachObject(context, f, child);
-  }
-}
-
-Object::Object() {
-  if (g_properties_unlocked_counter <= 0) {
-    throw std::runtime_error("Use LockScope to safely construct Objects");
-  }
-  assignNewId();
-  // registerObject(this);
-  // static std::vector<std::shared_ptr<Object>> g_object_ptr_test;
-  // g_object_ptr_test.push_back(shared_from_this());
-}
-void Object::assignNewId() {
-  static std::atomic<uint64_t> counter;
-  _id = (++counter);
-  if (g_properties_unlocked_counter <= 0) {
-    throw std::runtime_error("Use LockScope to safely call assignNewId");
-  }
-}
-Object::~Object() {
-  // deregisterObject(this);
-}
-void Object::setId(uint64_t id) {
-  // deregisterObject(this);
-  _id = id;
-  // registerObject(this);
-}
-
-void removeObject(const std::shared_ptr<Object> &parent, void *object) {
-  if (parent) {
-    for (auto &property : parent->properties()) {
-      property.remove(object);
-    }
-  }
 }

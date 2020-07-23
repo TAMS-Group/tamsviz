@@ -113,7 +113,7 @@ PropertyGridWidget::PropertyGridWidget() : QDockWidget("Properties") {
     }
     virtual void mouseReleaseEvent(QMouseEvent *event) override {
       unsetCursor();
-      // property_grid->drag_action_scope = nullptr;
+
       aggregate = false;
       property_grid->drag_property = nullptr;
       property_grid->drag_item = nullptr;
@@ -129,8 +129,10 @@ PropertyGridWidget::PropertyGridWidget() : QDockWidget("Properties") {
                         QAbstractItemView::AnyKeyPressed);
   view->setSelectionMode(QAbstractItemView::SingleSelection);
   view->setHeaderLabels({"Name", "Value"});
-  // view->header()->hide();
-  // view->setStyleSheet("QHeaderView::section { border: none; }");
+
+  view->header()->setSectionResizeMode(1, QHeaderView::Stretch);
+  view->setIndentation(10);
+
   class ItemDelegateBase : public QStyledItemDelegate {
     PropertyGridWidget *_parent = nullptr;
 
@@ -141,7 +143,7 @@ PropertyGridWidget::PropertyGridWidget() : QDockWidget("Properties") {
                    const QModelIndex &index) const {
       painter->setPen(QPen(QApplication::palette().brush(QPalette::Window), 0));
       painter->setBrush(QBrush(Qt::transparent));
-      // painter->drawRect(option.rect);
+
       auto rect = option.rect;
       rect.setX(_parent->view->columnViewportPosition(index.column()));
       rect.setWidth(_parent->view->columnWidth(index.column()));
@@ -167,16 +169,13 @@ PropertyGridWidget::PropertyGridWidget() : QDockWidget("Properties") {
       virtual QWidget *createEditor(QWidget *parent,
                                     const QStyleOptionViewItem &option,
                                     const QModelIndex &index) const override {
-        // LOG_INFO("blabla");
-        // property_grid->view->editItem(property_grid->view->itemFromIndex(index),
-        //                              1);
+
         return nullptr;
       }
     };
     view->setItemDelegateForColumn(0, new EditDelegate(this));
   }
-  // view->setMouseTracking(true);
-  // view->setFocusPolicy(Qt::ClickFocus);
+
   connect(view, &QTreeWidget::currentItemChanged, view, [this]() {
     if (view->currentColumn() != 1) {
       view->setCurrentItem(view->currentItem(), 1);
@@ -302,13 +301,70 @@ PropertyGridWidget::PropertyGridWidget() : QDockWidget("Properties") {
             connect(
                 editor,
                 static_cast<void (QComboBox::*)(int)>(&QComboBox::activated),
-                [editor, index, this](int i) { // editor->clearFocus();
+                [editor, index, this](int i) {
                   setModelData(editor, property_grid->view->model(), index);
                 });
             return editor;
           } else {
             LOG_DEBUG("line edit");
-            return QStyledItemDelegate::createEditor(parent, option, index);
+
+            auto editor = new QLineEdit(parent);
+            editor->setFrame(false);
+            if (auto complete = current_property.attributes()->complete) {
+              auto *completion_model = new QStringListModel(editor);
+              auto *completer = new QCompleter(completion_model, editor);
+              completer->setCaseSensitivity(Qt::CaseInsensitive);
+              completer->setCompletionMode(
+                  QCompleter::UnfilteredPopupCompletion);
+              completer->setMaxVisibleItems(20);
+              completer->setWidget(editor);
+              auto update = [current_property, completion_model, complete,
+                             editor, completer]() {
+                QString text = editor->text();
+                QStringList l;
+                {
+                  LockScope ws;
+                  for (auto &s :
+                       complete(current_property, text.toStdString())) {
+                    QString qs = QString(s.c_str());
+
+                    { l.push_back(qs); }
+                  }
+                }
+                l.sort();
+                {
+                  QStringList a, b;
+                  for (auto &s : l) {
+                    if (s.startsWith(text)) {
+                      a.push_back(s);
+                    } else {
+                      b.push_back(s);
+                    }
+                  }
+                  l = a + b;
+                }
+                if (!l.isEmpty()) {
+                  completion_model->setStringList(l);
+                  completer->complete();
+                  completer->popup()->show();
+                }
+              };
+              connect(editor, &QLineEdit::textEdited, editor,
+                      [update, completer](const QString &) { update(); });
+              connect(completer,
+                      static_cast<void (QCompleter::*)(const QString &text)>(
+                          &QCompleter::activated),
+                      [editor, update, completer](const QString &text) {
+                        if (text != editor->text()) {
+                          editor->setText(text);
+                          update();
+                        }
+                      });
+              QTimer::singleShot(0, completer,
+                                 [completer, update]() { update(); });
+            }
+
+            return editor;
           }
         } else {
           LOG_DEBUG("not editable");
@@ -381,19 +437,29 @@ bool PropertyGridWidget::isPropertyDraggable(QTreeWidgetItem *item) {
 }
 
 void PropertyGridWidget::sync(QTreeWidgetItem *parent_item,
-                              const std::vector<Property> &properties) {
+                              std::vector<Property> properties) {
   LockScope ws;
   size_t rows = 0;
   for (auto &property : properties) {
+    if (property.attributes()->hidden) {
+      continue;
+    }
     std::string s;
     bool ok = property.tryToString(s);
     std::vector<Property> children;
     if (!ok) {
       property.expand(children);
-      if (children.empty()) {
-        LOG_DEBUG("failed to analyze property " << property.name());
-        continue;
+      if (!children.empty()) {
+        ok = true;
       }
+    }
+    if (!ok) {
+      ok = property.expandList(children);
+      LOG_DEBUG("list elements " << children.size());
+    }
+    if (!ok) {
+      LOG_DEBUG("failed to analyze property " << property.name());
+      continue;
     }
     rows++;
     QTreeWidgetItem *item = nullptr;
@@ -420,17 +486,9 @@ void PropertyGridWidget::sync(QTreeWidgetItem *parent_item,
     }
     item->setText(1, QString::fromStdString(s));
     item->setFlags(item->flags() | Qt::ItemIsEditable);
-    // property_map[item] = property;
     if (isPropertyDraggable(item)) {
-      // static QIcon icon = createIcon(QChar(0x21c5));
-      // static QIcon icon = createIcon(QChar(0x2b83));
-      // static QIcon icon = createIcon(QChar(0x21B9));
-      // static QIcon icon = createIcon(QChar(0x21f5));
-      // static QIcon icon = createIcon(QChar(0x292f));
-      // static QIcon icon = createIcon(QChar(0x2197));
       item->setData(1, Qt::DecorationRole, MATERIAL_ICON("swap_vert"));
     }
-    // item->setData(Qt::BackgroundRole, QVariant(QBrush(Qt::black)));
     if (property.typeId() == typeid(bool)) {
       if (property.get<bool>()) {
         item->setData(1, Qt::DecorationRole, MATERIAL_ICON("check_box"));
@@ -468,12 +526,11 @@ void PropertyGridWidget::sync() {
       delete view->topLevelItem(0);
     }
   }
-  // property_map.clear();
+
   object_id = (object ? object->id() : 0);
   object_ptr = object;
   if (object != nullptr) {
     auto props = object->properties();
     sync(nullptr, std::vector<Property>(props.begin(), props.end()));
   }
-  // view->sortByColumn(0, Qt::AscendingOrder); // NO !!!
 }

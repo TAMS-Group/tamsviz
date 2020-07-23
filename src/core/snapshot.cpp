@@ -6,7 +6,11 @@
 #include <atomic>
 
 static std::atomic<size_t> g_snapshot_count;
+
 SnapshotBase::SnapshotBase() { g_snapshot_count++; }
+
 SnapshotBase::SnapshotBase(const SnapshotBase &other) { g_snapshot_count++; }
+
 SnapshotBase::~SnapshotBase() { g_snapshot_count--; }
+
 size_t SnapshotBase::instanceCount() { return g_snapshot_count; }

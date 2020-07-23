@@ -3,23 +3,16 @@
 
 #include "document.h"
 
+#include "../render/renderer.h"
+#include "../scene/node.h"
 #include "bagplayer.h"
+#include "interaction.h"
 #include "transformer.h"
 #include "workspace.h"
-
-#include "../render/renderer.h"
 
 Display::Display() {}
 
 TrackBase::TrackBase() {}
-
-struct PropertyTestDisplay : Display {
-  PROPERTY(float, flt, 0.0, min = 0, max = 1);
-  PROPERTY(Eigen::Vector3d, v3d, Eigen::Vector3d::Zero());
-  PROPERTY(Eigen::Vector2d, v2d, Eigen::Vector2d::Zero());
-  PROPERTY(int, i, 1);
-};
-DECLARE_TYPE(PropertyTestDisplay, Display);
 
 static float srgbGamma2Linear(float srgb) {
   if (srgb < 0.04045f) {
@@ -35,14 +28,13 @@ std::vector<std::string> WorldDisplay::_listFrames(const Property &) {
   return ret;
 }
 
+bool Display::interact(
+    const Interaction &interaction) { // interaction.ignored =
+  // true;
+  return false;
+}
+
 static Eigen::Vector3f srgb2Linear(const Eigen::Vector3f &srgb) {
-  /*Eigen::Matrix3f m;
-  m << 0.41239f, 0.35758f, 0.18048f, //
-      0.21263f, 0.71516f, 0.07219f,  //
-      0.01933f, 0.11919f, 0.95053f;
-  return m * Eigen::Vector3f(srgbGamma2Linear(srgb.x()),
-                             srgbGamma2Linear(srgb.y()),
-                             srgbGamma2Linear(srgb.z()));*/
   return Eigen::Vector3f(srgbGamma2Linear(srgb.x()), srgbGamma2Linear(srgb.y()),
                          srgbGamma2Linear(srgb.z()));
 }
@@ -62,11 +54,50 @@ WorldDisplay::WorldDisplay() {
 
 void WorldDisplay::renderSync(const RenderSyncContext &context) {
   transformer->update(fixedFrame());
-  LightBlock light;
-  light.color =
-      backgroundColor().toLinearVector4f().head(3) * (float)ambientLighting();
-  light.type = (uint32_t)LightType::Ambient;
-  context.render_list->push(light);
+  DisplayGroupBase::renderSync(context);
+  {
+    LightBlock light;
+    light.color =
+        backgroundColor().toLinearVector4f().head(3) * (float)ambientLighting();
+    light.type = (uint32_t)LightType::Ambient;
+    context.render_list->push(light);
+  }
+  /* _current_scene_annotations.clear();
+   {
+     LockScope ws;
+     if (ws->player && ws->document()->timeline()) {
+       auto current_time = ws->player->time();
+       for (auto &track : ws->document()->timeline()->tracks()) {
+         if (auto annotation_track =
+                 std::dynamic_pointer_cast<AnnotationTrack>(track)) {
+           if (auto branch = annotation_track->branch()) {
+             for (auto &span : branch->spans()) {
+               if (span->start() <= current_time &&
+                   span->start() + span->duration() >= current_time) {
+                 for (auto &annotation : span->annotations()) {
+                   if (auto scene_annotation =
+                           std::dynamic_pointer_cast<SceneAnnotationBase>(
+                               annotation)) {
+                     _current_scene_annotations.push_back(scene_annotation);
+                   }
+                 }
+               }
+             }
+           }
+         }
+       }
+     }
+   }
+   for (auto &scene_annotation : _current_scene_annotations) {
+     scene_annotation->renderSync(context);
+ }*/
+}
+
+void WorldDisplay::renderAsync(const RenderAsyncContext &context) {
+  DisplayGroupBase::renderAsync(context);
+  /*for (auto &scene_annotation : _current_scene_annotations) {
+    scene_annotation->renderAsync(context);
+}*/
 }
 
 void DisplayGroupBase::renderSyncRecursive(const RenderSyncContext &context) {
@@ -93,6 +124,14 @@ Eigen::Isometry3d Pose::toIsometry3d() const {
                            Eigen::Vector3d::UnitX());
 }
 
+void Pose::fromIsometry3d(const Eigen::Isometry3d &pose) {
+  position() = pose.translation();
+  Eigen::Vector3d angles = pose.linear().eulerAngles(2, 1, 0);
+  orientation().yaw() = angles.x() * (180.0 / M_PI);
+  orientation().pitch() = angles.y() * (180.0 / M_PI);
+  orientation().roll() = angles.z() * (180.0 / M_PI);
+}
+
 std::shared_ptr<AnnotationBranch> AnnotationTrack::branch(bool create) {
   LockScope ws;
   std::string name = "";
@@ -112,4 +151,15 @@ std::shared_ptr<AnnotationBranch> AnnotationTrack::branch(bool create) {
   } else {
     return nullptr;
   }
+}
+
+void Display::refreshRecursive() { refresh(); }
+
+void Display::refresh() {}
+
+void DisplayGroupBase::refreshRecursive() {
+  for (auto &display : displays()) {
+    display->refreshRecursive();
+  }
+  refresh();
 }

@@ -1,7 +1,7 @@
 // TAMSVIZ
 // (c) 2020 Philipp Ruppel
 
-#version 140
+#version 150
 
 layout(std140) uniform camera_block {
     mat4 view_matrix;
@@ -44,6 +44,9 @@ void main() {
     }
     if(extra.z == 2.0) { // line
         view_position.xyz -= normalize(cross(mat3(camera.view_matrix) * x_tangent, view_position.xyz)) * extra.x;
+    }
+    if(extra.z == 3.0) { // text
+        view_position.xy += extra.xy;
     }
     gl_Position = (camera.projection_matrix * view_position);
     x_position = world_position;

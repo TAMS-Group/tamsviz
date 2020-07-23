@@ -26,9 +26,9 @@ MeshData makeAxes(double length, double radius, size_t segments) {
 
 void AxesDisplay::renderSync(const RenderSyncContext &context) {
   if (_watcher.changed(length(), radius())) {
-    _mesh_renderer = std::make_shared<MeshRenderer>(
-        this, std::make_shared<Mesh>(makeAxes(length(), radius(), 32)),
-        material());
+    _mesh_renderer = node()->create<MeshRenderer>(
+        std::make_shared<Mesh>(makeAxes(length(), radius(), 32)), material());
+    _mesh_renderer->pose(Eigen::Isometry3d::Identity());
   }
   FrameDisplayBase::renderSync(context);
 }

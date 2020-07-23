@@ -5,39 +5,22 @@
 
 #include "../core/document.h"
 
-#include "materialrenderer.h"
-#include "meshrenderer.h"
-
-#include <unordered_set>
-
-class RenderSet {
-private:
-  std::mutex _mutex;
-  std::unordered_set<std::shared_ptr<MeshRenderer::Data>> _mesh_renderers;
-
-public:
-  void insert(const std::shared_ptr<MeshRenderer::Data> &renderer) {
-    std::lock_guard<std::mutex> lock(_mutex);
-    _mesh_renderers.insert(renderer);
-  }
-  void erase(const std::shared_ptr<MeshRenderer::Data> &renderer) {
-    std::lock_guard<std::mutex> lock(_mutex);
-    _mesh_renderers.erase(renderer);
-  }
-  friend class MeshDisplayBase;
-};
+#include "../scene/material.h"
+#include "../scene/mesh.h"
+#include "../scene/node.h"
 
 class MeshDisplayBase : public Display {
-  std::shared_ptr<RenderSet> _render_set = std::make_shared<RenderSet>();
-  std::vector<std::shared_ptr<MeshRenderer::Data>> _current_mesh_renderers;
+  std::shared_ptr<SceneNode> _node = std::make_shared<SceneNode>();
+  SceneContext _context;
 
 protected:
   MeshDisplayBase() {}
 
 public:
+  const std::shared_ptr<SceneNode> &node() { return _node; }
   virtual void renderSync(const RenderSyncContext &context) override;
   virtual void renderAsync(const RenderAsyncContext &context) override;
-  friend class MaterialRenderer;
-  friend class MeshRenderer;
+  virtual bool pick(uint32_t id) const override;
+  virtual bool interact(const Interaction &interaction) override;
 };
 DECLARE_TYPE(MeshDisplayBase, Display);

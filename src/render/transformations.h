@@ -5,9 +5,9 @@
 
 #include <Eigen/Dense>
 
-Eigen::Matrix4f projectionMatrix(double fov_y, double aspect, double near,
+Eigen::Matrix4d projectionMatrix(double fov_y, double aspect, double near,
                                  double far);
 
-Eigen::MatrixXf lookatMatrix(const Eigen::Vector3d &eye,
+Eigen::Matrix4d lookatMatrix(const Eigen::Vector3d &eye,
                              const Eigen::Vector3d &at,
                              const Eigen::Vector3d &up);

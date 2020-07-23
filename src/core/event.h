@@ -68,31 +68,31 @@ template <class FNC> class Event : public EventBase {
     }
   };
 
-  std::recursive_mutex mutex;
+  std::mutex mutex;
 
 public:
   Event() {}
   Event(const std::string &name) : EventBase(name) {}
 
   void clear() {
-    std::lock_guard<std::recursive_mutex> lock(mutex);
+    std::lock_guard<std::mutex> lock(mutex);
     listeners.clear();
   }
 
   void connect(const std::function<FNC> &callback) {
-    std::lock_guard<std::recursive_mutex> lock(mutex);
+    std::lock_guard<std::mutex> lock(mutex);
     listeners.push_back(std::make_shared<Listener0>(callback));
   }
 
   template <class T>
   void connect(const std::shared_ptr<T> &instance,
                const std::function<FNC> &callback) {
-    std::lock_guard<std::recursive_mutex> lock(mutex);
+    std::lock_guard<std::mutex> lock(mutex);
     listeners.push_back(std::make_shared<ListenerP<T>>(instance, callback));
   }
 
   void connect(const QObject *obj, const std::function<FNC> &callback) {
-    std::lock_guard<std::recursive_mutex> lock(mutex);
+    std::lock_guard<std::mutex> lock(mutex);
     listeners.push_back(
         std::make_shared<ListenerQ>(listenerMakeQPointer(obj), callback));
   }
@@ -101,7 +101,7 @@ public:
     begin();
     std::vector<std::shared_ptr<Listener>> ll;
     {
-      std::lock_guard<std::recursive_mutex> lock(mutex);
+      std::lock_guard<std::mutex> lock(mutex);
       ll.reserve(listeners.size());
       for (auto it = listeners.begin(); it != listeners.end();) {
         if ((*it)->check()) {

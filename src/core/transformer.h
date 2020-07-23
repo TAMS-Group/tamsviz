@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include "property.h"
+
 #include <map>
 #include <memory>
 #include <mutex>
@@ -39,17 +41,50 @@ public:
   }
 };
 
+class Frame;
+
 class Transformer {
   struct Data;
   std::shared_ptr<Data> _data;
+  std::string _root_name;
 
 public:
   Transformer(bool subscribe = true);
   Transformer(const Transformer &) = delete;
   Transformer &operator=(const Transformer &) = delete;
-  Optional<Eigen::Isometry3d> lookup(const std::string &frame);
   void update(const std::string &root);
   void clear();
-  void push(const std::shared_ptr<Message> &message);
+  void push(const std::shared_ptr<const Message> &message);
+  const std::string &root() const { return _root_name; }
   std::vector<std::string> list();
+  friend class Frame;
+};
+
+class Frame {
+  bool _active = false;
+  std::string _name;
+
+public:
+  Frame();
+  explicit Frame(const std::string &name);
+  Frame(const Frame &other);
+  Frame &operator=(const Frame &other);
+  ~Frame();
+  Optional<Eigen::Isometry3d>
+  pose(const std::shared_ptr<Transformer> &transformer);
+  const std::string &name() const { return _name; }
+  void name(const std::string &name);
+  bool empty() const { return _name.empty(); }
+};
+
+inline void toString(const Frame &v, std::string &s) { s = v.name(); }
+inline void fromString(Frame &v, const std::string &s) { v.name(s); }
+inline bool operator==(const Frame &a, const Frame &b) {
+  return a.name() == b.name();
+}
+inline bool operator!=(const Frame &a, const Frame &b) {
+  return a.name() != b.name();
+}
+template <> struct DefaultPropertyAttributes<Frame> {
+  static void initialize(PropertyAttributes *attributes);
 };

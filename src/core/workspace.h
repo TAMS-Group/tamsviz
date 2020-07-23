@@ -39,7 +39,6 @@ public:
   std::shared_ptr<BagPlayer> player;
   std::shared_ptr<History<std::shared_ptr<Workspace>>> history;
   Event<void()> modified{"modified"};
-  Event<void()> redraw{"redraw"};
   PROPERTY(std::shared_ptr<Document>, document, std::make_shared<Document>());
   std::shared_ptr<const Snapshot<std::shared_ptr<Document>>> saved_document;
   PROPERTY(Selection, selection);
@@ -47,9 +46,13 @@ public:
   Workspace();
   ~Workspace();
   std::vector<std::string> listTopics(const std::string &type_name);
-  // Tool tool = Tool::Select;
 };
 DECLARE_TYPE(Workspace, Object);
+
+struct GlobalEvents {
+  static std::shared_ptr<GlobalEvents> instance();
+  Event<void()> redraw{"redraw"};
+};
 
 class ObjectScope {
 public:
@@ -95,5 +98,4 @@ public:
               const std::shared_ptr<const Object> &object = nullptr,
               bool aggregate = false);
   ~ActionScope();
-  // static ActionScope *current();
 };

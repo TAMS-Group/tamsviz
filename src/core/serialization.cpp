@@ -5,6 +5,10 @@
 
 #include <yaml-cpp/yaml.h>
 
+SerializationTypeError::SerializationTypeError(const std::string &type_name)
+    : std::runtime_error("Type not found: " + type_name),
+      _type_name(type_name) {}
+
 void toYAML(const Variant &v, YAML::Emitter &emitter) {
   auto type = v.type();
   if (type == typeid(std::string)) {

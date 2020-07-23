@@ -48,10 +48,11 @@ struct LogManager {
 
 #define LOG_IMPL(level, condition, ...)                                        \
   if (condition) {                                                             \
-    std::ostringstream s; /* TODO: replace */                                  \
-    s << __VA_ARGS__;                                                          \
-    LogManager::instance().received(LogMessage(                                \
-        level, s.str().c_str(), __FILE__, __LINE__, __PRETTY_FUNCTION__, "")); \
+    std::ostringstream log_ostream_internal; /* TODO: replace */               \
+    log_ostream_internal << __VA_ARGS__;                                       \
+    LogManager::instance().received(                                           \
+        LogMessage(level, log_ostream_internal.str().c_str(), __FILE__,        \
+                   __LINE__, __PRETTY_FUNCTION__, ""));                        \
   }
 
 #define LOG_THROTTLE_IMPL(interval)                                            \

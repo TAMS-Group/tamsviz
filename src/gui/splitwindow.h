@@ -6,7 +6,6 @@
 #include "guicommon.h"
 
 #include "../core/document.h"
-#include "../render/context.h"
 
 #include <atomic>
 #include <typeindex>
@@ -27,6 +26,8 @@ class ContentWindowBase : public WindowBase {
   QVBoxLayout *layout = nullptr;
   QWidget *spacer = nullptr;
   QWidget *content_window = nullptr;
+  QStaticText _annotation_hud_text;
+  std::string _annotation_hud_string;
 
 protected:
   ContentWindowBase();
@@ -34,7 +35,9 @@ protected:
   void addToolWidget(QWidget *widget);
   void addToolWidgetRight(QWidget *widget);
   void replace(const std::shared_ptr<Window> &new_window);
-  // QMenu *addToolMenu(const QString &label);
+  QWidget *contentWidget() { return content_window; }
+  void paintAnnotationHUD(QPainter *painter,
+                          const std::shared_ptr<const Type> &type);
 };
 DECLARE_TYPE(ContentWindowBase, WindowBase);
 

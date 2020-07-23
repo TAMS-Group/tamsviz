@@ -3,7 +3,11 @@
 
 #pragma once
 
-#include "marker.h"
+#include "frame.h"
+
+#include "../core/watcher.h"
+#include "../render/mesh.h"
+#include "../scene/mesh.h"
 
 MeshData makeAxes(double radius, double length, size_t segments);
 

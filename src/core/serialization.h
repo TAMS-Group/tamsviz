@@ -3,9 +3,33 @@
 
 #pragma once
 
-#include "type.h"
+#include "object.h"
+#include "variant.h"
 
 #include <map>
+
+class SerializationTypeError : public std::runtime_error {
+protected:
+  std::string _type_name;
+  SerializationTypeError(const std::string &type_name);
+
+public:
+  const std::string &typeName() const { return _type_name; }
+  virtual void createReplacement() const = 0;
+};
+
+template <class T> struct SerializationTypeReplacement : T {};
+
+template <class T>
+class SerializationTypeErrorImpl : public SerializationTypeError {
+
+public:
+  SerializationTypeErrorImpl(const std::string &type_name)
+      : SerializationTypeError(type_name) {}
+  virtual void createReplacement() const {
+    Type::global<SerializationTypeReplacement<T>>(typeName(), Type::find<T>());
+  }
+};
 
 template <class T>
 auto serialize(const T &v) ->
@@ -104,7 +128,10 @@ void deserialize(std::shared_ptr<T> &object, const Variant &variant) {
     auto map = variant.value<std::map<std::string, Variant>>();
     if (map.find("type") != map.end()) {
       std::string type_name = map["type"].value<std::string>();
-      auto type = Type::find(type_name);
+      auto type = Type::tryFind(type_name);
+      if (!type) {
+        throw SerializationTypeErrorImpl<T>(type_name);
+      }
       if (object == nullptr ||
           std::type_index(typeid(*object)) != type->typeId()) {
         object = type->instantiate<T>();
@@ -115,6 +142,9 @@ void deserialize(std::shared_ptr<T> &object, const Variant &variant) {
           std::type_index(typeid(*object)) != type->typeId()) {
         object = type->instantiate<T>();
       }
+    }
+    if (map.find("id") != map.end()) {
+      object->setId(std::stoull(map["id"].value<std::string>()));
     }
     for (auto &property : object->properties()) {
       if (map.find(property.name()) != map.end()) {

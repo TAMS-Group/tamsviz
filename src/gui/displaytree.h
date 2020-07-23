@@ -9,7 +9,6 @@ class Object;
 
 class DisplayTreeWidget : public QDockWidget {
   TreeWidget *view = nullptr;
-  // QAbstractButton *delete_button = nullptr;
   std::vector<
       std::pair<std::weak_ptr<Object>, std::shared_ptr<QTreeWidgetItem>>>
       items;

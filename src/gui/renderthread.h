@@ -3,36 +3,26 @@
 
 #pragma once
 
-#include <QThread>
-
 #include <condition_variable>
 #include <memory>
 #include <mutex>
+#include <thread>
 
-class GLDisplay;
-class GLContext;
-class GLSurface;
-
-class RenderThread : public QThread {
-  std::unique_ptr<GLDisplay> _gl_display;
-  std::unique_ptr<GLContext> _gl_context;
-  std::unique_ptr<GLSurface> _gl_offscreen_surface;
+class RenderThread {
   bool _redraw_flag = false;
   bool _stop_flag = false;
+  bool _running = false;
   std::mutex _mutex;
   std::condition_variable _condition;
+  std::thread _thread;
 
-protected:
-  virtual void run() override;
+private:
+  void run();
 
 public:
   RenderThread();
+  ~RenderThread();
   void stop();
   static RenderThread *instance();
-  GLDisplay *display() { return _gl_display.get(); }
-  void invalidate() {
-    std::unique_lock<std::mutex> lock(_mutex);
-    _redraw_flag = true;
-    _condition.notify_all();
-  }
+  void invalidate();
 };

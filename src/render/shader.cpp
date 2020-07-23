@@ -3,10 +3,9 @@
 
 #include "shader.h"
 
-#include "opengl.h"
-
 #include "../core/destructor.h"
 #include "../core/log.h"
+#include "opengl.h"
 
 #include <vector>
 
@@ -88,6 +87,11 @@ void Shader::create() {
                               "pose_y"));
     V_GL(glBindAttribLocation(_program, (GLuint)VertexAttributes::pose_z,
                               "pose_z"));
+
+    V_GL(glBindFragDataLocation(_program, 0, "out_color"));
+    V_GL(glBindFragDataLocation(_program, 1, "out_blend"));
+    V_GL(glBindFragDataLocation(_program, 2, "out_id"));
+
     V_GL(glLinkProgram(_program));
 
     {
@@ -167,8 +171,6 @@ void Shader::destroy() {
 
 int Shader::program() {
   if (invalidated()) {
-    // LOG_INFO("recompiling shader " << _vertex_shader_url << " "
-    //                               << _fragment_shader_url);
     GLuint previous_program = _program;
     _program = 0;
     try {

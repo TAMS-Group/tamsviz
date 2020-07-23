@@ -1,10 +1,26 @@
 // TAMSVIZ
 // (c) 2020 Philipp Ruppel
 
-#include "materialrenderer.h"
-
 #include "material.h"
+
+#include "../core/log.h"
 #include "mesh.h"
+
+Material::Material() { _alive = true; }
+
+Material::Material(float r, float g, float b, float a) {
+  _alive = true;
+  color().r() = r;
+  color().g() = g;
+  color().b() = b;
+  opacity() = a;
+}
+
+Material::~Material() { _alive = false; }
+
+MaterialOverride::MaterialOverride() { _alive = true; }
+
+MaterialOverride::~MaterialOverride() { _alive = false; }
 
 static void syncTexture(std::shared_ptr<Texture> &texture,
                         const std::string &url, TextureType type) {
@@ -17,6 +33,32 @@ static void syncTexture(std::shared_ptr<Texture> &texture,
   }
 }
 
+struct MaterialIDFactory {
+  std::mutex _mutex;
+  size_t _counter = 1;
+  std::vector<uint32_t> _free;
+
+public:
+  uint32_t allocate() {
+    std::lock_guard<std::mutex> lock(_mutex);
+    if (_free.empty()) {
+      return _counter++;
+    } else {
+      auto id = _free.back();
+      _free.pop_back();
+      return id;
+    }
+  }
+  void release(uint32_t id) {
+    std::lock_guard<std::mutex> lock(_mutex);
+    _free.push_back(id);
+  }
+  static std::shared_ptr<MaterialIDFactory> instance() {
+    static auto instance = std::make_shared<MaterialIDFactory>();
+    return instance;
+  }
+};
+
 MaterialRenderer::MaterialRenderer(
     std::shared_ptr<const Material> material,
     std::shared_ptr<const MaterialOverride> material_override) {
@@ -25,9 +67,12 @@ MaterialRenderer::MaterialRenderer(
   }
   _material = material;
   _material_override = material_override;
+  _block.id = MaterialIDFactory::instance()->allocate();
 }
 
-MaterialRenderer::~MaterialRenderer() {}
+MaterialRenderer::~MaterialRenderer() {
+  MaterialIDFactory::instance()->release(_block.id);
+}
 
 void MaterialRenderer::updateSync(const Material &material) {
   if (!material._alive) {
@@ -52,10 +97,10 @@ void MaterialRenderer::updateSync(const MaterialOverride &material_override) {
     _block.color = material_override.material()->color().toLinearVector4f();
   }
   if (material_override.parameters()) {
-    _block.color.w() = (float)material_override.material()->opacity();
     _block.roughness = (float)material_override.material()->roughness();
     _block.metallic = (float)material_override.material()->metallic();
   }
+  _block.color.w() = (float)material_override.material()->opacity();
   if (material_override.texture()) {
     _color_texture_url = material_override.material()->texture();
   }
@@ -72,6 +117,8 @@ void MaterialRenderer::renderAsync(const RenderAsyncContext &context) {
   syncTexture(_normal_texture, _normal_texture_url, TextureType::Normal);
   _block.color_texture = _color_texture ? _color_texture->update() : 0;
   _block.normal_texture = _normal_texture ? _normal_texture->update() : 0;
+  _block.transparent = ((_block.color.w() < 1.0) ||
+                        (_color_texture && _color_texture->transparent()));
 }
 
 void MaterialRenderer::renderSync(const RenderSyncContext &context) {

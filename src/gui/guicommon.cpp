@@ -15,6 +15,13 @@ void startOnMainThreadAsync(const std::function<void()> &fun) {
                    [fun](QObject *o) { fun(); });
 }
 
+void startOnObjectThreadAsync(QObject *object,
+                              const std::function<void()> &fun) {
+  QObject o;
+  QObject::connect(&o, &QObject::destroyed, object,
+                   [fun](QObject *o) { fun(); });
+}
+
 QIcon _createTextIcon(const QString &str) {
   int w = g_icon_size;
   int h = g_icon_size;
@@ -116,7 +123,6 @@ QIcon _createMaterialIcon(const QString &str, double padding) {
           "/3rdparty/material-design-icons/MaterialIcons-Regular.ttf",
       ros::package::getPath(ROS_PACKAGE_NAME) +
           "/3rdparty/material-design-icons/codepoints.txt");
-  // return loader.load(str, 0.1);
   return loader.load(str, padding);
 }
 
@@ -125,7 +131,6 @@ QIcon _create_FA_R_Icon(const QString &str, double padding) {
                                "/3rdparty/fontawesome/fa-regular-400.ttf",
                            ros::package::getPath(ROS_PACKAGE_NAME) +
                                "/3rdparty/fontawesome/codepoints.txt");
-  // return loader.load(str, 0.6);
   return loader.load(str, padding);
 }
 
@@ -134,7 +139,6 @@ QIcon _create_FA_S_Icon(const QString &str, double padding) {
                                "/3rdparty/fontawesome/fa-solid-900.ttf",
                            ros::package::getPath(ROS_PACKAGE_NAME) +
                                "/3rdparty/fontawesome/codepoints.txt");
-  // return loader.load(str, 0.4);
   return loader.load(str, padding);
 }
 
@@ -142,33 +146,19 @@ void FlatButton::init() {
   setFlat(true);
   setFocusPolicy(Qt::TabFocus);
   setAutoDefault(false);
-  // setMinimumWidth(1);
-  // setMinimumSize(1, 1);
-  // setStyleSheet("* { border: none; }");
-  // setStyleSheet("* { background: none; }");
-  /*setPopupMode(InstantPopup);
-  setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
-  setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
-  setStyleSheet("text-align: center;");*/
-  // setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
 }
 
-FlatButton::~FlatButton() { // LOG_DEBUG("FlatButton::~FlatButton");
-}
+FlatButton::~FlatButton() {}
 
 void FlatButton::paintEvent(QPaintEvent *event) {
   QStylePainter p(this);
   QStyleOptionButton option;
   initStyleOption(&option);
   p.drawControl(QStyle::CE_PushButton, option);
-  // QPushButton::paintEvent(event);
 }
 
 QSize FlatButton::minimumSizeHint() const {
-  // return QToolButton::minimumSizeHint();
-  // return QPushButton::minimumSizeHint();
   return QAbstractButton::minimumSizeHint();
-  // return QSize(0, 0);
 }
 
 QSize FlatButton::sizeHint() const {
@@ -179,15 +169,4 @@ QSize FlatButton::sizeHint() const {
     width += style()->pixelMetric(QStyle::PM_ButtonIconSize);
   }
   return QSize(width, QPushButton::sizeHint().height());
-  // return QAbstractButton::sizeHint();
-  /*QStyleOptionButton opt;
-  initStyleOption(&opt);
-  return style()->sizeFromContents(QStyle::CT_ToolButton, &opt, QSize(0, 0),
-                                   this);*/
-  // return QToolButton::sizeHint();
-  // return QSize(QAbstractButton::sizeHint().width(),
-  //               QPushButton::sizeHint().height());
-  // return QPushButton::sizeHint();
-  // return QAbstractButton::sizeHint();
-  // return QSize(1, 1);
 }

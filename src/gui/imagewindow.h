@@ -5,6 +5,7 @@
 
 #include "renderwindow.h"
 
+#include "../annotations/image.h"
 #include "../core/topic.h"
 #include "../render/renderer.h"
 #include "../render/texture.h"

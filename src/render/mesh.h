@@ -27,30 +27,17 @@ public:
     return *this;
   }
   MeshData &append(const MeshData &other);
-  inline MeshData &operator+=(const MeshData &other) { return append(other); }
   MeshData &translate(const Eigen::Vector3f &v);
-  MeshData &translate(float x, float y, float z) {
-    return translate(Eigen::Vector3f(x, y, z));
-  }
-  MeshData &scale(const Eigen::Vector3f &v) {
-    return transform(Eigen::Scaling(v));
-  }
-  MeshData &scale(float x, float y, float z) {
-    return scale(Eigen::Vector3f(x, y, z));
-  }
-  MeshData &rotate(float angle, const Eigen::Vector3f &axis) {
-    return transform(Eigen::AngleAxisf(angle, axis));
-  }
+  MeshData &operator+=(const MeshData &other);
+  MeshData &translate(float x, float y, float z);
+  MeshData &scale(const Eigen::Vector3f &v);
+  MeshData &scale(float x, float y, float z);
+  MeshData &scale(float s);
+  MeshData &rotate(float angle, const Eigen::Vector3f &axis);
   MeshData &colorize(const Eigen::Vector4f &color);
-  MeshData &colorize(float r, float g, float b, float a = 1.0f) {
-    return colorize(Eigen::Vector4f(r, g, b, a));
-  }
+  MeshData &colorize(float r, float g, float b, float a = 1.0f);
 };
-inline MeshData operator+(const MeshData &a, const MeshData &b) {
-  MeshData r = a;
-  r.append(b);
-  return r;
-}
+MeshData operator+(const MeshData &a, const MeshData &b);
 template <class T>
 inline MeshData operator*(const T &transform, const MeshData &mesh) {
   MeshData ret = mesh;
@@ -62,15 +49,21 @@ class Mesh : public ResourceBase {
   bool _destructed = false;
   MeshData _data;
   GLuint _vao = 0;
+  bool _transparent = false;
+  std::function<void(MeshData &)> _loader;
   void createBuffer(GLenum type, GLuint index, const void *data, size_t size,
                     size_t stride);
   void create();
   void destroy();
+  void init();
 
 public:
   Mesh(const MeshData &data);
+  Mesh(const std::function<void(MeshData &)> &loader);
+  Mesh(const std::function<MeshData()> &loader);
   ~Mesh();
   void bind();
+  bool transparent() const { return _transparent; }
   GLuint vertexArrayObject();
   const MeshData &data() const { return _data; }
 };

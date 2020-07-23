@@ -3,34 +3,46 @@
 
 #include "renderthread.h"
 
+#include "../annotations/scene.h"
 #include "../core/bagplayer.h"
 #include "../core/loader.h"
 #include "../core/log.h"
+#include "../core/profiler.h"
 #include "../core/topic.h"
 #include "../core/workspace.h"
-
-#include "../render/context.h"
 #include "../render/renderer.h"
 #include "../render/resource.h"
 #include "../render/shader.h"
-
-#include "glqtwrapper.h"
 #include "renderwindow.h"
 
 RenderThread::RenderThread() {
-  _gl_display.reset(new GLDisplay());
-  _gl_context.reset(new GLContext(_gl_display.get()));
-  _gl_offscreen_surface.reset(new GLSurface(_gl_display.get()));
-  setObjectName("RenderThread");
-  start();
+  _running = true;
+  _thread = std::thread([this]() { run(); });
+}
+
+void RenderThread::invalidate() {
+  // LOG_DEBUG("render thread invalidate");
+  std::unique_lock<std::mutex> lock(_mutex);
+  _redraw_flag = true;
+  _condition.notify_all();
 }
 
 void RenderThread::run() {
   LOG_DEBUG("render thread started");
 
-  // try {
+  QOffscreenSurface offscreen_surface;
+  offscreen_surface.create();
+  if (!offscreen_surface.isValid()) {
+    throw std::runtime_error("failed to create offscreen surface");
+  }
 
-  // auto *qtgl = egl2qt(gl_context->eglContext(), gl_display->eglDisplay());
+  QOpenGLContext offscreen_context;
+  offscreen_context.setShareContext(QOpenGLContext::globalShareContext());
+  if (!offscreen_context.create()) {
+    throw std::runtime_error("failed to create offscreen context");
+  }
+
+  offscreen_context.makeCurrent(&offscreen_surface);
 
   std::vector<std::function<void()>> garbage_list;
   std::mutex garbage_mutex;
@@ -40,94 +52,117 @@ void RenderThread::run() {
   });
   std::vector<std::shared_ptr<RenderWindowBase>> render_window_list;
   std::vector<std::shared_ptr<Display>> display_list;
-  // Shader shader("package://" ROS_PACKAGE_NAME "/shaders/main.vert",
-  //            "package://" ROS_PACKAGE_NAME "/shaders/main.frag");
-  //{
-  // GLScope gl_scope(gl_context.get(), gl_offscreen_surface.get());
-  /*{
-    V_GL(glEnable(GL_DEBUG_OUTPUT));
-    V_GL(glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS));
-    V_GL(glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0,
-                               nullptr, GL_TRUE));
-    V_GL(glDebugMessageCallback(
-        [](GLenum source, GLenum type, GLuint id, GLenum severity,
-           GLsizei length, const GLchar *message,
-           const void *userParam) { LOG_INFO("GL " << message); },
-        0));
-  }*/
-  // shader.use();
-  //}
+  std::vector<std::shared_ptr<SceneAnnotationBase>> scene_annotations;
+
   Renderer renderer;
   RenderList render_list;
   while (true) {
+    // std::this_thread::sleep_for(std::chrono::milliseconds(10));
     {
       std::unique_lock<std::mutex> lock(_mutex);
+      while (true) {
+        if (_stop_flag) {
+          break;
+        }
+        if (_redraw_flag) {
+          _redraw_flag = false;
+          break;
+        }
+        _condition.wait(lock);
+      }
       if (_stop_flag) {
         break;
       }
-      if (!_redraw_flag) {
-        _condition.wait(lock);
-        continue;
-      }
-      _redraw_flag = false;
     }
+    // LOG_DEBUG("render");
+
+    PROFILER();
+
     render_list.clear();
     {
-      GLScope gl_scope(_gl_context.get(), _gl_offscreen_surface.get());
+      NoMessageScope m_scope;
+      LockScope ws;
+      ws->recurse([&render_window_list,
+                   &display_list](const std::shared_ptr<Object> &object) {
+        if (object) {
+          if (auto render_window =
+                  std::dynamic_pointer_cast<RenderWindowBase>(object)) {
+            render_window_list.push_back(render_window);
+          }
+          if (auto display = std::dynamic_pointer_cast<Display>(object)) {
+            display_list.push_back(display);
+          }
+        }
+      });
       {
-        LockScope ws;
-        ws->recurse([&render_window_list,
-                     &display_list](const std::shared_ptr<Object> &object) {
-          if (object) {
-            if (auto render_window =
-                    std::dynamic_pointer_cast<RenderWindowBase>(object)) {
-              render_window_list.push_back(render_window);
-            }
-            if (auto display = std::dynamic_pointer_cast<Display>(object)) {
-              display_list.push_back(display);
+        std::lock_guard<std::mutex> lock(garbage_mutex);
+        for (auto &f : garbage_list) {
+          f();
+        }
+        garbage_list.clear();
+      }
+      {
+        RenderSyncContext render_context;
+        render_context.render_list = &render_list;
+        ws->document()->display()->renderSyncRecursive(render_context);
+      }
+      {
+        scene_annotations.clear();
+        if (ws->player && ws->document()->timeline()) {
+          auto current_time = ws->player->time();
+          for (auto &track : ws->document()->timeline()->tracks()) {
+            if (auto annotation_track =
+                    std::dynamic_pointer_cast<AnnotationTrack>(track)) {
+              if (auto branch = annotation_track->branch()) {
+                for (auto &span : branch->spans()) {
+                  if (span->start() <= current_time &&
+                      span->start() + span->duration() >= current_time) {
+                    for (auto &annotation : span->annotations()) {
+                      if (auto scene_annotation =
+                              std::dynamic_pointer_cast<SceneAnnotationBase>(
+                                  annotation)) {
+                        {
+                          RenderSyncContext render_context;
+                          render_context.render_list = &render_list;
+                          scene_annotation->renderSync(render_context, track,
+                                                       span);
+                        }
+                        scene_annotations.push_back(scene_annotation);
+                      }
+                    }
+                  }
+                }
+              }
             }
           }
-        });
-        {
-          std::lock_guard<std::mutex> lock(garbage_mutex);
-          for (auto &f : garbage_list) {
-            f();
-          }
-          garbage_list.clear();
         }
-        {
-          RenderSyncContext render_context;
-          render_context.render_list = &render_list;
-          ws->document()->display()->renderSyncRecursive(render_context);
-        }
-        for (auto &render_window : render_window_list) {
-          RenderWindowSyncContext render_context;
-          render_window->renderWindowSync(render_context);
-        }
+      }
+      for (auto &render_window : render_window_list) {
+        RenderWindowSyncContext render_context;
+        render_window->renderWindowSync(render_context);
       }
     }
     {
-      GLScope gl_scope(_gl_context.get(), _gl_offscreen_surface.get());
       RenderAsyncContext render_context;
       render_context.render_list = &render_list;
       for (auto &display : display_list) {
         display->renderAsync(render_context);
       }
+      for (auto &scene_annotation : scene_annotations) {
+        scene_annotation->renderAsync(render_context);
+      }
     }
+    // V_GL(glFlush());
+    // V_GL(glFinish());
     for (auto &render_window : render_window_list) {
-      GLScope gl_scope(_gl_context.get(), render_window->surface());
-      // V_GL(glViewport(0, 0, render_window->surface()->width(),
-      //                  render_window->surface()->height()));
       RenderWindowAsyncContext render_context;
       render_context.render_list = &render_list;
       render_context.renderer = &renderer;
       render_window->renderWindowAsync(render_context);
-      render_window->surface()->swap();
     }
-    /*for (auto &render_window : render_window_list) {
-      GLScope gl_scope(gl_context.get(), render_window->surface());
-      render_window->surface()->swap();
-  }*/
+    for (auto &render_window : render_window_list) {
+      startOnMainThreadAsync([render_window]() { render_window->present(); });
+    }
     {
       LockScope ws;
       {
@@ -163,25 +198,25 @@ void RenderThread::run() {
       }
     }
   }
+  offscreen_context.doneCurrent();
   ResourceBase::setCleanupFunction(nullptr);
-
-  /* } catch (const std::exception &ex) {
-     LOG_FATAL(ex.what());
-     LOG_FATAL("fatal error in render thread");
-     std::terminate();
- }*/
 }
 
 void RenderThread::stop() {
-  LOG_DEBUG("stopping render thread");
-  {
-    std::unique_lock<std::mutex> lock(_mutex);
-    _stop_flag = true;
-    _condition.notify_all();
+  if (_running) {
+    _running = false;
+    LOG_DEBUG("stopping render thread");
+    {
+      std::unique_lock<std::mutex> lock(_mutex);
+      _stop_flag = true;
+      _condition.notify_all();
+    }
+    _thread.join();
+    LOG_DEBUG("render thread stopped");
   }
-  wait();
-  LOG_DEBUG("render thread stopped");
 }
+
+RenderThread::~RenderThread() { stop(); }
 
 RenderThread *RenderThread::instance() {
   static std::shared_ptr<RenderThread> instance = []() {
@@ -190,8 +225,11 @@ RenderThread *RenderThread::instance() {
     {
       LockScope ws;
       ws->modified.connect(instance, [ptr]() { ptr->invalidate(); });
-      ws->redraw.connect(instance, [ptr]() { ptr->invalidate(); });
+      GlobalEvents::instance()->redraw.connect(instance,
+                                               [ptr]() { ptr->invalidate(); });
     }
+    LoaderThread::instance()->started.connect(instance,
+                                              [ptr]() { ptr->invalidate(); });
     LoaderThread::instance()->finished.connect(instance,
                                                [ptr]() { ptr->invalidate(); });
     TopicManager::instance()->received.connect(instance,

@@ -7,7 +7,6 @@
 #include "../core/log.h"
 #include "../core/topic.h"
 #include "../core/workspace.h"
-
 #include "mainwindow.h"
 
 #include <std_msgs/Float64.h>
@@ -105,8 +104,6 @@ public:
     }
     painter->save();
     QGraphicsRectItem::paint(painter, option, widget);
-    // painter->fillRect(rect(), brush());
-    // painter->setPen(QPen(QApplication::palette().text(), 1.0));
     painter->setFont(_font);
     painter->setPen(_textPen);
     painter->drawText(rect().marginsRemoved(margins()), _text,
@@ -120,10 +117,7 @@ public:
       _edit = new QLineEdit();
       _edit->setFixedSize(rect().width(), rect().height());
       _edit->setAlignment(_alignment);
-      //_edit->setFrame(false);
       _edit->setTextMargins(margins());
-      //_edit->setStyleSheet("QLineEdit { background: transparent; border: "
-      //                     "none; padding: 0; margin: 0; }");
       _edit->setText(_text);
       connect(_edit, &QLineEdit::editingFinished, this, [this]() {
         if (_text != _edit->text()) {
@@ -175,9 +169,6 @@ class AnnotationSpanItem : public EditableText {
     }
     ResizeHandle(AnnotationSpanItem *parent, int side)
         : _parent(parent), _side(side) {
-      // setBrush(QBrush(Qt::red));
-      // setBrush(QBrush(QColor(0, 150, 0)));
-      // setBrush(QBrush(QColor(115, 179, 98)));
       setCursor(Qt::SizeHorCursor);
       setParentItem(parent);
       setBrush(QBrush(Qt::transparent));
@@ -221,18 +212,9 @@ class AnnotationSpanItem : public EditableText {
           } else {
             ActionScope ws("Resize Annotation Span");
             _parent->commit();
-            /*ActionScope ws("Resize Annotation Span");
-            _parent->_annotation->start() =
-                _parent->positionToTime(_parent->rect().x());
-            _parent->_annotation->duration() =
-                _parent->positionToTime(_parent->rect().width());*/
           }
         }
       }
-      // setCursor(Qt::SizeHorCursor); // would be required to fix cursor
-      // issue, but it causes qt to crash, qt sucks, they say that they don't
-      // event want to fix the problem, TODO: find a workaround or rewrite
-      // everything without qt
     }
     virtual void mouseMoveEvent(QGraphicsSceneMouseEvent *event) override {
       if (event->buttons() == Qt::LeftButton) {
@@ -269,7 +251,6 @@ class AnnotationSpanItem : public EditableText {
                                      track_label_width - track_padding_right,
                                  std::max(rect.left(), x)));
         }
-        //_parent->setRect(rect);
         _parent->setItemRect(rect.x(), rect.y(), rect.width());
         update();
       }
@@ -285,12 +266,8 @@ class AnnotationSpanItem : public EditableText {
   QRectF _drag_start_rect;
   ResizeHandle *left_handle = new ResizeHandle(this, -1);
   ResizeHandle *right_handle = new ResizeHandle(this, +1);
-  // QGraphicsRectItem *_selection_rect = new QGraphicsRectItem(this);
   bool _dragged = false;
-  // EditableText *_label_editor = new EditableText(this);
-  // QGraphicsRectItem *_ghost_rect = new QGraphicsRectItem(this);
   std::unordered_set<std::shared_ptr<AnnotationSpan>> _dragged_spans;
-  // bool _drag_aggregate = false;
   bool _selected = false;
   double _track_color = 0;
 
@@ -354,35 +331,9 @@ class AnnotationSpanItem : public EditableText {
 public:
   AnnotationSpanItem() {
 
-    // setBrush(QBrush(Qt::red));
-
-    // setPen(QPen(QApplication::palette().text(), 1));
-
-    // setBrush(QBrush(QColor(50, 200, 50)));
-    // setBrush(QBrush(QColor(150, 255, 150)));
-    // setBrush(QBrush(QColor(185, 240, 170)));
-    // setBrush(QBrush(QColor(250, 247, 202)));
-
     setTextAlignment(Qt::AlignHCenter | Qt::AlignVCenter);
 
     setTextPen(QPen(QBrush(QColor(0, 0, 0)), 1));
-
-    /*auto *fx = new QGraphicsDropShadowEffect();
-    fx->setBlurRadius(2);
-    fx->setOffset(0, 1);
-    setGraphicsEffect(fx);*/
-
-    //_selection_rect->setPen(
-    //    QPen(QApplication::palette().brush(QPalette::Highlight), 2));
-
-    /*_ghost_rect->setPen(
-        QPen(QApplication::palette().brush(QPalette::WindowText), 1));
-    //_ghost_rect->setPen(QPen(Qt::NoPen));
-    //_ghost_rect->setBrush(QApplication::palette().brush(QPalette::Midlight));
-    _ghost_rect->setBrush(QBrush(Qt::transparent));
-    _ghost_rect->setFlag(ItemStacksBehindParent, true);*/
-
-    //_selection_rect->setZValue(10000);
 
     changed.connect([this](const std::string &label) {
       ActionScope ws("Change annotation span label");
@@ -397,78 +348,33 @@ public:
     instances().insert(this);
   }
   ~AnnotationSpanItem() { instances().erase(this); }
-  /*virtual void paint(QPainter *painter,
-                     const QStyleOptionGraphicsItem *option,
-                     QWidget *widget) override {
-    painter->setPen(pen());
-    painter->setBrush(brush());
-    painter->drawRoundedRect(rect(), 2.0, 2.0);
-}*/
+
   void setItemRect(double x, double y, double width) {
     setRect(x, y, width, track_height);
     left_handle->update();
     right_handle->update();
-    //_selection_rect->setRect(rect().marginsAdded(QMarginsF(1, 1, 1, 2)));
-    //_selection_rect->setRect(rect().marginsRemoved(QMarginsF(1, 1, 1, 0)));
-    //_label_editor->setRect(rect());
-    /*{
-      int i = std::round(y / track_height) + 1;
-      setBrush(QBrush(QColor::fromHsvF(i % 8 / 7.0, 1.0, 1.0)));
-  }*/
+
     {
       LockScope ws;
       size_t itrack = std::max(0.0, std::round(y / track_height) - 1.0);
       if (auto track = trackAt(ws(), itrack)) {
-        // setBrush(QBrush(QColor::fromHsvF(track->color(), 0.3, 1.0)));
-        /*if (_annotation->label().empty()) {
-          setTextPen(QPen(QBrush(QColor(0, 0, 0, 180)), 1));
-          setText(track->label());
-          static auto font = []() {
-            auto font = QApplication::font();
-            font.setItalic(true);
-            return font;
-          }();
-          setFont(font);
-        } else {
-          setTextPen(QPen(QBrush(QColor(0, 0, 0)), 1));
-          setText(_annotation->label());
-          static auto font = []() {
-            auto font = QApplication::font();
-            font.setBold(true);
-            return font;
-          }();
-          setFont(font);
-      }*/
+
         setTextPen(QPen(QBrush(QColor(0, 0, 0)), 1));
         QFont font = QApplication::font();
         if (_annotation->label().empty()) {
-          // setTextPen(QPen(QBrush(QColor(0, 0, 0, 180)), 1));
-          // setTextPen(QPen(QBrush(QColor(Qt::white)), 1));
           setText(track->label());
           font.setItalic(true);
         } else {
-          // setTextPen(QPen(QBrush(QColor(0, 0, 0)), 1));
           setText(_annotation->label());
         }
         _track_color = track->color();
-        /*if (ws->selection().contains(_annotation)) {
-          font.setBold(true);
-          setBrush(QBrush(QColor::fromHsvF(track->color(), 0.4, 1.0)));
-        } else {
-          setBrush(QBrush(QColor::fromHsvF(track->color(), 0.2, 1.0)));
-      }*/
         if (_selected = ws->selection().contains(_annotation)) {
-          // font.setBold(true);
           setBrush(QBrush(QColor::fromHsvF(track->color(), 0.8, 0.6)));
           setTextPen(QPen(QBrush(QColor(Qt::white)), 1));
         } else {
           setBrush(QBrush(QColor::fromHsvF(track->color(), 0.2, 1.0)));
           setTextPen(QPen(QBrush(QColor(Qt::black)), 1));
         }
-        /*if (_track->id() ==
-            ws->currentAnnotationTrack().id()) {
-          font.setBold(true);
-      }*/
         setPen(QPen(QBrush(Qt::black), 1));
         setFont(font);
       }
@@ -476,25 +382,17 @@ public:
   }
   virtual void paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
                      QWidget *widget) override {
-    /*painter->setBrush(brush());
-    painter->setPen(QPen(QBrush(Qt::black), 1, Qt::SolidLine, Qt::SquareCap,
-                         Qt::MiterJoin));
-    painter->drawRect(rect());*/
     EditableText::paint(painter, option, widget);
-    // if (_selected) {
     painter->setBrush(QBrush(Qt::transparent));
     painter->setPen(QPen(QBrush(QColor(255, 255, 255, 200)), 1, Qt::SolidLine,
                          Qt::SquareCap, Qt::MiterJoin));
     painter->drawRect(rect().marginsRemoved(QMarginsF(1, 1, 1, 1)));
-    //}
   }
   void update(const std::shared_ptr<Workspace> &ws, size_t track_index,
               const std::shared_ptr<AnnotationTrack> &track,
               const std::shared_ptr<AnnotationSpan> &annotation,
               double track_length, double bag_duration) {
     _track = track;
-    // setZValue(2.0 + annotation->track() * 1e-6);
-
     _annotation = annotation;
     this->track_length = track_length;
     this->bag_duration = bag_duration;
@@ -509,8 +407,6 @@ public:
       LOG_DEBUG("begin dragging annotation span");
       _dragged = false;
       event->accept();
-      // drag_start_rect = rect();
-      // QGraphicsRectItem::mousePressEvent(event);
       {
         _dragged_spans.clear();
         LockScope ws;
@@ -572,7 +468,6 @@ public:
         }
         left_handle->unsetCursor();
         right_handle->unsetCursor();
-        //_drag_aggregate = false;
         ws->modified();
       }
     }
@@ -583,8 +478,6 @@ public:
       if (!_dragged_spans.empty()) {
         LockScope ws;
         _dragged = true;
-        // ActionScope ws("Drag Annotation Spans", nullptr, _drag_aggregate);
-        //_drag_aggregate = true;
         double timeline_duration = timelineDuration(ws());
         double max_x = timeToPosition(timeline_duration);
         size_t track_count = trackCount(ws());
@@ -682,15 +575,11 @@ public:
         for (auto *view : instances()) {
           if (_dragged_spans.find(view->_annotation) != _dragged_spans.end()) {
             auto rect = view->rect();
-            // rect.translate(
-            //    timeToPosition(dt + view->_annotation->start()) - rect.x(),
-            //    0);
             view->setItemRect(view->_drag_start_rect.x() + dx,
                               view->_drag_start_rect.y() + di * track_height,
                               rect.width());
           }
         }
-        // ws->modified();
       }
     }
   }
@@ -747,7 +636,7 @@ public:
           }
           annotation->start() = start;
           annotation->duration() = duration;
-          // ws->modified();
+          ws->modified();
         } else {
           LOG_ERROR("failed to move annotation");
         }
@@ -772,11 +661,6 @@ class TrackViewBase : public QGraphicsRectItem, public QObject {
         event->accept();
         LockScope ws;
         LOG_DEBUG("select " << _parent->_track->label());
-        /*if (event->modifiers() & Qt::ShiftModifier) {
-          ws->selection().toggle(_parent->_track);
-        } else {
-          ws->selection() = _parent->_track;
-      }*/
         if (event->modifiers() & Qt::ControlModifier) {
           ws->selection().toggle(_parent->_track);
         } else if (event->modifiers() & Qt::ShiftModifier) {
@@ -869,16 +753,6 @@ class TrackViewBase : public QGraphicsRectItem, public QObject {
                        const QStyleOptionGraphicsItem *option,
                        QWidget *widget) override {
       EditableText::paint(painter, option, widget);
-      /*if (_parent->_selected) {
-        painter->setBrush(QBrush(Qt::transparent));
-        painter->setPen(QPen(QBrush(QColor(255, 255, 255, 150)), 3,
-                             Qt::SolidLine, Qt::SquareCap, Qt::MiterJoin));
-        painter->drawRect(rect().marginsRemoved(QMarginsF(2, 2, 2, 1)));
-    }*/
-      /*painter->setBrush(QBrush(Qt::transparent));
-      painter->setPen(QPen(QBrush(QColor(255, 255, 255, 200)), 2, Qt::SolidLine,
-                           Qt::SquareCap, Qt::MiterJoin));
-      painter->drawRect(rect().marginsRemoved(QMarginsF(2, 2, 2, 1)));*/
       painter->setBrush(QBrush(Qt::transparent));
       painter->setPen(QPen(QBrush(QColor(255, 255, 255, 200)), 1, Qt::SolidLine,
                            Qt::SquareCap, Qt::MiterJoin));
@@ -904,7 +778,6 @@ public:
   TrackViewBase(size_t track_index, std::shared_ptr<TrackBase> track)
       : _track(track), _track_index(track_index) {
 
-    // setBrush(QApplication::palette().brush(QPalette::Dark));
     setBrush(QBrush(Qt::transparent));
     setPen(QPen(Qt::NoPen));
 
@@ -916,15 +789,6 @@ public:
     });
     _text->setZValue(100000);
   }
-  /*virtual QRectF boundingRect() const override {
-    auto r = rect();
-    if (r.x() != scrollPositionX()) {
-      r.translate(scrollPositionX() - r.x(), 0);
-      LOG_DEBUG("xy " << r.x());
-      ((QGraphicsRectItem *)this)->setRect(r);
-    }
-    return r;
-}*/
   virtual void update(const std::shared_ptr<Workspace> &ws, double width) {
     QRectF rect = scene()->sceneRect();
     double y = track_height * (_track_index + 1);
@@ -933,11 +797,6 @@ public:
                    track_height));
     _text->setRect(scrollPositionX() - 1, y, track_label_width + 1,
                    track_height);
-    /*setRect(QRectF(0, y,
-                   rect.width() - track_padding_right - track_label_width,
-                   track_height));
-    _text->setRect(-track_label_width, y + 1, track_label_width,
-                   track_height - 1);*/
     setZValue(ws->selection().contains(_track) ? 2 : 1);
     _text->setText(_track->label().c_str());
     if (_selected = ws->selection().contains(_track)) {
@@ -970,7 +829,6 @@ class GraphTrackView : public TrackViewBase {
   size_t _track_height = 0;
   double _track_length = 0;
   double _bag_duration = 0.0;
-  // QPolygonF _polygon;
   QVector<QPointF> _points;
   QPen _pen;
   double timeToPosition(double t) { return t * _track_length / _bag_duration; }
@@ -990,21 +848,15 @@ public:
 
     if (ws->player != _player.lock()) {
       _player = ws->player;
-      //_polygon = QPolygonF();
-      // QVector<QPointF> points;
       _points.clear();
       if (auto player = ws->player) {
         auto messages =
-            player->readMessageSamples(_track->label(), 0, _bag_duration, 0.1);
-        // LOG_DEBUG("msg");
+            player->readMessageSamples(_track->label(), 0, _bag_duration);
         for (auto &msg : messages) {
           if (auto m = msg->instantiate<std_msgs::Float64>()) {
-            // double x = (msg->time() - player->startTime()).toSec() *
-            //           _track_length / _bag_duration;
             double x =
                 (msg->time() - player->startTime()).toSec() / _bag_duration;
             double y = m->data;
-            // LOG_DEBUG(x << " " << y);
             _points.push_back(QPointF(x, y));
           }
         }
@@ -1284,15 +1136,8 @@ public:
     center.setX(center.x() * _width);
     center.setX(center.x() - center2mouse);
     view->centerOn(center);
-    // view->translate(center2mouse, 0);
 
     LockScope()->modified();
-
-    // LOG_DEBUG("zoom mosue pos " << wheel->scenePos().x());
-    /*auto *view = views().first();
-    double dx = posx - fcenter * _width;
-    LOG_DEBUG("dx " << dx);
-    view->translate(dx, 0);*/
   }
   void handleSeek(QGraphicsSceneMouseEvent *event) {
     LOG_DEBUG("seek");
@@ -1303,21 +1148,15 @@ public:
           0.0,
           std::min(timelineDuration(ws()),
                    event->scenePos().x() * timelineDuration(ws()) / _width)));
-      ws->modified();
     }
   }
   virtual void mousePressEvent(QGraphicsSceneMouseEvent *event) override {
-    // LOG_DEBUG("press");
     QGraphicsScene::mousePressEvent(event);
     if (event->isAccepted()) {
       return;
     }
     if (event->button() == Qt::MiddleButton) {
       event->accept();
-      // auto *view = views().first();
-      // QPointF center =
-      // view->mapToScene(view->viewport()->rect().center());
-      //_pan_start = center.x() - event->scenePos().x();
     }
     if (event->button() == Qt::LeftButton &&
         event->scenePos().y() < track_height) {
@@ -1325,7 +1164,6 @@ public:
     }
   }
   virtual void mouseMoveEvent(QGraphicsSceneMouseEvent *event) override {
-    // LOG_DEBUG("move");
     QGraphicsScene::mouseMoveEvent(event);
     if (event->isAccepted()) {
       return;
@@ -1338,11 +1176,6 @@ public:
         if (auto *view = views().first()) {
           double dx = event->scenePos().x() - event->lastScenePos().x();
           LOG_DEBUG("dx " << dx);
-          /*QPointF center =
-          view->mapToScene(view->viewport()->rect().center());
-          center.setX(center.x() - dx);
-          view->centerOn(center);*/
-          // view->setTransformationAnchor(QGraphicsView::NoAnchor)
           view->translate(dx, 0);
           LockScope()->modified();
         }
@@ -1355,20 +1188,17 @@ public:
     }
   }
   virtual void mouseReleaseEvent(QGraphicsSceneMouseEvent *event) override {
-    // LOG_DEBUG("move");
     QGraphicsScene::mouseReleaseEvent(event);
   }
 
   void render(QPainter *painter, const QRectF &target, const QRectF &source,
               Qt::AspectRatioMode aspectRatioMode) {
-    // painter->setRenderHints(QPainter::Antialiasing);
     QGraphicsScene::render(painter, target, source, aspectRatioMode);
   }
 
   void drawBackground(QPainter *painter, const QRectF &rect) {
     QGraphicsScene::drawBackground(painter, rect);
     painter->save();
-    // painter->fillRect(rect, QApplication::palette().window());
     painter->fillRect(rect, QApplication::palette().brush(QPalette::Base));
     painter->setPen(QPen(QApplication::palette().brush(
                              _enabled ? QPalette::Normal : QPalette::Disabled,
@@ -1394,20 +1224,12 @@ public:
 class TimeBar : public QGraphicsRectItem, public ItemBase {
 public:
   TimeBar() {
-    // setBrush(QApplication::palette().brush(QPalette::Window));
-    // setBrush(QApplication::palette().brush(QPalette::Button));
     setBrush(QBrush(Qt::transparent));
     setPen(QPen(Qt::NoPen));
-    /*auto *fx = new QGraphicsDropShadowEffect();
-    fx->setBlurRadius(5);
-    fx->setOffset(1, 3);
-    setGraphicsEffect(fx);*/
     setZValue(10);
   }
   virtual void sync(const std::shared_ptr<Workspace> &ws) override {
     QRectF rect = scene()->sceneRect();
-    // rect.setX(rect.x() + rect.width() * 0.1);
-    // rect.setWidth(rect.width() * 0.8);
     setRect(QRectF(0, 0, rect.width() - track_label_width - track_padding_right,
                    track_height - 1));
   }
@@ -1423,7 +1245,6 @@ public:
   }
   virtual QRectF boundingRect() const override {
     auto rect = scene()->sceneRect();
-    // rect.setHeight(track_height * 10);
     auto *graphics_view = scene()->views().first();
     if (graphics_view) {
       auto clip =
@@ -1442,14 +1263,11 @@ public:
     return (p - r.x()) * _duration / r.width();
   }
   void drawTime(QPainter *painter, double t) {
-    // LOG_DEBUG(t);
     double p = timeToPosition(t);
-    // painter->drawLine(p, 0, p, track_height);
     painter->drawLine(p, 0.0, p, track_height * 0.15);
     QTime tq(0, 0);
     tq = tq.addMSecs(std::round(t * 1000));
     QString tstr = tq.toString("hh:mm:ss.zzz");
-    // LOG_DEBUG(tstr.toStdString());
     painter->drawText(QRectF(p - 100, 0, 200, track_height),
                       Qt::AlignCenter | Qt::TextSingleLine, tstr);
   }
@@ -1459,13 +1277,7 @@ public:
   }
   virtual void paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
                      QWidget *widget) override {
-    // LOG_DEBUG("paint");
     painter->save();
-
-    /*painter->drawLine(-track_label_width, track_height,
-                      boundingRect().width(), track_height);
-    painter->drawLine(-track_label_width, track_height * 2,
-                      boundingRect().width(), track_height * 2);*/
 
     {
       QColor color = QApplication::palette().color(
@@ -1502,16 +1314,7 @@ public:
                         clip.y() + clip.height());
     }
 
-    /*if (clip.x() > -track_label_width + 1) {
-      painter->setClipRect(clip.x() + track_label_width, 0,
-                           boundingRect().width(), track_height,
-                           Qt::IntersectClip);
-    }*/
-
     auto r = parentItem()->boundingRect();
-    // painter->drawLine(0, clip.y(), 0, clip.height());
-    // painter->drawLine(clip.x() + track_label_width, clip.y(),
-    //                  clip.x() + track_label_width, clip.height());
     painter->drawLine(r.x() + r.width(), clip.y(), r.x() + r.width(),
                       clip.height());
 
@@ -1554,10 +1357,7 @@ public:
         break;
       }
     }
-    // LOG_DEBUG("timeline step size " << time_step);
-    // auto clip = scene()->views().first()->sceneRect();
 
-    // painter->drawRect(clip.marginsRemoved(QMarginsF(10, 10, 10, 10)));
     double t0 = std::max(0.0, std::round(positionToTime(clip.x()) / time_step) *
                                       time_step -
                                   time_step);
@@ -1567,26 +1367,14 @@ public:
                                     time_step +
                                 time_step);
     for (double t = t0; t == t0 || t < tn; t += tick_step) {
-      /*if (timeToPosition(t) < clip.x() + track_label_width) {
-        continue;
-    }*/
       drawTick(painter, t);
     }
     for (double t = t0; t == t0 || t < tn - desired_time_step; t += time_step) {
-      /*if (timeToPosition(t) < clip.x() + track_label_width) {
-        continue;
-    }*/
       double p = timeToPosition(t);
       drawTime(painter, t);
     }
-    // drawTick(painter, positionToTime(clip.x() + track_label_width));
-    // drawTime(painter, positionToTime(clip.x()));
     drawTick(painter, _duration);
     drawTime(painter, _duration);
-    /*LOG_DEBUG("t0:" << t0 << " tn:" << tn);
-    LOG_DEBUG("clip " << clip.x() << " " << clip.width());
-    LOG_DEBUG("time_step " << time_step);
-    LOG_DEBUG("desired_time_step " << desired_time_step);*/
     painter->restore();
   }
 };
@@ -1599,10 +1387,8 @@ class SeekHead : public QGraphicsRectItem, public ItemBase {
 public:
   SeekHead() {
     setRect(0, -1, 11, track_height);
-    // auto brush = QApplication::palette().brush(QPalette::Highlight);
     auto brush = QBrush(QColor(255, 0, 0));
     setBrush(brush);
-    // setPen(QPen(Qt::NoPen));
     setPen(QPen(QColor(130, 0, 0), 1.0));
     auto *seek_line = new QGraphicsLineItem(5, rect().height() * 0.5, 5, 1000);
     seek_line->setPen(QPen(brush, 3.0));
@@ -1648,8 +1434,6 @@ public:
     }
   }
   virtual void sync(const std::shared_ptr<Workspace> &ws) override {
-    // LOG_DEBUG("update" << rand());
-    // return;
     setZValue(1000000);
     if (_dragged) {
       return;
@@ -1683,9 +1467,6 @@ TimelineWidget::TimelineWidget() : QDockWidget("Timeline") {
 
   LockScope ws;
 
-  /*setFeatures(DockWidgetVerticalTitleBar | DockWidgetClosable |
-              DockWidgetMovable | DockWidgetFloatable);*/
-
   QWidget *content_widget = new QWidget();
 
   auto *main_layout = new QVBoxLayout(content_widget);
@@ -1695,11 +1476,8 @@ TimelineWidget::TimelineWidget() : QDockWidget("Timeline") {
   auto *playback_bar = new QHBoxLayout(content_widget);
   playback_bar->setSpacing(0);
   playback_bar->setContentsMargins(3, 3, 3, 3);
-  // main_layout->addLayout(playback_bar);
 
   QWidget *playback_bar_widget = new QWidget();
-  // playback_bar_widget->setBackground(
-  //      QApplication::palette().brush(QPalette::Window));
   playback_bar_widget->setAutoFillBackground(true);
   playback_bar_widget->setLayout(playback_bar);
   setTitleBarWidget(playback_bar_widget);
@@ -1725,7 +1503,6 @@ TimelineWidget::TimelineWidget() : QDockWidget("Timeline") {
 
   {
     auto *button = new FlatButton("Create");
-    // button->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
     QMenu *menu = new QMenu(this);
     auto types = Type::find<TrackBase>()->list();
     for (auto &type : types) {
@@ -1791,33 +1568,11 @@ TimelineWidget::TimelineWidget() : QDockWidget("Timeline") {
   if (1) {
 
     auto *open_button = new FlatButton("Open");
-    // auto *button = new FlatButton(MATERIAL_ICON("folder", 0.0), "Open");
-    // open_button->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
     always_active_widgets.insert(open_button);
     connect(open_button, &QPushButton::clicked, this, [this]() {
-      QString path =
-          QFileDialog::getOpenFileName(this, tr("Open Bag"), QString(),
-                                       tr("Bag files (*.bag);All files (*.*)"));
-      if (path.isNull()) {
-        return;
-      }
-      MainWindow::instance()->openBag(path);
-    });
-    playback_bar_left->addWidget(open_button);
-  }
-
-  if (0) {
-    auto *open_button = new QToolButton();
-    open_button->setText("Open Bag");
-    open_button->setPopupMode(QToolButton::MenuButtonPopup);
-    open_button->setAutoRaise(true);
-    QMenu *menu = new QMenu(this);
-    open_button->setMenu(menu);
-    always_active_widgets.insert(open_button);
-    connect(open_button, &QToolButton::clicked, this, [this]() {
-      QString path =
-          QFileDialog::getOpenFileName(this, tr("Open Bag"), QString(),
-                                       tr("Bag files (*.bag);All files (*.*)"));
+      QString path = QFileDialog::getOpenFileName(
+          this, tr("Open Bag"), QString(),
+          tr("Bag files (*.bag);;All files (*.*)"));
       if (path.isNull()) {
         return;
       }
@@ -1827,24 +1582,11 @@ TimelineWidget::TimelineWidget() : QDockWidget("Timeline") {
   }
 
   if (1) {
-    // auto *close_button = new FlatButton(MATERIAL_ICON("close", 0.2),
-    // "Close");
-    // auto *close_button = new FlatButton(FA_S_ICON("folder-open", 0),
-    // "Close");
-    // auto *close_button = new FlatButton(MATERIAL_ICON("eject", 0.0),
-    // "Close");
-    // auto *close_button = new FlatButton(MATERIAL_ICON("eject", 0.0), "");
     auto *close_button = new FlatButton("Close");
-    // close_button->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
     connect(close_button, &QPushButton::clicked, this,
             [this]() { MainWindow::instance()->closeBag(); });
     playback_bar_left->addWidget(close_button);
   }
-
-  /*auto *path_label = new QLabel();
-  path_label->setAlignment(Qt::AlignVCenter | Qt::AlignLeft);
-  path_label->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
-  playback_bar->addWidget(path_label, 2);*/
 
   playback_bar_left->addStretch(1);
 
@@ -1906,8 +1648,24 @@ TimelineWidget::TimelineWidget() : QDockWidget("Timeline") {
     auto *button = new FlatButton(MATERIAL_ICON("play_arrow", -0.12));
     connect(button, &QPushButton::clicked, this, [this]() {
       LockScope ws;
-      if (ws->player) {
-        ws->player->play();
+      if (ws->player && ws->document()->timeline()) {
+        std::vector<double> annotation_times;
+        for (auto &track : ws->document()->timeline()->tracks()) {
+          if (auto annotation_track =
+                  std::dynamic_pointer_cast<AnnotationTrack>(track)) {
+            if (auto branch = annotation_track->branch()) {
+              for (auto &span : branch->spans()) {
+                annotation_times.push_back(span->start());
+                annotation_times.push_back(span->start() + span->duration());
+              }
+            }
+          }
+        }
+        std::sort(annotation_times.begin(), annotation_times.end());
+        annotation_times.erase(
+            std::unique(annotation_times.begin(), annotation_times.end()),
+            annotation_times.end());
+        ws->player->play(annotation_times);
       }
     });
     playback_bar->addWidget(button);
@@ -1946,14 +1704,6 @@ TimelineWidget::TimelineWidget() : QDockWidget("Timeline") {
     playback_bar->addWidget(button);
   }
 
-  /*auto *time_label = new QLabel("00:00:00.0000");
-  // time_label->setAlignment(Qt::AlignCenter);
-  path_label->setAlignment(Qt::AlignVCenter | Qt::AlignLeft);
-  time_label->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
-  playback_bar->addWidget(time_label, 2);*/
-
-  // playback_bar->addStretch(4);
-
   auto *playback_bar_right = new QHBoxLayout(content_widget);
   playback_bar_right->setSpacing(0);
   playback_bar->addLayout(playback_bar_right, 4);
@@ -1971,11 +1721,6 @@ TimelineWidget::TimelineWidget() : QDockWidget("Timeline") {
     always_active_widgets.insert(button);
   }
 
-  // auto *zoom_slider = new QSlider(Qt::Horizontal);
-  // playback_bar_right->addWidget(zoom_slider);
-
-  // main_layout->addStretch(1);
-
   Scene *scene = new Scene(this);
 
   auto *time_bar = new TimeBar();
@@ -1989,29 +1734,17 @@ TimelineWidget::TimelineWidget() : QDockWidget("Timeline") {
   seek_head->setParentItem(time_bar);
   scene->addItem(seek_head);
 
-  class GraphicsViewCursorFix : public QGraphicsView {
-    /*void updateCursor(const QMouseEvent *event) {
-      if (auto *item = itemAt(event->pos())) {
-        QApplication::setOverrideCursor(item->cursor());
-      } else {
-        QApplication::restoreOverrideCursor();
-      }
-  }*/
+  class GraphicsView : public QGraphicsView {
 
   protected:
     virtual void mouseMoveEvent(QMouseEvent *event) override {
       QGraphicsView::mouseMoveEvent(event);
-      /*if (event->buttons() == 0) {
-        updateCursor(event);
-    }*/
     }
     virtual void mousePressEvent(QMouseEvent *event) override {
       QGraphicsView::mousePressEvent(event);
-      // updateCursor(event);
     }
     virtual void mouseReleaseEvent(QMouseEvent *event) override {
       QGraphicsView::mouseReleaseEvent(event);
-      // updateCursor(event);
     }
     virtual void scrollContentsBy(int dx, int dy) override {
       QGraphicsView::scrollContentsBy(dx, dy);
@@ -2019,11 +1752,12 @@ TimelineWidget::TimelineWidget() : QDockWidget("Timeline") {
     }
 
   public:
-    GraphicsViewCursorFix() { setMouseTracking(true); }
+    GraphicsView() { setMouseTracking(true); }
   };
 
-  auto *view = new GraphicsViewCursorFix();
+  auto *view = new GraphicsView();
   view->setParent(this);
+  view->setViewport(new QOpenGLWidget(this));
   view->setScene(scene);
   view->setCacheMode(QGraphicsView::CacheNone);
   view->setViewportUpdateMode(QGraphicsView::FullViewportUpdate);

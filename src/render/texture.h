@@ -4,6 +4,7 @@
 #pragma once
 
 #include "../core/loader.h"
+#include "../core/watcher.h"
 
 #include "opengl.h"
 #include "resource.h"
@@ -15,6 +16,7 @@ class Mat;
 enum class TextureType {
   Color = 0,
   Normal = 1,
+  Linear = 2,
 };
 
 class Texture;
@@ -38,14 +40,19 @@ class Texture : public TextureBase {
   bool _loaded = false;
   TextureType _type = TextureType::Color;
   std::string _url;
-  // Loader<std::shared_ptr<cv::Mat>, std::string> _loader;
   Loader<TextureData> _loader;
+  Watcher _watcher;
+  bool _transparent = false;
+  bool _mipmap = true;
 
 public:
-  Texture(TextureType type) : _type(type) {}
+  Texture(TextureType type = TextureType::Color) : _type(type) {}
   Texture(const std::string &url, TextureType type);
+  void mipmap(bool mipmap) { _mipmap = mipmap; }
   GLuint update(const cv::Mat &image);
   GLuint update();
+  GLuint update(int width, int height, int format, int samples = 0);
+  bool transparent() const { return _transparent; }
   const std::string &url() const { return _url; }
   static TextureManager &manager();
 };

@@ -3,10 +3,9 @@
 
 #include "splitwindow.h"
 
-#include "mainwindow.h"
-
 #include "../core/log.h"
 #include "../core/workspace.h"
+#include "mainwindow.h"
 
 WindowBase::WindowBase() {
   LOG_DEBUG("new split window created");
@@ -68,7 +67,6 @@ SplitWindowBase::SplitWindowBase(Qt::Orientation orientation)
         }
         parent->position() = std::max(0.05, std::min(0.95, p));
         LOG_DEBUG("splitter position " << parent->position());
-        // parent->sync();
         ws->modified();
       }
     }
@@ -162,7 +160,6 @@ void ContentWindowBase::replace(const std::shared_ptr<Window> &new_window) {
   });
 }
 ContentWindowBase::ContentWindowBase() {
-  // setFrameStyle(QFrame::Sunken || QFrame::Box);
   layout = new QVBoxLayout(this);
   layout->setContentsMargins(0, 0, 0, 0);
   bar = new QHBoxLayout(this);
@@ -185,8 +182,6 @@ ContentWindowBase::ContentWindowBase() {
         }
         QString label = type->name().c_str();
         label = label.replace("Window", "");
-        // label += " ";
-        // label += type->typeId().name();
         if (type->typeId() == typeid(*this)) {
           button->setText(label);
         }
@@ -222,9 +217,6 @@ ContentWindowBase::ContentWindowBase() {
 
   {
     auto *button = new FlatButton();
-    // button->setIcon(createIcon(QChar((int)0x1F031)));
-    // button->setIcon(createIcon(QChar(0x2015)));
-    // button->setIcon(MATERIAL_ICON("vertical_split"));
     button->setIcon(MATERIAL_ICON("border_vertical"));
     button->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
     connect(button, &QPushButton::clicked, this, [this]() {
@@ -235,8 +227,6 @@ ContentWindowBase::ContentWindowBase() {
   }
   {
     auto *button = new FlatButton();
-    // button->setIcon(createIcon(QChar(0x007c)));
-    // button->setIcon(MATERIAL_ICON("horizontal_split"));
     button->setIcon(MATERIAL_ICON("border_horizontal"));
     button->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
     connect(button, &QPushButton::clicked, this, [this]() {
@@ -246,15 +236,15 @@ ContentWindowBase::ContentWindowBase() {
     bar->addWidget(button);
   }
   {
-    // auto *button = new QPushButton(QString(QChar(0x2715)), this);
+
     auto *button = new FlatButton();
-    // button->setIcon(createIcon(QChar(0x2715)));
+
     button->setIcon(style()->standardIcon(QStyle::SP_DockWidgetCloseButton));
     button->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
     bar->addWidget(button);
     connect(button, &QAbstractButton::clicked, this, [this]() {
       QTimer::singleShot(0, this, [this]() {
-        // setUpdatesEnabled(false);
+
         LockScope ws;
         auto me = std::dynamic_pointer_cast<Window>(this->shared_from_this());
         std::shared_ptr<Object> window_old;
@@ -284,7 +274,7 @@ ContentWindowBase::ContentWindowBase() {
           replaceWindow(window_old, window_new);
           ws->modified();
         }
-        // setUpdatesEnabled(true);
+
       });
     });
   }
@@ -314,12 +304,64 @@ void ContentWindowBase::setContentWidget(QWidget *widget) {
 }
 
 EmptyWindow::EmptyWindow() {
-  /*auto *label = new QLabel("Empty");
-  label->setStyleSheet("background: #888;");
-  label->setAlignment(Qt::AlignCenter);
-  setContentWidget(label);
-  */
   auto *view = new QWidget(this);
   view->setStyleSheet("background: #000;");
   setContentWidget(view);
+  {
+    QTimer *timer = new QTimer(this);
+    timer->setInterval(10);
+    timer->setSingleShot(false);
+    connect(timer, &QTimer::timeout, this, [this, view]() {
+      static bool f = false;
+      if (f = !f) {
+        view->setStyleSheet("background: #000;");
+      } else {
+        view->setStyleSheet("background: #fff;");
+      }
+    });
+    timer->start();
+  }
+}
+
+void ContentWindowBase::paintAnnotationHUD(
+    QPainter *painter, const std::shared_ptr<const Type> &type) {
+  if (type != nullptr) {
+    double color = 0;
+    {
+      LockScope ws;
+      if (auto track = ws->currentAnnotationTrack().resolve(ws())) {
+        color = track->color();
+      }
+    }
+    QSize size = painter->window().size();
+    size = QSize(size.width(), size.height());
+    if (type->name() != _annotation_hud_string) {
+      static auto font = []() {
+        QFont font;
+        font.setPixelSize(32);
+        return font;
+      }();
+      _annotation_hud_string = type->name();
+      _annotation_hud_text = QStaticText(_annotation_hud_string.c_str());
+      _annotation_hud_text.setPerformanceHint(QStaticText::AggressiveCaching);
+      _annotation_hud_text.prepare(QTransform(), font);
+    }
+    int padding_x = 8;
+    int padding_y = 4;
+    auto c = QColor::fromHsvF(color, 1, 0.7, 0.9);
+    int frame = 5;
+    double text_right = padding_x * 2 + _annotation_hud_text.size().width();
+    double text_bottom = padding_y * 2 + _annotation_hud_text.size().height();
+    painter->fillRect(0, 0, text_right, text_bottom, QBrush(c));
+    painter->fillRect(text_right, 0, size.width() - text_right, frame,
+                      QBrush(c));
+    painter->fillRect(0, text_bottom, frame, size.height() - text_bottom,
+                      QBrush(c));
+    painter->fillRect(size.width() - frame, frame, frame, size.height() - frame,
+                      QBrush(c));
+    painter->fillRect(frame, size.height() - frame, size.width() - 2 * frame,
+                      frame, QBrush(c));
+    painter->setPen(QPen(QBrush(Qt::white), 0));
+    painter->drawStaticText(padding_x, padding_y, _annotation_hud_text);
+  }
 }

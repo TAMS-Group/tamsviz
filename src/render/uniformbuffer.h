@@ -36,14 +36,9 @@ public:
   void update(const T &value) { UniformBufferBase::update(&value, sizeof(T)); }
   template <class CONTAINER> void update(const CONTAINER &data) {
     if (_aligned_stride < 0) {
-
-      // TODO:
       GLint buffer_alignment = -1;
       V_GL(
           glGetIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &buffer_alignment));
-      /*if (buffer_alignment < 1) {
-        throw std::runtime_error("invalid buffer alignment value");
-    }*/
       if (buffer_alignment < 1) {
         LOG_ERROR("failed to get buffer alignment, using 256");
         buffer_alignment = 256;

@@ -43,7 +43,9 @@ struct MaterialBlock {
   float metallic = 0.0f;
   uint32_t color_texture = 0;
   uint32_t normal_texture = 0;
-  uint32_t shading_method = 1;
+  uint32_t id = 0;
+  uint32_t flags = 0;
+  uint8_t transparent = false;
 };
 
 struct InstanceBlock {
@@ -65,6 +67,8 @@ struct InstanceBlock {
 
 struct RenderOptions {
   GLuint primitive_type = GL_TRIANGLES;
+  bool transparent = false;
+  bool double_sided = false;
 };
 
 struct RenderCommand {
@@ -82,7 +86,7 @@ class RenderList {
       _materials;
   std::vector<InstanceBlock, Eigen::aligned_allocator<InstanceBlock>>
       _instances;
-  std::vector<RenderCommand, Eigen::aligned_allocator<RenderCommand>> _commands;
+  std::vector<RenderCommand> _commands;
   std::vector<LightBlock, Eigen::aligned_allocator<LightBlock>> _lights;
 
 public:
@@ -114,12 +118,7 @@ public:
 
   inline void push(const LightBlock &light) { _lights.push_back(light); }
 
-  void clear() {
-    _materials.clear();
-    _instances.clear();
-    _commands.clear();
-    _lights.clear();
-  }
+  void clear();
 
   friend class Renderer;
 };

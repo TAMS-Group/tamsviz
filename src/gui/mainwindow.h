@@ -10,10 +10,7 @@ class MainWindow : public QMainWindow {
   QMenu *open_recent_menu = nullptr;
 
 protected:
-  virtual bool event(QEvent *event) override {
-    // LOG_DEBUG(event->type());
-    QMainWindow::event(event);
-  }
+  virtual bool event(QEvent *event) override;
 
 public:
   bool closeDocument();

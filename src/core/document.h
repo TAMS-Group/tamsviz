@@ -4,10 +4,15 @@
 #pragma once
 
 #include "event.h"
+#include "object.h"
 #include "serialization.h"
 #include "snapshot.h"
+#include "struct.h"
 
 #include <Eigen/Dense>
+
+class SceneContext;
+class SceneAnnotationBase;
 
 STRUCT_BEGIN(Eigen::Vector2d);
 STRUCT_PROPERTY(x);
@@ -82,6 +87,7 @@ struct Pose {
   }
   inline bool operator!=(const Pose &other) const { return !(*this == other); }
   Eigen::Isometry3d toIsometry3d() const;
+  void fromIsometry3d(const Eigen::Isometry3d &pose);
 };
 STRUCT_BEGIN(Pose);
 STRUCT_PROPERTY(position);
@@ -110,12 +116,14 @@ STRUCT_END();
 class RenderList;
 
 struct RenderSyncContext {
-  Eigen::Isometry3d pose = Eigen::Isometry3d::Identity();
+  Eigen::Affine3d pose = Eigen::Affine3d::Identity();
   RenderList *render_list = nullptr;
 };
 struct RenderAsyncContext {
   RenderList *render_list = nullptr;
 };
+
+class Interaction;
 
 struct Display : Object {
 
@@ -162,6 +170,10 @@ public:
   }
   virtual void renderSync(const RenderSyncContext &context) {}
   virtual void renderAsync(const RenderAsyncContext &context) {}
+  virtual bool pick(uint32_t id) const { return false; }
+  virtual bool interact(const Interaction &interaction);
+  virtual void refreshRecursive();
+  virtual void refresh();
 };
 DECLARE_TYPE(Display, Object);
 
@@ -171,8 +183,9 @@ protected:
 
 public:
   PROPERTY(std::vector<std::shared_ptr<Display>>, displays,
-           std::vector<std::shared_ptr<Display>>());
+           std::vector<std::shared_ptr<Display>>(), hidden = true);
   virtual void renderSyncRecursive(const RenderSyncContext &context) override;
+  virtual void refreshRecursive();
 };
 DECLARE_TYPE(DisplayGroupBase, Display);
 
@@ -196,6 +209,7 @@ public:
   PROPERTY(Color4, backgroundColor, Color4(0.3, 0.3, 0.3, 1.0));
   PROPERTY(double, ambientLighting, 1.0, min = 0.0, max = 1.0);
   virtual void renderSync(const RenderSyncContext &context) override;
+  virtual void renderAsync(const RenderAsyncContext &context) override;
   WorldDisplay();
 };
 DECLARE_TYPE(WorldDisplay, DisplayGroupBase);
@@ -208,20 +222,6 @@ public:
   PROPERTY(std::string, label, "");
 };
 DECLARE_TYPE(AnnotationBase, Object);
-
-class QPainterPath;
-struct ImageAnnotationBase : AnnotationBase {
-protected:
-  ImageAnnotationBase() {}
-
-public:
-  PROPERTY(std::vector<Eigen::Vector2d>, controlPoints);
-  bool complete = false;
-  std::shared_ptr<QPainterPath> shape;
-  virtual void render() = 0;
-  virtual void constrain() {}
-};
-DECLARE_TYPE(ImageAnnotationBase, AnnotationBase);
 
 struct AnnotationSpan : Object {
   PROPERTY(std::string, label, "");
@@ -243,12 +243,14 @@ DECLARE_TYPE(TrackBase, Object);
 
 struct AnnotationBranch : Object {
   PROPERTY(std::string, name);
-  PROPERTY(std::vector<std::shared_ptr<AnnotationSpan>>, spans);
+  PROPERTY(std::vector<std::shared_ptr<AnnotationSpan>>, spans, {},
+           hidden = true);
 };
 DECLARE_TYPE(AnnotationBranch, Object);
 
 struct AnnotationTrack : TrackBase {
-  PROPERTY(std::vector<std::shared_ptr<AnnotationBranch>>, branches);
+  PROPERTY(std::vector<std::shared_ptr<AnnotationBranch>>, branches, {},
+           hidden = true);
   std::shared_ptr<AnnotationBranch> branch(bool create = false);
 };
 DECLARE_TYPE(AnnotationTrack, TrackBase);
@@ -257,7 +259,7 @@ struct GraphTrack : TrackBase {};
 DECLARE_TYPE(GraphTrack, TrackBase);
 
 struct Timeline : Object {
-  PROPERTY(std::vector<std::shared_ptr<TrackBase>>, tracks);
+  PROPERTY(std::vector<std::shared_ptr<TrackBase>>, tracks, {}, hidden = true);
 };
 DECLARE_TYPE(Timeline, Object);
 

@@ -11,6 +11,11 @@
 
 #include <QTimer>
 
+std::shared_ptr<GlobalEvents> GlobalEvents::instance() {
+  static auto instance = std::make_shared<GlobalEvents>();
+  return instance;
+}
+
 void Selection::operator=(const std::shared_ptr<Object> &o) {
   _objects.clear();
   if (o) {
@@ -97,6 +102,8 @@ Workspace::Workspace() {
       });
     });
   }
+
+  modified.connect([this]() { document()->display()->refreshRecursive(); });
 }
 Workspace::~Workspace() { object_ptr_test.clear(); }
 std::vector<std::string> Workspace::listTopics(const std::string &type_name) {
@@ -110,7 +117,14 @@ std::vector<std::string> Workspace::listTopics(const std::string &type_name) {
 ObjectScope::ObjectScope() { Property::unlockScope(+1); }
 ObjectScope::~ObjectScope() { Property::unlockScope(-1); }
 
-LockScope::LockScope() {}
+LockScope::LockScope() {
+  if (!ws()->history->current) {
+    auto item = std::make_shared<History<std::shared_ptr<Workspace>>::Item>();
+    item->snapshot =
+        Snapshot<std::shared_ptr<Workspace>>::save(ws(), nullptr, nullptr);
+    ws()->history->current = item;
+  }
+}
 LockScope::~LockScope() {}
 
 std::shared_ptr<Workspace> &LockScope::workspace_instance() {
@@ -138,8 +152,6 @@ ActionScope::ActionScope(const std::string &label,
 ActionScope::~ActionScope() {
   LOG_INFO("done " << label);
   if (g_current_action_scopes.back() != this) {
-    // throw std::runtime_error("action scope corrupted, race condition?");
-    // LOG_ERROR("overlapping actions");
     throw std::runtime_error("overlapping actions");
   }
   g_current_action_scopes.pop_back();

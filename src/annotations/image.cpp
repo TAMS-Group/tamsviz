@@ -1,7 +1,8 @@
 // TAMSVIZ
 // (c) 2020 Philipp Ruppel
 
-#include "../core/document.h"
+#include "image.h"
+
 #include "../core/log.h"
 
 #include <QPainterPath>

@@ -19,14 +19,16 @@ class LoaderThread {
   std::condition_variable _condition;
   std::deque<std::pair<std::shared_ptr<void>, std::function<void()>>> _queue;
   bool _stop = false;
+  std::atomic<size_t> _count;
 
 public:
   void start(const std::shared_ptr<void> &owner,
              const std::function<void()> &fnc);
   void cancel(const std::shared_ptr<void> &owner);
+  size_t count() const { return _count; }
   LoaderThread();
   ~LoaderThread();
-  Event<void()> finished;
+  Event<void()> started, finished;
   static const std::shared_ptr<LoaderThread> &instance();
 };
 

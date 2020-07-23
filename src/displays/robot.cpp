@@ -3,14 +3,11 @@
 
 #include "robot.h"
 
-#include "material.h"
-#include "shapes.h"
-
 #include "../core/log.h"
 #include "../core/transformer.h"
 #include "../core/workspace.h"
-
 #include "../render/mesh.h"
+#include "shapes.h"
 
 #include <moveit/robot_model/robot_model.h>
 #include <moveit/robot_model_loader/robot_model_loader.h>
@@ -52,18 +49,19 @@ createShapeMesh(const boost::shared_ptr<urdf::Visual> &visual) {
 
 struct RobotLink {
   std::shared_ptr<Material> material = []() {
-    LockScope ws;
+    ObjectScope ws;
     return std::make_shared<Material>();
   }();
   Eigen::Isometry3d pose = Eigen::Isometry3d::Identity();
   const moveit::core::LinkModel *moveit_link = nullptr;
   size_t link_index = 0;
   size_t part_index = 0;
+  Frame frame;
   std::shared_ptr<Mesh> mesh;
   RobotLink(const moveit::core::LinkModel *moveit_link,
             const Eigen::Isometry3d &pose, const std::shared_ptr<Mesh> &mesh)
       : moveit_link(moveit_link), link_index(moveit_link->getLinkIndex()),
-        pose(pose), mesh(mesh) {}
+        pose(pose), mesh(mesh), frame(moveit_link->getName()) {}
 };
 
 struct RobotModel {
@@ -256,7 +254,7 @@ struct RobotModel {
                           auto link = std::shared_ptr<RobotLink>(
                               new RobotLink(moveit_link, pose,
                                             std::make_shared<Mesh>(mesh_data)));
-                          LockScope ws;
+                          ObjectScope ws;
                           auto *ai_material =
                               ai_scene->mMaterials[ai_mesh->mMaterialIndex];
                           {
@@ -323,21 +321,21 @@ struct RobotModel {
   }
 };
 
-struct RobotState {
+struct RobotState : SceneNode {
   std::unordered_set<std::string> variable_names;
   std::vector<std::shared_ptr<MeshRenderer>> mesh_renderers;
   std::shared_ptr<RobotModel> robot_model;
   moveit::core::RobotState moveit_state;
-  RobotState(RobotDisplayBase *display,
-             const std::shared_ptr<RobotModel> &robot_model)
+  RobotState(const std::shared_ptr<RobotModel> &robot_model,
+             std::shared_ptr<MaterialOverride> material_override)
       : robot_model(robot_model), moveit_state(robot_model->moveit_robot) {
     moveit_state.setToDefaultValues();
     {
-      LockScope ws;
+      ObjectScope ws;
       for (size_t i = 0; i < robot_model->links.size(); i++) {
-        mesh_renderers.push_back(std::make_shared<MeshRenderer>(
-            display, robot_model->links.at(i)->mesh,
-            robot_model->links.at(i)->material, display->materialOverride()));
+        mesh_renderers.push_back(create<MeshRenderer>(
+            robot_model->links.at(i)->mesh, robot_model->links.at(i)->material,
+            material_override));
       }
     }
     for (auto &n : moveit_state.getVariableNames()) {
@@ -350,7 +348,7 @@ void RobotDisplayBase::renderSync(const RenderSyncContext &context) {
   MeshDisplayBase::renderSync(context);
   bool invalidated = _invalidated.poll();
   if (invalidated || _watcher.changed(description(), importOptions()) ||
-      (!_robot_state && !_robot_model_loader)) {
+      !_robot_model_loader) {
     static auto manager =
         std::make_shared<ResourceManager<Loader<RobotModel>, std::string,
                                          RobotModelImportOptions>>();
@@ -359,11 +357,13 @@ void RobotDisplayBase::renderSync(const RenderSyncContext &context) {
       _robot_model_loader->clear();
     }
     _robot_state = nullptr;
-    if (_robot_model_loader->load()) {
-      _robot_state =
-          std::make_shared<RobotState>(this, _robot_model_loader->load());
+    GlobalEvents::instance()->redraw();
+  }
+  if (_robot_state) {
+    bool double_sided = doubleSided();
+    for (auto &r : _robot_state->mesh_renderers) {
+      r->options().double_sided = double_sided;
     }
-    LockScope()->redraw();
   }
 }
 
@@ -372,19 +372,16 @@ void RobotDisplayBase::renderAsync(const RenderAsyncContext &context) {
   if (!_robot_state && _robot_model_loader) {
     if (auto robot_model = _robot_model_loader->load()) {
       if (robot_model->moveit_robot) {
-        _robot_state = std::make_shared<RobotState>(this, robot_model);
-        LockScope()->redraw();
+        _robot_state =
+            node()->create<RobotState>(robot_model, _material_override);
+        GlobalEvents::instance()->redraw();
       }
     }
   }
 }
 
 void RobotStateDisplay::renderSync(const RenderSyncContext &context) {
-  RobotDisplayBase::renderSync(context);
   _joint_state_message = topic().message();
-}
-
-void RobotStateDisplay::renderAsync(const RenderAsyncContext &context) {
   if (_robot_state) {
     _robot_state->moveit_state.setToDefaultValues();
     if (_joint_state_message) {
@@ -410,26 +407,24 @@ void RobotStateDisplay::renderAsync(const RenderAsyncContext &context) {
                           link->link_index))
                   .matrix()) *
           link->pose);
+      _robot_state->mesh_renderers.at(i)->show();
     }
   }
+  RobotDisplayBase::renderSync(context);
+}
+
+void RobotStateDisplay::renderAsync(const RenderAsyncContext &context) {
   RobotDisplayBase::renderAsync(context);
 }
 
 void RobotModelDisplay::renderSync(const RenderSyncContext &c) {
   auto context = c;
   context.pose.setIdentity();
-  {
-    LockScope ws;
-    _transformer = ws->document()->display()->transformer;
-  }
-  RobotDisplayBase::renderSync(context);
-}
-
-void RobotModelDisplay::renderAsync(const RenderAsyncContext &context) {
+  _transformer = LockScope()->document()->display()->transformer;
   if (_robot_state) {
     for (size_t i = 0; i < _robot_state->robot_model->links.size(); i++) {
       auto &link = _robot_state->robot_model->links.at(i);
-      if (auto transform = _transformer->lookup(link->moveit_link->getName())) {
+      if (auto transform = link->frame.pose(_transformer)) {
         _robot_state->mesh_renderers.at(i)->pose((*transform) * link->pose);
         _robot_state->mesh_renderers.at(i)->show();
       } else {
@@ -437,5 +432,9 @@ void RobotModelDisplay::renderAsync(const RenderAsyncContext &context) {
       }
     }
   }
+  RobotDisplayBase::renderSync(context);
+}
+
+void RobotModelDisplay::renderAsync(const RenderAsyncContext &context) {
   RobotDisplayBase::renderAsync(context);
 }

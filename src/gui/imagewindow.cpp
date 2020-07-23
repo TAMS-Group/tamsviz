@@ -158,7 +158,6 @@ struct AnnotationView : QGraphicsItem {
     painter->setPen(QPen(QBrush(QColor(0, 0, 0, 255)), 0, Qt::SolidLine,
                          Qt::SquareCap, Qt::MiterJoin));
     auto color = _color;
-    // color.setAlpha(_selected ? 255 : 200);
     painter->setBrush(QBrush(color));
     painter->drawPath(_visual);
 
@@ -198,9 +197,6 @@ struct AnnotationView : QGraphicsItem {
   }
   virtual QPainterPath shape() const override { return _collider; }
   virtual void mousePressEvent(QGraphicsSceneMouseEvent *event) override {
-    /*if (event->isAccepted()) {
-      return;
-  }*/
     if (_window->annotation_type) {
       return;
     }
@@ -224,9 +220,6 @@ struct AnnotationView : QGraphicsItem {
     }
   }
   virtual void mouseMoveEvent(QGraphicsSceneMouseEvent *event) override {
-    /*if (event->isAccepted()) {
-      return;
-  }*/
     if (_window->annotation_type) {
       return;
     }
@@ -241,9 +234,6 @@ struct AnnotationView : QGraphicsItem {
     }
   }
   virtual void mouseReleaseEvent(QGraphicsSceneMouseEvent *event) override {
-    /*if (event->isAccepted()) {
-      return;
-  }*/
     if (_window->annotation_type) {
       return;
     }
@@ -251,9 +241,7 @@ struct AnnotationView : QGraphicsItem {
       if (event->scenePos() != event->buttonDownScenePos(Qt::LeftButton)) {
         ActionScope ws("Move Annotations");
         auto delta =
-            (event->scenePos() - event->buttonDownScenePos(Qt::LeftButton)) /*/
-            (_zoom_factor / _window->zoom())*/
-            ;
+            (event->scenePos() - event->buttonDownScenePos(Qt::LeftButton));
         for (auto &p : _window->annotation_views) {
           auto *view = p.second;
           if (view->_selected) {
@@ -280,7 +268,6 @@ ImageWindow::ImageWindow() {
     button->setText("Image Topic");
     addToolWidget(button);
     connect(menu, &QMenu::aboutToShow, this, [this, menu]() {
-      // LOG_DEBUG("update topic menu");
       menu->clear();
       auto topics = LockScope()->listTopics(
           ros::message_traits::DataType<sensor_msgs::Image>::value());
@@ -364,7 +351,7 @@ ImageWindow::ImageWindow() {
 
   class MessageBuffer {
     std::mutex _mutex;
-    std::shared_ptr<sensor_msgs::Image> _image;
+    std::shared_ptr<const sensor_msgs::Image> _image;
     std::condition_variable _put_condition;
     std::thread _worker;
     QPixmap _pixmap;
@@ -376,8 +363,7 @@ ImageWindow::ImageWindow() {
     MessageBuffer() {
       _worker = std::thread([this]() {
         while (true) {
-          // LOG_DEBUG("image a");
-          std::shared_ptr<sensor_msgs::Image> image;
+          std::shared_ptr<const sensor_msgs::Image> image;
           {
             std::unique_lock<std::mutex> lock(_mutex);
             while (true) {
@@ -399,7 +385,6 @@ ImageWindow::ImageWindow() {
             }
             continue;
           }
-          // LOG_DEBUG("image b");
           cv_bridge::CvImagePtr cv_ptr;
           try {
             cv_ptr = cv_bridge::toCvCopy(*image,
@@ -422,8 +407,6 @@ ImageWindow::ImageWindow() {
             continue;
           }
           cv::Mat mat = cv_ptr->image;
-          // mat *= 1.5;
-          // cv::GaussianBlur(mat, mat, cv::Size(0, 0), 0.5, 0.5);
           auto pixmap =
               QPixmap::fromImage(QImage((uchar *)mat.data, mat.cols, mat.rows,
                                         mat.step, QImage::Format_RGBA8888));
@@ -444,7 +427,7 @@ ImageWindow::ImageWindow() {
       }
       _worker.join();
     }
-    void putImage(const std::shared_ptr<Message> &msg) {
+    void putImage(const std::shared_ptr<const Message> &msg) {
       std::unique_lock<std::mutex> lock(_mutex);
       _image = nullptr;
       _image_time = ros::Time();
@@ -469,16 +452,12 @@ ImageWindow::ImageWindow() {
     class GraphicsScene : public QGraphicsScene {
       GraphicsView *_parent = nullptr;
       QGraphicsRectItem *_selection_rect = nullptr;
-      // bool _press_already_accepted = false;
 
     protected:
       virtual void mousePressEvent(QGraphicsSceneMouseEvent *event) override {
         QGraphicsScene::mousePressEvent(event);
-        // LOG_DEBUG("mouse press accepted " << event->isAccepted());
         if (event->button() == Qt::LeftButton) {
-          //_press_already_accepted = event->isAccepted();
           if (event->modifiers() == 0 && !event->isAccepted()) {
-            // LOG_DEBUG("clear selection");
             LockScope ws;
             ws->selection().clear();
             ws->modified();
@@ -488,7 +467,6 @@ ImageWindow::ImageWindow() {
       }
       virtual void mouseMoveEvent(QGraphicsSceneMouseEvent *event) override {
         QGraphicsScene::mouseMoveEvent(event);
-        // LOG_DEBUG("mouse move accepted " << event->isAccepted());
         if (_parent->_parent->annotation_type == nullptr) {
           if (event->buttons() == Qt::LeftButton && !event->isAccepted()) {
             event->accept();
@@ -506,25 +484,16 @@ ImageWindow::ImageWindow() {
       }
       virtual void mouseReleaseEvent(QGraphicsSceneMouseEvent *event) override {
         QGraphicsScene::mouseReleaseEvent(event);
-        // LOG_DEBUG("mouse release accepted " << event->isAccepted());
-        // LOG_DEBUG("mouse release");
         if (event->button() == Qt::LeftButton && !event->isAccepted()) {
           event->accept();
           if (_selection_rect->isVisible()) {
             LockScope ws;
-            // LOG_DEBUG("rectangle selection");
-            /*if (event->modifiers() == 0) {
-              LOG_DEBUG("clear selection");
-              ws->selection().clear();
-          }*/
             QPainterPath selection_path;
             selection_path.addRect(_selection_rect->rect());
             for (auto &p : _parent->_parent->annotation_views) {
               auto *view = p.second;
-              // LOG_DEBUG("checking annotation");
               if (selection_path.intersects(
                       view->shape().translated(view->pos()))) {
-                // LOG_DEBUG("annotation selected");
                 ws->selection().add(p.first);
               }
             }
@@ -544,6 +513,16 @@ ImageWindow::ImageWindow() {
         _selection_rect->setZValue(10);
         addItem(_selection_rect);
       }
+
+      virtual void drawForeground(QPainter *painter,
+                                  const QRectF &rect) override {
+        QGraphicsScene::drawForeground(painter, rect);
+        painter->save();
+        painter->resetTransform();
+        _parent->_parent->paintAnnotationHUD(painter,
+                                             _parent->_parent->annotation_type);
+        painter->restore();
+      }
     };
     ImageWindow *_parent = nullptr;
     std::shared_ptr<MessageBuffer> _buffer;
@@ -559,7 +538,6 @@ ImageWindow::ImageWindow() {
 
   private:
     void sync() {
-      // scene()->setSceneRect(_image_pixmap.rect());
       {
         double s = 1000000;
         scene()->setSceneRect(-s, -s, 2 * s, 2 * s);
@@ -567,10 +545,6 @@ ImageWindow::ImageWindow() {
       _image_item->setPixmap(_image_pixmap);
       {
         LockScope ws;
-        /*if (_parent->new_annotation && _parent->new_annotation_span &&
-            ws()->selection().empty()) {
-          _parent->new_annotation = nullptr;
-      }*/
         {
           resetTransform();
           double zoom = zoomFactor();
@@ -598,6 +572,9 @@ ImageWindow::ImageWindow() {
                       if (auto annotation =
                               std::dynamic_pointer_cast<ImageAnnotationBase>(
                                   annotation_base)) {
+                        if (annotation->topic() != _parent->topic()) {
+                          continue;
+                        }
                         auto &view = _parent->annotation_views[annotation];
                         if (view == nullptr) {
                           view = new AnnotationView(_parent, ws(), track, span,
@@ -645,6 +622,7 @@ ImageWindow::ImageWindow() {
                  ImageWindow *parent)
         : _buffer(buffer), _parent(parent) {
       _scene = new GraphicsScene(this);
+      setViewport(new QOpenGLWidget(this));
       setCacheMode(QGraphicsView::CacheNone);
       setViewportUpdateMode(QGraphicsView::FullViewportUpdate);
       setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
@@ -666,24 +644,12 @@ ImageWindow::ImageWindow() {
         });
       });
       LockScope()->modified.connect(this, [this]() { sync(); });
-      // grabShortcut(Qt::Key_Escape, Qt::WidgetShortcut);
     }
     void focusOutEvent(QFocusEvent *event) {
-      // LOG_DEBUG("focus lost");
       QGraphicsView::focusOutEvent(event);
       _parent->new_annotation = nullptr;
       sync();
     }
-    /*void keyPressEvent(QKeyEvent *event) {
-      QGraphicsView::keyPressEvent(event);
-      LOG_DEBUG("key press");
-      if (_parent->new_annotation) {
-        if (event->key() == Qt::Key_Escape) {
-          _parent->new_annotation = nullptr;
-          sync();
-        }
-      }
-    }*/
     void wheelEvent(QWheelEvent *wheel) {
       double degrees = wheel->angleDelta().y() * (1.0 / 8);
       double exponent = degrees / 90;
@@ -800,7 +766,6 @@ ImageWindow::ImageWindow() {
                     current_track = std::make_shared<AnnotationTrack>());
               }
               ws->currentAnnotationTrack() = current_track;
-              // ws->selection() = current_track;
               std::shared_ptr<AnnotationSpan> current_span;
               if (auto branch = current_track->branch()) {
                 for (auto &span : branch->spans()) {
@@ -820,12 +785,8 @@ ImageWindow::ImageWindow() {
                   double duration = 0;
                   if (ws->player->findMessageTimeSpan(
                           _parent->topic(), current_time, &start, &duration)) {
-                    // LOG_DEBUG("message time span " << start << " " <<
-                    // duration);
                     current_span->start() = start;
                     current_span->duration() = duration;
-                  } else {
-                    // LOG_DEBUG("no current message");
                   }
                 }
                 current_track->branch(true)->spans().push_back(current_span);
@@ -836,6 +797,7 @@ ImageWindow::ImageWindow() {
                 _parent->new_annotation =
                     _parent->annotation_type
                         ->instantiate<ImageAnnotationBase>();
+                _parent->new_annotation->topic() = _parent->topic();
                 _parent->new_annotation->controlPoints().emplace_back(
                     scene_pos.x(), scene_pos.y());
                 _parent->new_annotation->constrain();
@@ -900,8 +862,6 @@ ImageWindow::ImageWindow() {
   };
 
   auto *view = new GraphicsView(buffer, this);
-  // view->setInteractive(true);
-  // view->setDragMode(QGraphicsView::ScrollHandDrag);
   setContentWidget(view);
 
   {
@@ -916,7 +876,7 @@ ImageWindow::ImageWindow() {
           buffer->putImage(nullptr);
           subscriber = std::make_shared<Subscriber<Message>>(
               topic(), shared_from_this(),
-              [buffer](const std::shared_ptr<Message> &msg) {
+              [buffer](const std::shared_ptr<const Message> &msg) {
                 buffer->putImage(msg);
               });
         }

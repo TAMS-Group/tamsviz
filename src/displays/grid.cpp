@@ -4,7 +4,6 @@
 #include "grid.h"
 
 #include "../core/log.h"
-
 #include "../render/mesh.h"
 
 void GridDisplay::renderSync(const RenderSyncContext &context) {

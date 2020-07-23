@@ -10,6 +10,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include "event.h"
+
 #include <rosbag/bag.h>
 
 class RosBagView;
@@ -25,13 +27,15 @@ class BagPlayer {
   std::string _path;
   std::string _file_name;
   ros::Time _bag_start_time;
-  rosbag::Bag _bag;
   std::thread _thread;
   std::mutex _action_mutex;
   std::function<void()> _pending_action;
   std::function<double()> _time_function;
   std::condition_variable _action_condition;
   std::unordered_map<std::string, std::shared_ptr<Topic>> _topics;
+  std::vector<std::string> _topic_names;
+  std::vector<std::pair<std::string, std::string>> _topic_type_name_list;
+  volatile bool _is_playing = false;
   bool _exit = false;
   void startAction(const std::function<void()> &action);
   inline bool interrupted_nolock() {
@@ -41,18 +45,18 @@ class BagPlayer {
     std::unique_lock<std::mutex> lock(_action_mutex);
     return interrupted_nolock();
   }
-  std::shared_ptr<Message>
-  instantiate_nolock(const rosbag::MessageInstance &msg);
-  void publish(const rosbag::MessageInstance &msg);
+  // std::shared_ptr<const Message>
+  // instantiate_nolock(const rosbag::MessageInstance &msg);
+  // void publish(const rosbag::MessageInstance &msg);
   void publish(const std::string &topic,
-               const std::shared_ptr<Message> &message);
+               const std::shared_ptr<const Message> &message);
 
 public:
   BagPlayer(const std::string &path);
   BagPlayer(const BagPlayer &) = delete;
   BagPlayer &operator=(const BagPlayer &) = delete;
   void stop();
-  void play();
+  void play(const std::vector<double> &notification_times);
   void rewind();
   void seek(double time_from_start);
   double time();
@@ -63,8 +67,13 @@ public:
   bool findMessageTimeSpan(const std::string &topic, double time, double *start,
                            double *duration) const;
   const ros::Time &startTime() const { return _bag_start_time; }
-  std::vector<std::shared_ptr<Message>>
-  readMessageSamples(const std::string &topic, double start, double stop,
-                     double step);
+  std::vector<std::shared_ptr<const Message>>
+  readMessageSamples(const std::string &topic, double start, double stop);
+  void readMessageSamples(
+      const std::string &topic, double start, double stop,
+      const std::function<void(const std::shared_ptr<const Message> &)>
+          &callback);
+  bool isPlaying() const { return _is_playing; }
   ~BagPlayer();
+  Event<void()> changed;
 };

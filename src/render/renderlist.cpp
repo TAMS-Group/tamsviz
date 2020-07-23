@@ -3,9 +3,8 @@
 
 #include "renderlist.h"
 
-#include "mesh.h"
-
 #include "../core/log.h"
+#include "mesh.h"
 
 void RenderList::push(const MaterialBlock &material) {
   _materials.push_back(material);
@@ -15,6 +14,9 @@ void RenderList::push(const std::shared_ptr<Mesh> &mesh,
                       const RenderOptions &options) {
   RenderCommand command;
   command.options = options;
+  if (mesh->transparent()) {
+    command.options.transparent = true;
+  }
   command.vertex_array_object = mesh->vertexArrayObject();
   if (!mesh->data().indices.empty()) {
     command.element_count = mesh->data().indices.size();
@@ -36,4 +38,11 @@ void RenderList::push(const InstanceBlock &instance) {
     command.instance_count++;
   }
   _instances.push_back(instance);
+}
+
+void RenderList::clear() {
+  _materials.clear();
+  _instances.clear();
+  _commands.clear();
+  _lights.clear();
 }

@@ -3,11 +3,40 @@
 
 #include "mesh.h"
 
+#include "../core/log.h"
 #include "shader.h"
 
-#include "../core/log.h"
-
 #include <map>
+
+MeshData operator+(const MeshData &a, const MeshData &b) {
+  MeshData r = a;
+  r.append(b);
+  return r;
+}
+
+MeshData &MeshData::colorize(float r, float g, float b, float a) {
+  return colorize(Eigen::Vector4f(r, g, b, a));
+}
+
+MeshData &MeshData::operator+=(const MeshData &other) { return append(other); }
+
+MeshData &MeshData::translate(float x, float y, float z) {
+  return translate(Eigen::Vector3f(x, y, z));
+}
+
+MeshData &MeshData::scale(const Eigen::Vector3f &v) {
+  return transform(Eigen::Scaling(v));
+}
+
+MeshData &MeshData::scale(float x, float y, float z) {
+  return scale(Eigen::Vector3f(x, y, z));
+}
+
+MeshData &MeshData::scale(float s) { return scale(s, s, s); }
+
+MeshData &MeshData::rotate(float angle, const Eigen::Vector3f &axis) {
+  return transform(Eigen::AngleAxisf(angle, axis));
+}
 
 void MeshData::_transform(const Eigen::Affine3f &transform) {
   for (auto &p : positions) {
@@ -93,7 +122,20 @@ MeshData &MeshData::computeNormals() {
   return *this;
 }
 
-Mesh::Mesh(const MeshData &data) : _data(data) {}
+Mesh::Mesh(const MeshData &data) : _data(data) { init(); }
+
+Mesh::Mesh(const std::function<void(MeshData &)> &loader) : _loader(loader) {}
+
+Mesh::Mesh(const std::function<MeshData()> &loader)
+    : _loader([loader](MeshData &d) { d = loader(); }) {}
+
+void Mesh::init() {
+  for (auto &c : _data.colors) {
+    if (c.w() < 1.0) {
+      _transparent = true;
+    }
+  }
+}
 
 void Mesh::createBuffer(GLenum type, GLuint index, const void *data,
                         size_t size, size_t stride) {
@@ -112,9 +154,12 @@ void Mesh::createBuffer(GLenum type, GLuint index, const void *data,
 
 void Mesh::create() {
   if (!_vao) {
-    /*LOG_DEBUG("creating opengl mesh with "
-              << _data.positions.size() << " positions and "
-              << _data.indices.size() << " indices");*/
+    if (_loader) {
+      _data = MeshData();
+      _loader(_data);
+      _loader = nullptr;
+      init();
+    }
     V_GL(glGenVertexArrays(1, &_vao));
     if (!_data.positions.empty()) {
       createBuffer(GL_ARRAY_BUFFER, (GLuint)VertexAttributes::position,
@@ -165,17 +210,13 @@ void Mesh::create() {
                      sizeof(_data.indices[0]));
       }
     }
-    // LOG_DEBUG("opengl mesh created");
   }
 }
 
 void Mesh::destroy() {
   if (_vao) {
     GLuint vao = _vao;
-    cleanup([vao]() {
-      // LOG_DEBUG("destroy mesh");
-      V_GL(glDeleteVertexArrays(1, &vao));
-    });
+    cleanup([vao]() { V_GL(glDeleteVertexArrays(1, &vao)); });
     _vao = 0;
   }
 }
@@ -199,6 +240,5 @@ void Mesh::bind() {
   if (!_vao) {
     create();
   }
-  // LOG_DEBUG("bind vao " << _vao);
   V_GL(glBindVertexArray(_vao));
 }

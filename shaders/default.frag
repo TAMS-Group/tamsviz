@@ -1,7 +1,7 @@
 // TAMSVIZ
 // (c) 2020 Philipp Ruppel
 
-#version 140
+#version 150
 
 layout(std140) uniform material_block {
   vec4 color;
@@ -9,7 +9,9 @@ layout(std140) uniform material_block {
   float metallic;
   int color_texture;
   int normal_texture;
-  int shading_method;
+  //int shading_method;
+  uint id;
+  int flags;
 } material;
 
 struct Light {
@@ -37,6 +39,8 @@ in vec4 x_color;
 in vec4 x_extra;
 
 out vec4 out_color;
+out vec4 out_blend;
+out uint out_id;
 
 void main() {
     
@@ -49,26 +53,14 @@ void main() {
     vec3 lighting = vec3(0.0, 0.0, 0.0);
     vec3 view_direction = normalize(x_view_position - x_position.xyz);
     
-    if(x_extra.y != 0.0) {
+    if(x_extra.z > 0.5 && x_extra.z < 1.5) {
         if(length(x_texcoord) > 1.0) {
             discard;
         }
     }
     
-    if(x_extra.w < 0.5) {
-        out_color = x_color;
-        return;
-    }
-    
-    vec3 albedo = material.color.xyz;
-    albedo *= x_color.xyz;
-    if(material.color_texture != 0) {
-        albedo *= texture2D(color_sampler, x_texcoord).xyz;
-    }
-    if(material.shading_method == 0) {
-        out_color = vec4(albedo, material.color.w);
-        return;
-    }
+    vec3 albedo = material.color.xyz * x_color.xyz;
+    float alpha = material.color.w * x_color.w;
     
     vec3 normal;
     if(material.normal_texture > 0) {
@@ -79,6 +71,33 @@ void main() {
     } else {
         normal = normalize(x_normal);
     }
+    
+    out_id = material.id;
+    
+    out_blend = vec4(alpha, 0.0, 0.0, 1.0);
+    if(material.color_texture != 0) {
+        vec4 t = texture2D(color_sampler, x_texcoord);
+        if((material.flags & 1) != 0) {
+            if(t.x < 0.5) {
+                discard;
+            }
+        } else {
+            alpha *= t.w;
+            albedo *= t.xyz;
+        }
+        //albedo = vec3(t.xxx);
+    }
+    
+    if(((material.flags & 2) != 0) || (x_extra.z > 0.1)) {
+        out_color = vec4(albedo, alpha);
+        return;
+    }
+    
+    if(dot(normal, view_direction) < 0.0) {
+        normal = -normal;
+    }
+    
+    float specular_factor = 1.0 / (0.2 + alpha);
     
     float n_dot_v = dot(normal, view_direction);
     
@@ -103,6 +122,7 @@ void main() {
             float ndf = 1.0;
             vec3 specular = (vec3(ndf * geometry) * fresnel) / max(0.001, 4.0 * max(0.0, n_dot_v));
             specular = min(vec3(1.0), specular);
+            specular *= specular_factor;
             lighting += max(vec3(0.0), (diffuse * albedo / pi + specular) * radiance * max(0.0, n_dot_l));
             continue;
         }
@@ -139,9 +159,10 @@ void main() {
             float ndf = roughness_2 / (pi * ndf_d * ndf_d);
 
             vec3 specular = (vec3(ndf * geometry) * fresnel) / max(0.001, 4.0 * max(0.0, n_dot_l) * max(0.0, n_dot_v));
+            specular *= specular_factor;
             lighting += max(vec3(0.0), (diffuse * albedo / pi + specular) * radiance * max(0.0, n_dot_l));
             
         }
     }
-    out_color = vec4(lighting, material.color.w);
+    out_color = vec4(lighting, alpha);
 }    

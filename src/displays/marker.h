@@ -4,77 +4,81 @@
 #pragma once
 
 #include "frame.h"
-#include "material.h"
-#include "mesh.h"
+#include "text.h"
 
 #include "../core/topic.h"
+#include "../core/watcher.h"
 #include "../render/mesh.h"
+#include "../scene/material.h"
+#include "../scene/mesh.h"
 
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
 
 #include <unordered_map>
 
-class VisualizationMarker {
+class VisualizationMarker : public SceneNode {
+  std::mutex _mutex;
   int _type = -1;
   Eigen::Affine3d _pose = Eigen::Affine3d::Identity();
   std::shared_ptr<Mesh> _mesh;
   Color4 _color;
   std::string _frame;
+  RenderOptions _render_options;
+  std::shared_ptr<Material> _material;
+  std::shared_ptr<SceneNode> _renderer;
+  std::string _text;
+  Watcher _mesh_watcher;
+  // std::string _checksum;
+  double _scale = 1.0;
 
 public:
-  std::shared_ptr<Mesh> mesh() const { return _mesh; }
-  int type() const { return _type; }
-  const Eigen::Affine3d &pose() const { return _pose; }
-  const Color4 &color() const { return _color; }
   void update(const visualization_msgs::Marker &marker);
-  const std::string &frame() const { return _frame; }
+  virtual void renderSync(const RenderSyncContext &context) override;
   VisualizationMarker() {}
   VisualizationMarker(const visualization_msgs::Marker &marker) {
     update(marker);
   }
 };
 
-namespace std {
-template <> struct hash<std::pair<std::string, int>> {
-  size_t operator()(const std::pair<std::string, int> &p) const {
-    return std::hash<std::string>()(p.first) ^ std::hash<int>()(p.second);
+class VisualizationMarkerArray : public SceneNode {
+  std::mutex _mutex;
+  std::map<std::pair<std::string, int>, std::shared_ptr<VisualizationMarker>>
+      _markers;
+  std::vector<std::shared_ptr<VisualizationMarker>> _marker_list;
+  void _update_nolock(const visualization_msgs::Marker &marker);
+
+public:
+  void update(const visualization_msgs::Marker &marker);
+  void update(const visualization_msgs::MarkerArray &marker_array);
+  virtual void renderSync(const RenderSyncContext &context) override;
+  VisualizationMarkerArray() {}
+  VisualizationMarkerArray(const visualization_msgs::Marker &marker) {
+    update(marker);
+  }
+  VisualizationMarkerArray(
+      const visualization_msgs::MarkerArray &marker_array) {
+    update(marker_array);
   }
 };
-} // namespace std
 
 class MarkerDisplayBase : public MeshDisplayBase {
 protected:
-  struct Data {
-    std::mutex _mutex;
-    std::unordered_map<std::pair<std::string, int>,
-                       std::shared_ptr<VisualizationMarker>>
-        _markers;
-    void update(const visualization_msgs::Marker &marker);
-  };
-  std::shared_ptr<Data> _data = std::make_shared<Data>();
-  struct Renderer {
-    std::shared_ptr<Mesh> mesh;
-    std::shared_ptr<Material> material;
-    std::shared_ptr<MeshRenderer> mesh_renderer;
-  };
-  std::unordered_map<std::pair<std::string, int>, std::shared_ptr<Renderer>>
-      _renderers;
-  void update(const visualization_msgs::Marker &marker);
-
-protected:
-  MarkerDisplayBase();
-
-public:
-  virtual void renderSync(const RenderSyncContext &context) override;
-  virtual void renderAsync(const RenderAsyncContext &context) override;
-  // PROPERTY(std::shared_ptr<MaterialOverride>, materialOverride,
-  //           std::make_shared<MaterialOverride>());
+  std::shared_ptr<VisualizationMarkerArray> _marker_array =
+      node()->create<VisualizationMarkerArray>();
+  void update(const visualization_msgs::Marker &marker) {
+    _marker_array->update(marker);
+  }
+  void update(const visualization_msgs::MarkerArray &marker_array) {
+    _marker_array->update(marker_array);
+  }
+  MarkerDisplayBase() {}
 };
 DECLARE_TYPE(MarkerDisplayBase, MeshDisplayBase);
 
 class MarkerFrameDisplayBase : public GenericFrameDisplay<MarkerDisplayBase> {
 public:
+  PROPERTY(Pose, transform);
 };
 
 class MarkerDisplay : public MarkerDisplayBase {

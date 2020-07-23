@@ -6,10 +6,10 @@
 #include "../core/bagplayer.h"
 #include "../core/history.h"
 #include "../core/log.h"
+#include "../core/profiler.h"
 #include "../core/serialization.h"
 #include "../core/snapshot.h"
 #include "../core/workspace.h"
-
 #include "displaytree.h"
 #include "imagewindow.h"
 #include "propertygrid.h"
@@ -21,6 +21,8 @@
 #include <ros/package.h>
 #include <ros/ros.h>
 
+#include <signal.h>
+
 struct ClipboardItem : Object {
   PROPERTY(std::shared_ptr<Object>, object);
   PROPERTY(Handle<Object>, parent);
@@ -31,6 +33,8 @@ struct ClipboardData : Object {
   PROPERTY(std::vector<std::shared_ptr<ClipboardItem>>, clipboard);
 };
 DECLARE_TYPE(ClipboardData, Object)
+
+bool MainWindow::event(QEvent *event) { QMainWindow::event(event); }
 
 void MainWindow::addRecentFile(const QString &path) {
   {
@@ -92,13 +96,28 @@ void MainWindow::openDocument(const QString &path) {
     return;
   }
   std::shared_ptr<Document> displays;
-  try {
-    deserialize(displays, v);
-  } catch (const std::exception &ex) {
-    QMessageBox::critical(
-        this, "Error",
-        tr("Failed to load file. Deserialization error.\n%1").arg(ex.what()));
-    return;
+  while (true) {
+    try {
+      deserialize(displays, v);
+    } catch (const SerializationTypeError &ex) {
+      auto button = QMessageBox::critical(
+          this, "Error",
+          tr("Type not found: %1\nIncompatible version or missing plug-ins?")
+              .arg(ex.typeName().c_str()),
+          QMessageBox::Ignore | QMessageBox::Cancel);
+      if (button == QMessageBox::Ignore) {
+        ex.createReplacement();
+        continue;
+      } else {
+        return;
+      }
+    } catch (const std::exception &ex) {
+      QMessageBox::critical(
+          this, "Error",
+          tr("Failed to load file. Deserialization error.\n%1").arg(ex.what()));
+      return;
+    }
+    break;
   }
   displays->path = path.toStdString();
   ws->document() = displays;
@@ -171,23 +190,46 @@ bool MainWindow::closeDocument() {
 }
 
 void MainWindow::openBag(const QString &path) {
+  LockScope ws;
+  QProgressDialog progress(tr("Loading bag..."), QString(), 0, 0);
+  progress.setModal(true);
+  progress.setWindowFlags(Qt::Window | Qt::WindowTitleHint |
+                          Qt::CustomizeWindowHint);
+  progress.show();
+  std::string error;
+  volatile bool finished = false;
   std::shared_ptr<BagPlayer> player;
-  try {
-    player = std::make_shared<BagPlayer>(path.toStdString());
-  } catch (const std::exception &ex) {
-    LOG_ERROR("failed to load bag file " << ex.what());
-    QMessageBox::critical(
-        this, "Error",
-        tr("Failed to load file. Deserialization error.\n%1").arg(ex.what()));
+  std::thread thread([&]() {
+    try {
+      player = std::make_shared<BagPlayer>(path.toStdString());
+    } catch (const std::exception &ex) {
+      LOG_ERROR("failed to load bag " << ex.what());
+      error = ex.what();
+    }
+    if (player) {
+      LOG_DEBUG("bag loaded");
+      player->changed.connect([]() { GlobalEvents::instance()->redraw(); });
+    }
+    LOG_DEBUG("bag loader thread finished");
+    finished = true;
+  });
+  while (!finished) {
+    QThread::msleep(10);
+    QApplication::processEvents();
   }
+  thread.join();
+  progress.close();
   if (player) {
-    LockScope ws;
     ws->player = player;
-    // ws->document()->display()->transformer = std::make_shared<Transformer>();
-    // ws->document()->display()->transformer->subscribe();
     ws->modified();
     addRecentFile(path);
     player->rewind();
+  } else {
+    progress.close();
+    LOG_ERROR("failed to load bag file " << error);
+    QMessageBox::critical(this, "Error",
+                          tr("Failed to load file. Deserialization error.\n%1")
+                              .arg(error.c_str()));
   }
 }
 
@@ -197,8 +239,6 @@ bool MainWindow::closeBag() {
     return true;
   }
   ws->player = nullptr;
-  // ws->document()->display()->transformer = std::make_shared<Transformer>();
-  // ws->document()->display()->transformer->subscribe();
   ws->modified();
   return true;
 }
@@ -267,17 +307,6 @@ MainWindow::MainWindow() {
   addDockWidget(Qt::BottomDockWidgetArea, timeline_widget);
   ws->modified.connect(this, [this]() {
     LockScope ws;
-    /*if (ws->document()->path.empty()) {
-      setWindowTitle(QString("%1%2")
-                         .arg(qApp->applicationName())
-                         .arg(ws->history->save_counter != 0 ? "*" : ""));
-    } else {
-      setWindowTitle(
-          QString("%1%2 - %3")
-              .arg(QFileInfo(ws->document()->path.c_str()).fileName())
-              .arg(ws->history->save_counter != 0 ? "*" : "")
-              .arg(qApp->applicationName()));
-    }*/
     if (ws->document()->path.empty()) {
       setWindowTitle(QString("%1").arg(qApp->applicationName()));
     } else {
@@ -300,8 +329,6 @@ MainWindow::MainWindow() {
     if (predicate) {
       ws->modified.connect(
           item, [item, predicate]() { item->setEnabled(predicate()); });
-      // connect(QGuiApplication::clipboard(), &QClipboard::dataChanged, this,
-      //          [item, predicate]() { item->setEnabled(predicate()); });
       item->setEnabled(predicate());
     }
   };
@@ -343,9 +370,10 @@ MainWindow::MainWindow() {
         ->setShortcut(QKeySequence(Qt::CTRL + Qt::Key_S));
     createMenuItem(menu, "Save &As...", [this]() { saveDocumentAs(); })
         ->setShortcut(QKeySequence(Qt::CTRL + Qt::SHIFT + Qt::Key_S));
-    createMenuItem(menu, "&Close Bag", [this]() { closeBag(); })
+    createMenuItem(menu, "&Close Document", [this]() { closeDocument(); })
+        ->setShortcut(QKeySequence(Qt::CTRL + Qt::Key_W));
+    createMenuItem(menu, "Close &Bag", [this]() { closeBag(); })
         ->setShortcut(QKeySequence(Qt::CTRL + Qt::Key_B));
-    createMenuItem(menu, "Close Document", [this]() { closeDocument(); });
     createMenuItem(menu, "E&xit", [this]() { close(); })
         ->setShortcut(QKeySequence(Qt::CTRL + Qt::Key_Q));
   }
@@ -383,15 +411,6 @@ MainWindow::MainWindow() {
           LOG_INFO("copy to clipboard");
           LockScope ws;
           QGuiApplication::clipboard()->clear();
-          /*std::shared_ptr<Display> selection =
-              std::dynamic_pointer_cast<Display>(
-                  ws()->selection().resolve(ws()));
-          if (selection) {
-            std::string data =
-                "#" ROS_PACKAGE_NAME "\n" +
-        toYAML(serialize(selection));
-            QGuiApplication::clipboard()->setText(data.c_str());
-        }*/
           std::unordered_set<std::shared_ptr<Object>> selection_set;
           for (auto &o : ws->selection().resolve(ws())) {
             selection_set.insert(o);
@@ -437,27 +456,6 @@ MainWindow::MainWindow() {
               this, "Error", tr("Clipboard parsing error.\n%1").arg(ex.what()));
           return;
         }
-        // TODO: FIX !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        /*std::shared_ptr<Display> display;
-        try {
-          deserialize(display, v);
-        } catch (const std::exception &ex) {
-          QMessageBox::critical(
-              this, "Error",
-              tr("Clipboard deserialization error.\n%1").arg(ex.what()));
-          return;
-        }
-        display->recurse([](const std::shared_ptr<Object> &object) {
-          object->setNewId();
-        });
-        std::shared_ptr<DisplayGroupBase> group =
-            std::dynamic_pointer_cast<DisplayGroupBase>(
-                ws()->selection().resolve(ws()));
-        if (!group) {
-          group = ws->document()->display();
-        }
-        group->displays().push_back(display);
-        ws->modified();*/
         std::shared_ptr<ClipboardData> clipboard_data;
         try {
           deserialize(clipboard_data, v);
@@ -547,7 +545,7 @@ MainWindow::MainWindow() {
     createMenuAndToolbarItem(menu, "Reload", QIcon::fromTheme("view-refresh"),
                              [this]() {
                                ResourceEvents::instance().reload();
-                               LockScope()->redraw();
+                               GlobalEvents::instance()->redraw();
                              })
         ->setShortcut(QKeySequence(Qt::Key_F5));
   }
@@ -557,6 +555,8 @@ MainWindow::MainWindow() {
     for (auto *dock : findChildren<QDockWidget *>()) {
       menu->addAction(dock->toggleViewAction());
     }
+    // menu->addAction("x")->setShortcut(QKeySequence(Qt::Key_Alt));
+    // menu->addAction("x")->setShortcut(QKeySequence(Qt::Key_AltGr));
   }
 
   {
@@ -633,84 +633,73 @@ void MainWindow::closeEvent(QCloseEvent *event) {
 }
 
 int main(int argc, char **argv) {
-  if (0) {
-    LOG_DEBUG("debug");
-    LOG_INFO("info");
-    LOG_WARN("warn");
-    LOG_ERROR("error");
-    LOG_FATAL("fatal");
-    LOG_SUCCESS("success");
-  }
-  // XInitThreads();
-  ros::init(argc, argv, ROS_PACKAGE_NAME);
-  ros::NodeHandle node("~");
-  /*if (ros::console::set_logger_level("robot_model_loader",
-                                     ros::console::levels::Error)) {
-    ros::console::notifyLoggerLevelsChanged();
-}*/
-  console_bridge::noOutputHandler();
-  LOG_DEBUG("package name " << ROS_PACKAGE_NAME);
-  LOG_DEBUG("package path " << ros::package::getPath(ROS_PACKAGE_NAME));
-  QCoreApplication::setAttribute(Qt::AA_ShareOpenGLContexts);
-  QApplication app(argc, argv);
-  // app.setGlobalStrut(QSize(1, 1));
-  QCoreApplication::setOrganizationName("TAMS");
-  QCoreApplication::setApplicationName(QString(ROS_PACKAGE_NAME).toUpper());
-
-  // app.setStyle("Fusion");
 
   {
+    QCoreApplication::setAttribute(Qt::AA_ShareOpenGLContexts);
     {
-      MainWindow main_window;
-      qDebug() << "styles" << QStyleFactory::keys();
-      RenderThread::instance();
-      {
-        ros::AsyncSpinner spinner(0);
-        spinner.start();
-        QTimer shutdown_timer;
-        QObject::connect(&shutdown_timer, &QTimer::timeout, &main_window,
-                         [&shutdown_timer, &main_window]() {
-                           if (!ros::ok() && shutdown_timer.isActive()) {
-                             shutdown_timer.stop();
-                             main_window.close();
-                           }
-                         });
-        shutdown_timer.setInterval(100);
-        shutdown_timer.setSingleShot(false);
-        shutdown_timer.start();
-        app.exec();
+      QSurfaceFormat format;
+      format.setVersion(3, 2);
+      format.setProfile(QSurfaceFormat::CompatibilityProfile);
+      format.setSamples(16);
+      QSurfaceFormat::setDefaultFormat(format);
+    }
+
+    QCoreApplication::setOrganizationName("TAMS");
+    QCoreApplication::setApplicationName(QString(ROS_PACKAGE_NAME).toUpper());
+
+    QApplication app(argc, argv);
+
+    ros::init(argc, argv, ROS_PACKAGE_NAME, ros::init_options::NoSigintHandler);
+    ros::NodeHandle node("~");
+    signal(SIGINT, [](int sig) {
+      LOG_DEBUG("shutting down");
+      if (auto *app = qApp) {
+        app->exit();
       }
-      // main_window.closeDocument();
+      ros::shutdown();
+    });
 
-      // stop renderthread
-      RenderThread::instance()->stop();
+    console_bridge::noOutputHandler();
 
-      // wait for async cleanup from renderthread to be finished
-      qApp->processEvents();
+    LOG_DEBUG("package name " << ROS_PACKAGE_NAME);
+    LOG_DEBUG("package path " << ros::package::getPath(ROS_PACKAGE_NAME));
 
+    // ProfilerThread profiler_thread;
+
+    {
+      {
+        RenderThread::instance();
+        MainWindow main_window;
+        qDebug() << "styles" << QStyleFactory::keys();
+        {
+          ros::AsyncSpinner spinner(0);
+          spinner.start();
+          app.exec();
+        }
+        RenderThread::instance()->stop();
+
+        // wait for async cleanup from renderthread to be finished
+        qApp->processEvents();
+
+        {
+          LockScope ws;
+
+          // windows will be deleted by the document
+          auto widgets = main_window.findChildren<QWidget *>();
+          for (auto *w : widgets) {
+            if (dynamic_cast<Window *>(w)) {
+              w->setParent(nullptr);
+            }
+          }
+
+          ws()->document() = std::make_shared<Document>();
+        }
+      }
       {
         LockScope ws;
-
-        // windows will be deleted by the document
-        auto widgets = main_window.findChildren<QWidget *>();
-        for (auto *w : widgets) {
-          if (dynamic_cast<Window *>(w)) {
-            w->setParent(nullptr);
-          }
-        }
-
-        /*if (main_window.centralWidget()) {
-          auto* central = main_window.takeCentralWidget();
-        }
-        main_window.setCentralWidget(new QWidget(&main_window));*/
-        // ws() = nullptr;
-        ws()->document() = std::make_shared<Document>();
-        // ws->modified();
+        ws() = nullptr;
       }
     }
-    {
-      LockScope ws;
-      ws() = nullptr;
-    }
   }
+  LOG_DEBUG("shut down");
 }

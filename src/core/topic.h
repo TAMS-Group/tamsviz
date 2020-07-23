@@ -5,7 +5,8 @@
 
 #include "event.h"
 #include "log.h"
-#include "type.h"
+#include "message.h"
+#include "property.h"
 
 #include <ros/ros.h>
 
@@ -18,86 +19,20 @@
 class TopicManager {
 public:
   std::vector<std::string> listTopics(const std::string &type_name);
+  std::vector<std::string> listTopics();
   Event<void()> received{"received"};
   static const std::shared_ptr<TopicManager> &instance();
 };
 
-class MessageType {
-  std::string _hash, _name, _definition;
-
-private:
-  MessageType() {}
-  MessageType(const MessageType &) = delete;
-  MessageType &operator=(const MessageType &) = delete;
-
-public:
-  static std::shared_ptr<MessageType> instance(const std::string &hash,
-                                               const std::string &name,
-                                               const std::string &definition);
-  const std::string &hash() const { return _hash; }
-  const std::string &name() const { return _name; }
-  const std::string &definition() const { return _definition; }
-};
-
-class Message {
-  std::shared_ptr<MessageType> _type;
-  std::vector<uint8_t> _data;
-  ros::Time _time;
-
-public:
-  template <class T> std::shared_ptr<T> instantiate() const {
-    if (_data.empty() || _type == nullptr ||
-        ros::message_traits::datatype<T>() != _type->name() ||
-        ros::message_traits::md5sum<T>() != _type->hash()) {
-      return nullptr;
-    } else {
-      auto m = std::make_shared<T>();
-      ros::serialization::IStream s((uint8_t *)_data.data(), _data.size());
-      ros::serialization::deserialize(s, *m);
-      return m;
-    }
-  }
-  template <class Stream> void read(Stream &stream) {
-    _data.resize(stream.getLength());
-    std::memcpy(_data.data(), stream.getData(), _data.size());
-  }
-  void type(const std::shared_ptr<MessageType> &type) { _type = type; }
-  const ros::Time &time() const { return _time; }
-  void time(const ros::Time &time) { _time = time; }
-};
-
-namespace ros {
-namespace message_traits {
-template <> struct MD5Sum<Message> {
-  static const char *value() { return "*"; }
-};
-template <> struct DataType<Message> {
-  static const char *value() { return "*"; }
-};
-} // namespace message_traits
-namespace serialization {
-template <> struct Serializer<Message> {
-  template <typename Stream>
-  inline static void read(Stream &stream, Message &m) {
-    m.read(stream);
-  }
-};
-template <> struct PreDeserialize<Message> {
-  static void notify(const PreDeserializeParams<Message> &params) {
-    params.message->type(MessageType::instance(
-        (*params.connection_header)["md5sum"],
-        (*params.connection_header)["type"],
-        (*params.connection_header)["message_definition"]));
-  }
-};
-} // namespace serialization
-} // namespace ros
+class TopicRegistry;
 
 class Topic {
   std::string _topic_name;
   ros::Subscriber _ros_subscriber;
   std::mutex _message_mutex;
-  std::shared_ptr<Message> _message_instance;
+  std::shared_ptr<const Message> _message_instance;
+  std::atomic<size_t> _connections;
+  std::shared_ptr<TopicRegistry> _registry;
   Topic(const std::string &name);
   Topic(const Topic &) = delete;
   Topic &operator=(const Topic &) = delete;
@@ -106,20 +41,22 @@ class Topic {
 
 public:
   ~Topic();
-  void publish(const std::shared_ptr<Message> &message);
+  void countConnection(size_t d) { _connections += d; }
+  void publish(const std::shared_ptr<const Message> &message);
   inline const std::string &name() const { return _topic_name; }
-  std::shared_ptr<Message> message() {
+  std::shared_ptr<const Message> message() {
     std::unique_lock<std::mutex> lock(_message_mutex);
     return _message_instance;
   }
   static std::shared_ptr<Topic> instance(const std::string &name);
-  Event<void(const std::shared_ptr<Message> &)> received;
+  Event<void(const std::shared_ptr<const Message> &)> received;
   Event<void()> connected;
   friend class MessagePlaybackScope;
 };
 
 class MessagePlaybackScope {
-  const std::vector<std::string> _topics;
+  std::vector<std::string> _topics;
+  std::shared_ptr<TopicRegistry> _registry;
 
 public:
   MessagePlaybackScope(const std::vector<std::string> &topics);
@@ -128,29 +65,79 @@ public:
   MessagePlaybackScope &operator=(const MessagePlaybackScope &) = delete;
 };
 
+template <class Message> class Publisher {
+  std::string _topic;
+  std::unique_ptr<ros::Publisher> _publisher;
+
+public:
+  Publisher() {}
+  Publisher(const std::string &topic) { this->topic(topic); }
+  Publisher(const Publisher &) = delete;
+  Publisher &operator=(const Publisher &) = delete;
+  const std::string &topic() const { return _topic; }
+  void topic(const std::string &topic) {
+    if (topic != _topic) {
+      _topic = topic;
+      if (_topic.empty()) {
+        _publisher.reset();
+      } else {
+        static ros::NodeHandle ros_node;
+        _publisher.reset(
+            new ros::Publisher(ros_node.advertise<Message>(topic, 1000)));
+      }
+      _topic = topic;
+    }
+  }
+  bool connected() const {
+    return _publisher && _publisher->getNumSubscribers() > 0;
+  }
+  void publish(const Message &message) {
+    if (connected()) {
+      _publisher->publish(message);
+    }
+  }
+  void publish(const std::shared_ptr<const Message> &message) {
+    if (connected()) {
+      _publisher->publish(*message);
+    }
+  }
+  void publish(const std::string &topic, const Message &message) {
+    this->topic(topic);
+    if (connected()) {
+      _publisher->publish(message);
+    }
+  }
+  void publish(const std::string &topic,
+               const std::shared_ptr<const Message> &message) {
+    this->topic(topic);
+    if (connected()) {
+      _publisher->publish(*message);
+    }
+  }
+};
+
 template <class M> class Subscriber {
   struct Callback {
-    std::weak_ptr<void> receiver;
+    std::weak_ptr<const void> receiver;
   };
+  bool _visible = true;
   std::shared_ptr<Callback> _callback;
   std::shared_ptr<Topic> _topic;
   Subscriber() {}
-  Subscriber(const Subscriber &) = delete;
-  Subscriber &operator=(const Subscriber &) = delete;
   class MessageCast {
-    std::shared_ptr<Message> _message;
+    std::shared_ptr<const Message> _message;
 
   public:
-    inline MessageCast(const std::shared_ptr<Message> &message)
+    inline MessageCast(const std::shared_ptr<const Message> &message)
         : _message(message) {}
-    inline operator std::shared_ptr<Message>() { return _message; }
+    inline operator std::shared_ptr<const Message>() { return _message; }
     template <class T> inline operator std::shared_ptr<T>() {
       return _message ? _message->instantiate<T>() : nullptr;
     }
   };
   template <class F>
   static void invoke(const F &callback,
-                     const std::shared_ptr<Message> &message) {
+                     const std::shared_ptr<const Message> &message) {
     if (!message) {
       return;
     }
@@ -158,25 +145,43 @@ template <class M> class Subscriber {
   }
 
 public:
-  Subscriber(const std::string &name) { _topic = Topic::instance(name); }
-  template <class T, class F>
-  Subscriber(const std::string &name, const std::shared_ptr<T> &receiver,
-             const F &function) {
+  Subscriber(const std::string &name, bool visible = true) {
+    _topic = Topic::instance(name);
+    _visible = visible;
+    if (_visible) {
+      _topic->countConnection(+1);
+    }
+  }
+  template <class F>
+  Subscriber(const std::string &name,
+             const std::shared_ptr<const void> &receiver, const F &function,
+             bool visible = true) {
     _topic = Topic::instance(name);
     _callback = std::make_shared<Callback>();
     _callback->receiver = receiver;
     auto *callback_ptr = _callback.get();
     _topic->received.connect(
-        _callback,
-        [callback_ptr, function](const std::shared_ptr<Message> &message) {
+        _callback, [callback_ptr,
+                    function](const std::shared_ptr<const Message> &message) {
           if (auto ptr = callback_ptr->receiver.lock()) {
             invoke(function, message);
           }
         });
     invoke(function, _topic->message());
+    _visible = visible;
+    if (_visible) {
+      _topic->countConnection(+1);
+    }
   }
+  ~Subscriber() {
+    if (_visible) {
+      _topic->countConnection(-1);
+    }
+  }
+  Subscriber(const Subscriber &) = delete;
+  Subscriber &operator=(const Subscriber &) = delete;
   const std::shared_ptr<Topic> &topic() const { return _topic; }
-  std::shared_ptr<M> message() const {
+  std::shared_ptr<const M> message() const {
     if (auto msg = _topic->message()) {
       if (auto m = msg->instantiate<M>()) {
         return m;
@@ -186,12 +191,23 @@ public:
   }
 };
 
+class NoMessageScope {
+  std::shared_ptr<void> _instance;
+
+public:
+  NoMessageScope();
+  ~NoMessageScope();
+  NoMessageScope(const NoMessageScope &) = delete;
+  NoMessageScope &operator=(const NoMessageScope &) = delete;
+};
+
 template <class Message> class TopicProperty {
 private:
   std::string _topic;
   bool _used = false;
   std::shared_ptr<void> _callback_object;
-  std::function<void(const std::shared_ptr<Message> &)> _callback_function;
+  std::function<void(const std::shared_ptr<const Message> &)>
+      _callback_function;
   std::shared_ptr<Subscriber<Message>> _subscriber;
   void _sync() {
     if ((_topic.empty() || !_used) && _subscriber) {
@@ -222,7 +238,7 @@ public:
     return *this;
   }
   void connect(const std::shared_ptr<void> &callback_object,
-               const std::function<void(const std::shared_ptr<Message> &)>
+               const std::function<void(const std::shared_ptr<const Message> &)>
                    &callback_function) {
     _used = true;
     _callback_object = callback_object;
@@ -240,7 +256,7 @@ public:
       _sync();
     }
   }
-  std::shared_ptr<Message> message() {
+  std::shared_ptr<const Message> message() {
     _used = true;
     _sync();
     if (_subscriber) {

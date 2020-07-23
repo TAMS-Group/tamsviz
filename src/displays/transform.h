@@ -6,7 +6,8 @@
 #include "marker.h"
 
 struct TransformationsDisplay : MeshDisplayBase {
-  std::shared_ptr<MeshRenderer> _mesh_renderer;
+  std::vector<Frame> _frames;
+  std::shared_ptr<InstancedMeshRenderer> _mesh_renderer;
   PROPERTY(double, radius, 0.01, min = 0.0);
   PROPERTY(double, length, 0.2, min = 0.0);
   PROPERTY(std::shared_ptr<Material>, material,
