@@ -877,6 +877,7 @@ ImageWindow::ImageWindow() {
           subscriber = std::make_shared<Subscriber<Message>>(
               topic(), shared_from_this(),
               [buffer](const std::shared_ptr<const Message> &msg) {
+                LOG_DEBUG("image " << msg->time());
                 buffer->putImage(msg);
               });
         }

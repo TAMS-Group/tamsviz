@@ -53,11 +53,11 @@ public:
       if (range->begin != range->end) {
         auto iter = std::upper_bound(range->begin, range->end, t,
                                      rosbag::IndexEntryCompare());
-        if (iter == range->end) {
-          iter = range->end;
+        if (iter != range->begin) {
           --iter;
         }
-        if (iter != range->begin) {
+        if (iter == range->end) {
+          iter = range->end;
           --iter;
         }
         callback(
