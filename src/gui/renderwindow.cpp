@@ -39,9 +39,8 @@ RenderWindowBase::RenderWindowBase() {
     }
     void paintGL() override {
       V_GL(glClearColor(0, 0, 0, 1));
-      V_GL(glClear(GL_COLOR_BUFFER_BIT));
+      V_GL(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
       if (int target = defaultFramebufferObject()) {
-        //_parent->_render_target.present(target);
         _parent->composite(target);
       }
       {
@@ -52,7 +51,43 @@ RenderWindowBase::RenderWindowBase() {
       }
     }
   };
-  setContentWidget(new RenderWidget(this));
+  auto *render_widget = new RenderWidget(this);
+  setContentWidget(render_widget);
+
+  {
+    auto *button = new FlatButton();
+    button->setIcon(MATERIAL_ICON("photo_camera", 0.0));
+    button->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
+    connect(button, &QPushButton::clicked, this, [this, render_widget]() {
+      QImage screenshot;
+      {
+        render_widget->makeCurrent();
+        {
+          QOpenGLFramebufferObject fbo(render_widget->width(),
+                                       render_widget->height());
+          composite(fbo.handle());
+          screenshot = fbo.toImage();
+        }
+        render_widget->doneCurrent();
+      }
+      QString file_name = QFileDialog::getSaveFileName(
+          this, tr("Save Screenshot"), "", tr("Images (*.png *.jpg)"));
+      if (!file_name.isEmpty()) {
+        if (QFileInfo(file_name).suffix().isEmpty()) {
+          if (!file_name.endsWith(".")) {
+            file_name += ".";
+          }
+          file_name += "png";
+        }
+        if (screenshot.save(file_name)) {
+          LOG_SUCCESS("screenshot saved: " << file_name.toStdString());
+        } else {
+          LOG_ERROR("failed to save screenshot: " << file_name.toStdString());
+        }
+      }
+    });
+    addToolWidgetRight(button);
+  }
 }
 
 RenderWindowBase::~RenderWindowBase() {}

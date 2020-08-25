@@ -20,7 +20,6 @@ find_package(catkin REQUIRED COMPONENTS
     interactive_markers
     moveit_core
     moveit_ros_planning
-    moveit_ros_planning
     moveit_ros_planning_interface
     moveit_ros_robot_interaction
     resource_retriever
@@ -50,7 +49,7 @@ include_directories(
 
 find_package(Boost REQUIRED COMPONENTS program_options)
 
-add_executable(tamsviz
+add_executable(${PROJECT_NAME}
     src/annotations/image.cpp
     src/annotations/scene.cpp
     src/core/bagplayer.cpp

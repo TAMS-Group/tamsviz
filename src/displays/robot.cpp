@@ -94,14 +94,17 @@ struct RobotModel {
               auto link = new RobotLink(moveit_link, visual_pose, mesh);
               if (auto mat = urdf_visual->material) {
                 LockScope ws;
-                /*LOG_DEBUG("urdf material color " << mat->color.r << " "
-                                                 << mat->color.g << " "
-                                                 << mat->color.b);*/
+                LOG_DEBUG("urdf material color "
+                          << urdf_link->name << " " << mat->color.r << " "
+                          << mat->color.g << " " << mat->color.b << " "
+                          << mat->color.a);
                 link->material->color().r() = mat->color.r;
                 link->material->color().g() = mat->color.g;
                 link->material->color().b() = mat->color.b;
                 link->material->color().a() = mat->color.a;
                 link->material->texture() = mat->texture_filename;
+              } else {
+                LOG_DEBUG("no material for " << urdf_link->name);
               }
               links.emplace_back(link);
             } else if (urdf_visual->geometry->type == urdf::Geometry::MESH) {
