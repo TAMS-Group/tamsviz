@@ -18,12 +18,9 @@ protected:
 
 class RosBagView : protected RosBagViewBase, protected rosbag::View {
 
-public:
-  RosBagView(const std::string &filename)
-      : RosBagViewBase(filename), rosbag::View(_bag) {}
-
-  ros::Time startTime() { return getBeginTime(); }
-  ros::Time endTime() { return getEndTime(); }
+  std::vector<std::pair<std::string, std::string>> _viz_topic_list;
+  std::unordered_map<std::string, std::string> _topic_bag_to_viz;
+  std::unordered_map<std::string, std::string> _topic_viz_to_bag;
 
   std::shared_ptr<const Message> loadMessage(const rosbag::ConnectionInfo *conn,
                                              const rosbag::IndexEntry &index,
@@ -36,12 +33,25 @@ public:
     return m;
   }
 
-  std::vector<std::pair<std::string, std::string>> topics() {
-    std::vector<std::pair<std::string, std::string>> ret;
+public:
+  RosBagView(const std::string &filename)
+      : RosBagViewBase(filename), rosbag::View(_bag) {
     for (auto &conn : getConnections()) {
-      ret.emplace_back(conn->datatype, conn->topic);
+      std::string viz_name = conn->topic;
+      if (viz_name.empty() || viz_name[0] != '/') {
+        viz_name = "/" + viz_name;
+      }
+      _topic_bag_to_viz[conn->topic] = viz_name;
+      _topic_viz_to_bag[viz_name] = conn->topic;
+      _viz_topic_list.emplace_back(conn->datatype, viz_name);
     }
-    return ret;
+  }
+
+  ros::Time startTime() { return getBeginTime(); }
+  ros::Time endTime() { return getEndTime(); }
+
+  std::vector<std::pair<std::string, std::string>> topics() {
+    return _viz_topic_list;
   }
 
   void
@@ -61,17 +71,18 @@ public:
           --iter;
         }
         callback(
-            range->connection_info->topic,
+            _topic_bag_to_viz[range->connection_info->topic],
             loadMessage(range->connection_info, *iter, *range->bag_query->bag));
         continue;
       }
     }
   }
 
-  bool findTimeSpan(const std::string &topic, double t, double *start,
+  bool findTimeSpan(const std::string &viz_topic, double t, double *start,
                     double *duration) {
+    auto &bag_topic = _topic_viz_to_bag[viz_topic];
     for (auto *range : ranges_) {
-      if (range->connection_info->topic != topic) {
+      if (range->connection_info->topic != bag_topic) {
         continue;
       }
       auto iter2 = std::upper_bound(range->begin, range->end,
@@ -138,10 +149,10 @@ public:
     }
     std::pair<std::string, std::shared_ptr<const Message>> operator*() const {
       auto &pair = _iterators.begin()->second;
-      return std::make_pair(pair.second->connection_info->topic,
-                            _view->loadMessage(pair.second->connection_info,
-                                               *pair.first,
-                                               *(pair.second->bag_query->bag)));
+      return std::make_pair(
+          _view->_topic_bag_to_viz[pair.second->connection_info->topic],
+          _view->loadMessage(pair.second->connection_info, *pair.first,
+                             *(pair.second->bag_query->bag)));
     }
   };
 };
@@ -151,19 +162,6 @@ bool BagPlayer::findMessageTimeSpan(const std::string &topic, double time,
   std::unique_lock<std::mutex> lock(_view_mutex);
   return _view->findTimeSpan(topic, time, start, duration);
 }
-
-/*
-std::shared_ptr<const Message>
-BagPlayer::instantiate_nolock(const rosbag::MessageInstance &msg) {
-  boost::shared_ptr<Message> inst = msg.instantiate<Message>();
-  if (!inst) {
-    return nullptr;
-  }
-  auto m = std::make_shared<Message>(*inst);
-  m->time(msg.getTime());
-  return m;
-}
-*/
 
 void BagPlayer::publish(const std::string &topic,
                         const std::shared_ptr<const Message> &message) {
@@ -176,17 +174,6 @@ void BagPlayer::publish(const std::string &topic,
     _topics[topic]->publish(message);
   }
 }
-
-/*
-void BagPlayer::publish(const rosbag::MessageInstance &msg) {
-  std::shared_ptr<const Message> m;
-  {
-    std::unique_lock<std::mutex> lock(_view_mutex);
-    m = instantiate_nolock(msg);
-  }
-  publish(msg.getTopic(), m);
-}
-*/
 
 std::vector<std::shared_ptr<const Message>>
 BagPlayer::readMessageSamples(const std::string &topic, double start,
@@ -203,8 +190,6 @@ void BagPlayer::readMessageSamples(
     const std::string &topic, double start, double stop,
     const std::function<void(const std::shared_ptr<const Message> &)>
         &callback) {
-  // std::unique_lock<std::mutex> lock(_view_mutex);
-  //_view->readMessageSamples(topic, start, stop, step, callback);
   RosBagView::Iterator it;
   RosBagView::Iterator it_end;
   {
@@ -324,8 +309,6 @@ void BagPlayer::play(const std::vector<double> &notification_times) {
     RosBagView::Iterator it_end;
     {
       std::unique_lock<std::mutex> lock(_view_mutex);
-      // it = _view->begin();
-      // it_end = _view->end();
       it = RosBagView::Iterator(*_view, time_from_start);
     }
     while (it != it_end) {

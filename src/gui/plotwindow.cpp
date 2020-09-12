@@ -77,6 +77,9 @@ void PlotWindow::renderWindowSync(const RenderWindowSyncContext &context) {
   if (_renderer) {
     _renderer->renderSync();
   }
+  if (!LockScope()->player) {
+    GlobalEvents::instance()->redraw();
+  }
 }
 
 void PlotWindow::renderWindowAsync(const RenderWindowAsyncContext &context) {
@@ -185,5 +188,16 @@ void PlotWindow::composite(int target) {
                                    GL_RENDERBUFFER, 0));
 
     V_GL(glBindFramebuffer(GL_FRAMEBUFFER, 0));
+  }
+}
+
+void PlotWindow::handleEvent(QEvent *event) {
+  switch (event->type()) {
+  case QEvent::MouseButtonPress:
+    if (_renderer) {
+      ActionScope ws("Pick");
+      ws->selection() = _renderer->plotDisplay();
+    }
+    break;
   }
 }

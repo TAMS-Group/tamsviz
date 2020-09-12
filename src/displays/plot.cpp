@@ -20,14 +20,14 @@ void PlotRenderer::PlotRendererData::update() {
     auto &topic_renderer = topics[itopic];
 
     if (!topic_renderer.subscriber ||
-        topic_renderer.subscriber->topic() != topic_display.topic) {
+        topic_renderer.subscriber->topic() != topic_display.topic.topic()) {
       topic_renderer.subscriber = topic_display.subscriber.lock();
       topic_renderer.queries.clear();
     }
     if (!topic_renderer.subscriber ||
-        topic_renderer.subscriber->topic() != topic_display.topic) {
+        topic_renderer.subscriber->topic() != topic_display.topic.topic()) {
       topic_renderer.subscriber =
-          std::make_shared<TimeSeriesSubscriber>(topic_display.topic);
+          std::make_shared<TimeSeriesSubscriber>(topic_display.topic.topic());
       topic_renderer.queries.clear();
     }
     topic_display.subscriber = topic_renderer.subscriber;
@@ -44,7 +44,7 @@ void PlotRenderer::PlotRendererData::update() {
             std::make_shared<TimeSeriesQuery>(query_display.query.query());
         topic_renderer.subscriber->addListener(query_renderer.query);
       }
-      query_display.query.subscriber(topic_renderer.subscriber->subscriber());
+      // query_display.query.subscriber(topic_renderer.subscriber->subscriber());
     }
   }
 }
@@ -189,6 +189,18 @@ void PlotRenderer::renderAsync(QPainter *painter) {
 
   tmin = tmax - std::max(int64_t(1000), int64_t(_duration * 1000000000));
 
+  {
+    double vd = (vmax - vmin) * (1.0 / frame.height());
+    vmin -= vd * _style.spacing.bottom;
+    vmax += vd * _style.spacing.top;
+  }
+
+  {
+    double vd = (tmax - tmin) * (1.0 / frame.width());
+    tmin -= vd * _style.spacing.left;
+    tmax += vd * _style.spacing.right;
+  }
+
   if (tmax != tmin && vmax != vmin) {
 
     QFont font;
@@ -196,8 +208,9 @@ void PlotRenderer::renderAsync(QPainter *painter) {
     painter->setFont(font);
 
     {
-      int64_t step = std::round(stepSize(
-          (tmax - tmin) * (_style.ticks.x.stride * 1.0 / frame.width())));
+      int64_t step = std::round(
+          stepSize((tmax - tmin) * (_style.ticks.x.stride * 1.0 /
+                                    std::max(1.0, 1.0 * frame.width()))));
       for (int64_t x = (tmin + step - 1) / step * step; x <= tmax / step * step;
            x += step) {
         double fx = (x - tmin) * (1.0 / (tmax - tmin));
@@ -207,10 +220,10 @@ void PlotRenderer::renderAsync(QPainter *painter) {
         painter->drawLine(px, frame.bottom(), px,
                           frame.bottom() + _style.ticks.length);
         if (_style.grid.enable) {
-          painter->setPen(
-              QPen(toQColor(_style.foregroundColor), _style.grid.width));
+          painter->setPen(QPen(toQColor(_style.grid.color), _style.grid.width));
           painter->drawLine(px, frame.bottom(), px, frame.top());
         }
+        painter->setPen(QPen(toQColor(_style.foregroundColor)));
         double w = step * 1.0 / (tmax - tmin) * frame.width();
         painter->drawText(
             QRectF(px - w * 0.5, frame.bottom() + _style.ticks.length, w,
@@ -222,8 +235,9 @@ void PlotRenderer::renderAsync(QPainter *painter) {
     }
 
     {
-      double step = stepSize((vmax - vmin) *
-                             (_style.ticks.y.stride * 1.0 / frame.height()));
+      double step =
+          stepSize((vmax - vmin) * (_style.ticks.y.stride * 1.0 /
+                                    std::max(1.0, 1.0 * frame.height())));
       for (double y = vmin / step * step; y <= vmax / step * step; y += step) {
         double fy = 1.0 - (y - vmin) * (1.0 / (vmax - vmin));
         double py = fy * frame.height() + frame.top();
@@ -232,10 +246,10 @@ void PlotRenderer::renderAsync(QPainter *painter) {
         painter->drawLine(frame.left(), py, frame.left() - _style.ticks.length,
                           py);
         if (_style.grid.enable) {
-          painter->setPen(
-              QPen(toQColor(_style.foregroundColor), _style.grid.width));
+          painter->setPen(QPen(toQColor(_style.grid.color), _style.grid.width));
           painter->drawLine(frame.left(), py, frame.right(), py);
         }
+        painter->setPen(QPen(toQColor(_style.foregroundColor)));
         double h = step * 1.0 / (vmax - vmin) * frame.height();
         painter->drawText(
             QRectF(frame.left() - _style.ticks.length - _style.ticks.y.width -

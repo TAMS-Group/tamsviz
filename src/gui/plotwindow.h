@@ -28,7 +28,6 @@ class PlotWindow : public RenderWindowBase {
 
 public:
   PlotWindow();
-  PROPERTY(double, duration, 5.0, min = 1e-3);
   PROPERTY(Handle<PlotDisplay>, plot);
   virtual void
   renderWindowSync(const RenderWindowSyncContext &context) override;
@@ -36,5 +35,6 @@ public:
   renderWindowAsync(const RenderWindowAsyncContext &context) override;
   virtual void paintHUD(QPainter *painter) override;
   virtual void composite(int target) override;
+  virtual void handleEvent(QEvent *event) override;
 };
 DECLARE_TYPE(PlotWindow, RenderWindowBase);

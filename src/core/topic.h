@@ -7,6 +7,7 @@
 #include "log.h"
 #include "message.h"
 #include "property.h"
+#include "watcher.h"
 
 #include <ros/ros.h>
 
@@ -123,6 +124,8 @@ template <class M> class Subscriber {
   bool _visible = true;
   std::shared_ptr<Callback> _callback;
   std::shared_ptr<Topic> _topic;
+  std::shared_ptr<const M> _message_instance;
+  Watcher _watcher;
   Subscriber() {}
   class MessageCast {
     std::shared_ptr<const Message> _message;
@@ -181,13 +184,16 @@ public:
   Subscriber(const Subscriber &) = delete;
   Subscriber &operator=(const Subscriber &) = delete;
   const std::shared_ptr<Topic> &topic() const { return _topic; }
-  std::shared_ptr<const M> message() const {
-    if (auto msg = _topic->message()) {
-      if (auto m = msg->instantiate<M>()) {
-        return m;
+  std::shared_ptr<const M> message() {
+    auto msg = _topic->message();
+    if (_watcher.changed(msg)) {
+      if (msg) {
+        _message_instance = msg->instantiate<M>();
+      } else {
+        _message_instance = nullptr;
       }
     }
-    return nullptr;
+    return _message_instance;
   }
 };
 
@@ -263,6 +269,11 @@ public:
       return _subscriber->message();
     }
     return nullptr;
+  }
+  std::shared_ptr<Subscriber<Message>> subscriber() {
+    _used = true;
+    _sync();
+    return _subscriber;
   }
 };
 template <class T>

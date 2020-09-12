@@ -9,6 +9,20 @@
 
 #include <boost/thread.hpp>
 
+struct TopicRegistry {
+
+  std::unordered_map<std::string, std::weak_ptr<Topic>> topic_map;
+  std::mutex topic_map_mutex;
+
+  std::unordered_map<std::string, size_t> topic_bag_counters;
+  std::mutex topic_bag_counter_mutex;
+
+  static std::shared_ptr<TopicRegistry> instance() {
+    static auto instance = std::make_shared<TopicRegistry>();
+    return instance;
+  }
+};
+
 std::shared_ptr<MessageType>
 MessageType::instance(const std::string &hash, const std::string &name,
                       const std::string &definition) {
@@ -28,47 +42,45 @@ MessageType::instance(const std::string &hash, const std::string &name,
 
 std::vector<std::string>
 TopicManager::listTopics(const std::string &type_name) {
-  ros::master::V_TopicInfo topics;
-  ros::master::getTopics(topics);
-  std::vector<std::string> ret;
-  for (auto &topic : topics) {
-    if (topic.datatype == type_name) {
-      ret.push_back(topic.name);
+  std::set<std::string> topic_set;
+  {
+    ros::master::V_TopicInfo ros_topics;
+    ros::master::getTopics(ros_topics);
+    for (auto &topic : ros_topics) {
+      if (type_name.empty() || type_name == "*" ||
+          topic.datatype == type_name) {
+        topic_set.insert(topic.name);
+      }
     }
   }
-  std::sort(ret.begin(), ret.end());
+  {
+    auto registry = TopicRegistry::instance();
+    std::lock_guard<std::mutex> lock(registry->topic_map_mutex);
+    for (auto &pair : registry->topic_map) {
+      if (auto topic = pair.second.lock()) {
+        auto message = topic->message();
+        if (type_name.empty() || type_name == "*" ||
+            message && message->type()->name() == type_name) {
+          topic_set.insert(pair.first);
+        }
+      }
+    }
+  }
+  std::vector<std::string> ret;
+  for (auto &t : topic_set) {
+    ret.push_back(t);
+  }
   return ret;
 }
 
 std::vector<std::string> TopicManager::listTopics() {
-  ros::master::V_TopicInfo topics;
-  ros::master::getTopics(topics);
-  std::vector<std::string> ret;
-  for (auto &topic : topics) {
-    ret.push_back(topic.name);
-  }
-  std::sort(ret.begin(), ret.end());
-  return ret;
+  return listTopics(std::string());
 }
 
 const std::shared_ptr<TopicManager> &TopicManager::instance() {
   static auto instance = std::make_shared<TopicManager>();
   return instance;
 }
-
-struct TopicRegistry {
-
-  std::unordered_map<std::string, std::weak_ptr<Topic>> topic_map;
-  std::mutex topic_map_mutex;
-
-  std::unordered_map<std::string, size_t> topic_bag_counters;
-  std::mutex topic_bag_counter_mutex;
-
-  static std::shared_ptr<TopicRegistry> instance() {
-    static auto instance = std::make_shared<TopicRegistry>();
-    return instance;
-  }
-};
 
 void Topic::_subscribe(const std::shared_ptr<Topic> &topic) {
   static ros::NodeHandle _ros_node;

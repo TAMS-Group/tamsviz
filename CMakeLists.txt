@@ -26,6 +26,8 @@ find_package(catkin REQUIRED COMPONENTS
     rosbag
     roscpp
     std_msgs
+    eigen_conversions
+    laser_geometry
 )
 
 catkin_package(
@@ -41,6 +43,8 @@ catkin_package(
         rosbag
         roscpp
         std_msgs
+        eigen_conversions
+        laser_geometry
 )
 
 include_directories(
@@ -79,6 +83,7 @@ add_executable(${PROJECT_NAME}
     src/displays/frame.cpp
     src/displays/grid.cpp
     src/displays/interactive.cpp
+    src/displays/laserscan.cpp
     src/displays/light.cpp
     src/displays/marker.cpp
     src/displays/mesh.cpp
