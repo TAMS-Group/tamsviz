@@ -17,6 +17,7 @@ set(QT_LIBRARIES Qt5::Widgets Qt5::OpenGL)
 
 find_package(catkin REQUIRED COMPONENTS
     cv_bridge
+    eigen_conversions
     geometry_msgs
     interactive_markers
     moveit_core
@@ -29,6 +30,7 @@ find_package(catkin REQUIRED COMPONENTS
     std_msgs
     eigen_conversions
     laser_geometry
+    tf
 )
 
 catkin_package(
