@@ -1,9 +1,10 @@
+cmake_minimum_required(VERSION 3.1)
 # TAMSVIZ
 # (c) 2020 Philipp Ruppel
 
 project(tamsviz)
 
-set(CMAKE_CXX_FLAGS " -std=c++11 ")
+set(CMAKE_CXX_STANDARD 11)
 
 find_package(OpenCV REQUIRED)
 
