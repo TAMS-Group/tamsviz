@@ -27,7 +27,7 @@ struct TextureData {
       LOG_ERROR("texture file is empty " << url);
       return;
     }
-    auto img = cv::imdecode(data, CV_LOAD_IMAGE_COLOR);
+    auto img = cv::imdecode(data, cv::IMREAD_COLOR);
     if (img.data == nullptr) {
       LOG_ERROR("failed to decode texture " << url);
       return;

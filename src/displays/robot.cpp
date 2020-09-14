@@ -21,7 +21,7 @@
 #include <assimp/scene.h>
 
 static std::shared_ptr<Mesh>
-createShapeMesh(const boost::shared_ptr<urdf::Visual> &visual) {
+createShapeMesh(const urdf::VisualSharedPtr &visual) {
   auto geometry = visual->geometry;
   switch (geometry->type) {
   case urdf::Geometry::SPHERE: {

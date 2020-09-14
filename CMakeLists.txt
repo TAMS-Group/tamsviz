@@ -1,9 +1,10 @@
+cmake_minimum_required(VERSION 3.1)
 # TAMSVIZ
 # (c) 2020 Philipp Ruppel
 
 project(tamsviz)
 
-set(CMAKE_CXX_FLAGS " -std=c++11 ")
+set(CMAKE_CXX_STANDARD 11)
 
 find_package(OpenCV REQUIRED)
 
@@ -16,6 +17,7 @@ set(QT_LIBRARIES Qt5::Widgets Qt5::OpenGL)
 
 find_package(catkin REQUIRED COMPONENTS
     cv_bridge
+    eigen_conversions
     geometry_msgs
     interactive_markers
     moveit_core
@@ -28,6 +30,7 @@ find_package(catkin REQUIRED COMPONENTS
     std_msgs
     eigen_conversions
     laser_geometry
+    tf
 )
 
 catkin_package(
