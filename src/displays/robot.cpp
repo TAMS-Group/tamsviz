@@ -386,7 +386,6 @@ void RobotDisplayBase::renderAsync(const RenderAsyncContext &context) {
 void RobotStateDisplay::renderSync(const RenderSyncContext &context) {
   _joint_state_message = topic().message();
   if (_robot_state) {
-    _robot_state->moveit_state.setToDefaultValues();
     if (_joint_state_message) {
       for (size_t i = 0; i < _joint_state_message->name.size() &&
                          i < _joint_state_message->position.size();
