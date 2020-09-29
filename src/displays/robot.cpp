@@ -383,21 +383,44 @@ void RobotDisplayBase::renderAsync(const RenderAsyncContext &context) {
   }
 }
 
-void RobotStateDisplay::renderSync(const RenderSyncContext &context) {
-  _joint_state_message = topic().message();
-  if (_robot_state) {
-    if (_joint_state_message) {
-      for (size_t i = 0; i < _joint_state_message->name.size() &&
-                         i < _joint_state_message->position.size();
-           i++) {
-        auto &variable_name = _joint_state_message->name.at(i);
-        if (_robot_state->variable_names.find(variable_name) !=
-            _robot_state->variable_names.end()) {
-          _robot_state->moveit_state.setVariablePosition(
-              variable_name, _joint_state_message->position.at(i));
-        }
+class RobotStateTimeSeriesListener : public TimeSeriesListener {
+  std::mutex _mutex;
+  std::unordered_map<std::string, double> _positions, _temp;
+
+public:
+  virtual void push(const std::shared_ptr<const Message> &msg, int64_t start,
+                    int64_t end) override {
+    if (auto message = msg->instantiate<sensor_msgs::JointState>()) {
+      for (size_t i = 0;
+           i < message->name.size() && i < message->position.size(); i++) {
+        _temp[message->name.at(i)] = message->position.at(i);
       }
     }
+  }
+  virtual void commit() override {
+    std::lock_guard<std::mutex> lock(_mutex);
+    _positions = _temp;
+  }
+  void apply(moveit::core::RobotState &robot_state) {
+    std::lock_guard<std::mutex> lock(_mutex);
+    for (auto &pair : _positions) {
+      robot_state.setVariablePosition(pair.first, pair.second);
+    }
+  }
+};
+
+void RobotStateDisplay::refresh() {
+  if (!_subscriber || topic().topic() != _subscriber->topic()) {
+    _subscriber = std::make_shared<TimeSeriesSubscriber>(topic().topic());
+    _subscriber->duration(0.5);
+    _listener = std::make_shared<RobotStateTimeSeriesListener>();
+    _subscriber->addListener(_listener);
+  }
+}
+
+void RobotStateDisplay::renderSync(const RenderSyncContext &context) {
+  if (_robot_state && _listener) {
+    _listener->apply(_robot_state->moveit_state);
     for (size_t i = 0; i < _robot_state->robot_model->links.size(); i++) {
       auto &link = _robot_state->robot_model->links[i];
       _robot_state->mesh_renderers.at(i)->pose(

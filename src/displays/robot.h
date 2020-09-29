@@ -5,6 +5,7 @@
 
 #include "../core/document.h"
 #include "../core/loader.h"
+#include "../core/timeseries.h"
 #include "../core/topic.h"
 #include "../core/watcher.h"
 
@@ -64,13 +65,17 @@ public:
 };
 DECLARE_TYPE(RobotDisplayBase, MeshDisplayBase);
 
+class RobotStateTimeSeriesListener;
+
 class RobotStateDisplay : public GenericFrameDisplay<RobotDisplayBase> {
-  std::shared_ptr<const sensor_msgs::JointState> _joint_state_message;
+  std::shared_ptr<TimeSeriesSubscriber> _subscriber;
+  std::shared_ptr<RobotStateTimeSeriesListener> _listener;
 
 public:
   PROPERTY(TopicProperty<sensor_msgs::JointState>, topic, "/joint_states");
   virtual void renderSync(const RenderSyncContext &context) override;
   virtual void renderAsync(const RenderAsyncContext &context) override;
+  virtual void refresh() override;
 };
 DECLARE_TYPE(RobotStateDisplay, RobotDisplayBase);
 
