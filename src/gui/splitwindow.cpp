@@ -307,20 +307,6 @@ EmptyWindow::EmptyWindow() {
   auto *view = new QWidget(this);
   view->setStyleSheet("background: #000;");
   setContentWidget(view);
-  {
-    QTimer *timer = new QTimer(this);
-    timer->setInterval(10);
-    timer->setSingleShot(false);
-    connect(timer, &QTimer::timeout, this, [this, view]() {
-      static bool f = false;
-      if (f = !f) {
-        view->setStyleSheet("background: #000;");
-      } else {
-        view->setStyleSheet("background: #fff;");
-      }
-    });
-    timer->start();
-  }
 }
 
 void ContentWindowBase::paintAnnotationHUD(
