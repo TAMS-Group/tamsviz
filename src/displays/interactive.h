@@ -12,6 +12,7 @@
 
 #include <geometry_msgs/PointStamped.h>
 #include <geometry_msgs/PoseStamped.h>
+#include <tf2_msgs/TFMessage.h>
 #include <visualization_msgs/InteractiveMarker.h>
 #include <visualization_msgs/InteractiveMarkerFeedback.h>
 #include <visualization_msgs/InteractiveMarkerInit.h>
@@ -89,6 +90,8 @@ protected:
   std::shared_ptr<InteractiveMarkerParameters> _params;
   std::shared_ptr<InteractiveMarkerArray> _markers;
   InteractiveMarkerDisplayBase();
+  visualization_msgs::InteractiveMarker makePointMarker();
+  visualization_msgs::InteractiveMarker makePoseMarker();
 
 public:
   virtual void renderSync(const RenderSyncContext &context) override;
@@ -121,8 +124,25 @@ public:
 DECLARE_TYPE(InteractiveMarkerDisplay, InteractiveMarkerDisplayBase);
 
 class InteractivePoseDisplayBase : public InteractiveMarkerDisplayBase {
+  void publish();
+  struct PublishThreadData {
+    std::condition_variable _stop_condition;
+    std::mutex _publish_mutex;
+    bool _stop_flag = false;
+  };
+  std::shared_ptr<PublishThreadData> _publish_thread_data;
+
 protected:
   InteractivePoseDisplayBase();
+  ~InteractivePoseDisplayBase();
+  Watcher _publish_watcher;
+  virtual void publish(const std::string &frame,
+                       const Eigen::Isometry3d &pose) = 0;
+  static uint64_t publisherClock() {
+    return std::chrono::duration_cast<std::chrono::seconds>(
+               std::chrono::steady_clock::now().time_since_epoch())
+        .count();
+  };
 
 public:
   PROPERTY(Frame, frame);
@@ -130,8 +150,7 @@ public:
   PROPERTY(double, scale, 1.0, min = 0.0);
   virtual void renderSync(const RenderSyncContext &context) override;
   virtual bool interact(const Interaction &interaction) override;
-  virtual void publish(const std::string &frame,
-                       const Eigen::Isometry3d &pose) {}
+  virtual void refresh() override;
 };
 DECLARE_TYPE(InteractivePoseDisplayBase, InteractiveMarkerDisplayBase);
 
@@ -152,3 +171,12 @@ struct PosePublisherDisplay : InteractivePoseDisplayBase {
                        const Eigen::Isometry3d &pose) override;
 };
 DECLARE_TYPE(PosePublisherDisplay, InteractivePoseDisplayBase);
+
+struct TransformPublisherDisplay : InteractivePoseDisplayBase {
+  Publisher<tf2_msgs::TFMessage> _publisher{"/tf"};
+  PROPERTY(std::string, childFrame);
+  TransformPublisherDisplay();
+  virtual void publish(const std::string &frame,
+                       const Eigen::Isometry3d &pose) override;
+};
+DECLARE_TYPE(TransformPublisherDisplay, InteractivePoseDisplayBase);

@@ -169,7 +169,12 @@ std::shared_ptr<Topic> Topic::instance(const std::string &name) {
   if (!topic) {
     topic = std::shared_ptr<Topic>(new Topic(name));
     {
-      if (registry->topic_bag_counters[topic->name()] == 0) {
+      bool sub = false;
+      {
+        std::lock_guard<std::mutex> lock(registry->topic_bag_counter_mutex);
+        sub = (registry->topic_bag_counters[topic->name()] == 0);
+      }
+      if (sub) {
         _subscribe(topic);
       }
     }
@@ -177,6 +182,19 @@ std::shared_ptr<Topic> Topic::instance(const std::string &name) {
   }
   return topic;
 }
+
+bool Topic::isFromBag() const {
+  std::lock_guard<std::mutex> lock(_registry->topic_bag_counter_mutex);
+  return _registry->topic_bag_counters[_topic_name] > 0;
+}
+
+/*
+bool Topic::isFromBag(const std::string &topic) {
+  auto registry = TopicRegistry::instance();
+  std::lock_guard<std::mutex> lock(registry->topic_bag_counter_mutex);
+  return registry->topic_bag_counters[topic] > 0;
+}
+*/
 
 static std::shared_ptr<boost::shared_mutex> topicMessageMutex() {
   static auto instance = std::make_shared<boost::shared_mutex>();

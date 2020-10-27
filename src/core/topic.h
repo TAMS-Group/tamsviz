@@ -52,6 +52,8 @@ public:
   static std::shared_ptr<Topic> instance(const std::string &name);
   Event<void(const std::shared_ptr<const Message> &)> received;
   Event<void()> connected;
+  bool isFromBag() const;
+  // static bool isFromBag(const std::string &topic);
   friend class MessagePlaybackScope;
 };
 

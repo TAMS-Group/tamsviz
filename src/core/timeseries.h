@@ -19,7 +19,7 @@ class TimeSeriesSubscriber {
     std::mutex _mutex;
     bool _refresh = false;
     std::condition_variable _condition;
-    std::string _topic;
+    std::shared_ptr<Topic> _topic;
     double _duration;
     std::thread _thread;
     std::shared_ptr<const Message> _received_message;

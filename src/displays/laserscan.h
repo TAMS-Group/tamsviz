@@ -15,7 +15,7 @@
 
 #include <laser_geometry/laser_geometry.h>
 
-class LaserScanDisplay : public FrameDisplayBase {
+class LaserScanDisplay : public MeshDisplayBase {
   std::shared_ptr<MeshRenderer> _mesh_renderer;
   std::shared_ptr<Material> _material = std::make_shared<Material>();
   laser_geometry::LaserProjection _projector;
@@ -28,4 +28,4 @@ public:
   virtual void renderSync(const RenderSyncContext &context) override;
   LaserScanDisplay() {}
 };
-DECLARE_TYPE(LaserScanDisplay, FrameDisplayBase);
+DECLARE_TYPE(LaserScanDisplay, MeshDisplayBase);

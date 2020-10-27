@@ -8,6 +8,7 @@
 #include "../core/workspace.h"
 
 #include <cv_bridge/cv_bridge.h>
+#include <sensor_msgs/CompressedImage.h>
 #include <sensor_msgs/Image.h>
 
 #include <QGraphicsScene>
@@ -16,6 +17,8 @@
 #include <condition_variable>
 #include <mutex>
 #include <thread>
+
+#include <opencv2/imgcodecs.hpp>
 
 struct AnnotationView : QGraphicsItem {
   bool ok = false;
@@ -269,8 +272,10 @@ ImageWindow::ImageWindow() {
     addToolWidget(button);
     connect(menu, &QMenu::aboutToShow, this, [this, menu]() {
       menu->clear();
-      auto topics = LockScope()->listTopics(
-          ros::message_traits::DataType<sensor_msgs::Image>::value());
+      auto topics = LockScope()->listTopics({
+          "sensor_msgs/Image",
+          "sensor_msgs/CompressedImage",
+      });
       if (topics.empty()) {
         connect(menu->addAction("<no image topics found>"), &QAction::triggered,
                 this, [this](bool) {
@@ -351,7 +356,7 @@ ImageWindow::ImageWindow() {
 
   class MessageBuffer {
     std::mutex _mutex;
-    std::shared_ptr<const sensor_msgs::Image> _image;
+    std::shared_ptr<const Message> _image;
     std::condition_variable _put_condition;
     std::thread _worker;
     QPixmap _pixmap;
@@ -363,7 +368,7 @@ ImageWindow::ImageWindow() {
     MessageBuffer() {
       _worker = std::thread([this]() {
         while (true) {
-          std::shared_ptr<const sensor_msgs::Image> image;
+          std::shared_ptr<const Message> image;
           {
             std::unique_lock<std::mutex> lock(_mutex);
             while (true) {
@@ -385,10 +390,22 @@ ImageWindow::ImageWindow() {
             }
             continue;
           }
+
+          /*
           cv_bridge::CvImagePtr cv_ptr;
+          QImage::Format image_format;
           try {
-            cv_ptr = cv_bridge::toCvCopy(*image,
-                                         sensor_msgs::image_encodings::RGBA8);
+            if (sensor_msgs::image_encodings::isColor(image->encoding)) {
+              LOG_DEBUG("color");
+              image_format = QImage::Format_RGBA8888;
+              cv_ptr = cv_bridge::toCvCopy(*image,
+                                           sensor_msgs::image_encodings::RGBA8);
+            } else {
+              LOG_DEBUG("grayscale");
+              image_format = QImage::Format_Grayscale8;
+              cv_ptr = cv_bridge::toCvCopy(*image,
+                                           sensor_msgs::image_encodings::MONO8);
+            }
           } catch (cv_bridge::Exception &e) {
             LOG_ERROR("cv_bridge exception: " << e.what());
             {
@@ -407,9 +424,120 @@ ImageWindow::ImageWindow() {
             continue;
           }
           cv::Mat mat = cv_ptr->image;
-          auto pixmap =
-              QPixmap::fromImage(QImage((uchar *)mat.data, mat.cols, mat.rows,
-                                        mat.step, QImage::Format_RGBA8888));
+          auto pixmap = QPixmap::fromImage(QImage(
+              (uchar *)mat.data, mat.cols, mat.rows, mat.step, image_format));
+          {
+            std::unique_lock<std::mutex> lock(_mutex);
+            _pixmap = pixmap;
+            _pixmap_time = _image_time;
+          }
+          */
+
+          cv::Mat mat;
+
+          if (auto img = image->instantiate<sensor_msgs::Image>()) {
+            cv_bridge::CvImagePtr cv_ptr;
+            try {
+              cv_ptr = cv_bridge::toCvCopy(*img);
+            } catch (cv_bridge::Exception &e) {
+              LOG_ERROR("cv_bridge exception: " << e.what());
+              {
+                std::unique_lock<std::mutex> lock(_mutex);
+                _pixmap = QPixmap();
+              }
+              ready();
+              continue;
+            }
+            mat = cv_ptr->image;
+          } else if (auto img =
+                         image->instantiate<sensor_msgs::CompressedImage>()) {
+            mat = cv::imdecode(img->data, cv::IMREAD_UNCHANGED);
+          } else {
+            LOG_WARN("unsupported image message type" << image->type()->name());
+            continue;
+          }
+
+          if (mat.empty()) {
+            LOG_WARN("failed to decode image");
+            continue;
+          }
+
+          QImage qimage;
+          switch (mat.type()) {
+
+          case CV_8UC1:
+            qimage = QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
+                            QImage::Format_Grayscale8);
+            break;
+          case CV_16UC1:
+            mat.convertTo(mat, CV_8U, 1.0 / 256.0);
+            qimage = QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
+                            QImage::Format_Grayscale8);
+            break;
+          case CV_32FC1:
+            mat.convertTo(mat, CV_8U, 255.0);
+            qimage = QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
+                            QImage::Format_Grayscale8);
+            break;
+          case CV_64FC1:
+            mat.convertTo(mat, CV_8U, 255.0);
+            qimage = QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
+                            QImage::Format_Grayscale8);
+            break;
+
+          case CV_8UC3:
+            cv::cvtColor(mat, mat, cv::COLOR_BGR2RGB);
+            qimage = QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
+                            QImage::Format_RGB888);
+            break;
+          case CV_16UC3:
+            cv::cvtColor(mat, mat, cv::COLOR_BGR2RGB);
+            mat.convertTo(mat, CV_8UC3, 1.0 / 256.0);
+            qimage = QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
+                            QImage::Format_RGB888);
+            break;
+          case CV_32FC3:
+            cv::cvtColor(mat, mat, cv::COLOR_BGR2RGB);
+            mat.convertTo(mat, CV_8UC3, 255.0);
+            qimage = QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
+                            QImage::Format_RGB888);
+            break;
+          case CV_64FC3:
+            cv::cvtColor(mat, mat, cv::COLOR_BGR2RGB);
+            mat.convertTo(mat, CV_8UC3, 255.0);
+            qimage = QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
+                            QImage::Format_RGB888);
+            break;
+
+          case CV_8UC4:
+            cv::cvtColor(mat, mat, cv::COLOR_BGRA2RGBA);
+            qimage = QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
+                            QImage::Format_RGBA8888);
+            break;
+          case CV_16UC4:
+            cv::cvtColor(mat, mat, cv::COLOR_BGRA2RGBA);
+            mat.convertTo(mat, CV_8UC4, 1.0 / 256.0);
+            qimage = QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
+                            QImage::Format_RGBA8888);
+            break;
+          case CV_32FC4:
+            cv::cvtColor(mat, mat, cv::COLOR_BGRA2RGBA);
+            mat.convertTo(mat, CV_8UC4, 255.0);
+            qimage = QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
+                            QImage::Format_RGBA8888);
+            break;
+          case CV_64FC4:
+            cv::cvtColor(mat, mat, cv::COLOR_BGRA2RGBA);
+            mat.convertTo(mat, CV_8UC4, 255.0);
+            qimage = QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
+                            QImage::Format_RGBA8888);
+            break;
+
+          default:
+            LOG_WARN("image format not yet supported " << mat.type());
+            continue;
+          }
+          auto pixmap = QPixmap::fromImage(qimage);
           {
             std::unique_lock<std::mutex> lock(_mutex);
             _pixmap = pixmap;
@@ -432,11 +560,9 @@ ImageWindow::ImageWindow() {
       _image = nullptr;
       _image_time = ros::Time();
       if (msg) {
-        if (auto image = msg->instantiate<sensor_msgs::Image>()) {
-          _image = image;
-          _image_time = msg->time();
-          _put_condition.notify_one();
-        }
+        _image = msg;
+        _image_time = msg->time();
+        _put_condition.notify_one();
       }
       _put_condition.notify_one();
     }
@@ -877,7 +1003,7 @@ ImageWindow::ImageWindow() {
           subscriber = std::make_shared<Subscriber<Message>>(
               topic(), shared_from_this(),
               [buffer](const std::shared_ptr<const Message> &msg) {
-                LOG_DEBUG("image " << msg->time());
+                // LOG_DEBUG("image " << msg->time());
                 buffer->putImage(msg);
               });
         }

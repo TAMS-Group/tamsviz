@@ -132,7 +132,7 @@ protected:
   virtual ~Display() {}
 
 public:
-  PROPERTY(std::string, name, "Display");
+  PROPERTY(std::string, name, "Display", hidden = true);
   template <class F>
   auto recurse(const F &f)
       -> decltype(f(std::shared_ptr<Display>(), std::shared_ptr<Display>())) {

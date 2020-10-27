@@ -10,11 +10,11 @@
 #include "../core/workspace.h"
 #include "mainwindow.h"
 
-#include <sensor_msgs/Image.h>
-#include <std_msgs/Float64.h>
-
+#include <fstream>
 #include <rosbag/bag.h>
 #include <rosbag/view.h>
+#include <sensor_msgs/Image.h>
+#include <std_msgs/Float64.h>
 
 static const double track_height = 42;
 static const double track_label_width = 200;
@@ -1596,7 +1596,7 @@ TimelineWidget::TimelineWidget() : QDockWidget("Timeline") {
             LockScope ws;
             auto player = ws->player;
             if (!player) {
-              throw std::runtime_error("Not bag player");
+              throw std::runtime_error("No bag player");
             }
             std::string src_path(player->path());
             std::string dst_path(src_path + ".annotated.bag");
@@ -1686,6 +1686,47 @@ TimelineWidget::TimelineWidget() : QDockWidget("Timeline") {
             QMessageBox::critical(nullptr, "Error", ex.what());
           }
         });
+    connect(menu->addAction("Time Spans / CSV"), &QAction::triggered, this,
+            [this](bool checked) {
+              try {
+                LockScope ws;
+                auto player = ws->player;
+                if (!player) {
+                  throw std::runtime_error("No bag player");
+                }
+                std::string dst_path(player->path() + ".annotations.csv");
+                LOG_INFO("writing csv " << dst_path);
+                QFile::remove(dst_path.c_str());
+                std::ofstream stream(dst_path);
+                stream << "start,duration,label" << std::endl;
+                for (auto &track : ws->document()->timeline()->tracks()) {
+                  if (auto annotation_track =
+                          std::dynamic_pointer_cast<AnnotationTrack>(track)) {
+                    for (auto &branch : annotation_track->branches()) {
+                      if (branch->name() == player->fileName()) {
+                        for (auto &span : branch->spans()) {
+                          auto label = span->label().empty() ? track->label()
+                                                             : span->label();
+                          std::string label_escaped;
+                          for (auto &c : label) {
+                            if (c == '"') {
+                              label_escaped.append("\"\"");
+                            } else {
+                              label_escaped.push_back(c);
+                            }
+                          }
+                          stream << span->start() << "," << span->duration()
+                                 << ",\"" << label_escaped << "\"" << std::endl;
+                        }
+                      }
+                    }
+                  }
+                }
+                LOG_SUCCESS("csv written " << dst_path);
+              } catch (const std::exception &ex) {
+                QMessageBox::critical(nullptr, "Error", ex.what());
+              }
+            });
     button->setMenu(menu);
     playback_bar_left->addWidget(button);
   }

@@ -12,6 +12,9 @@ void LaserScanDisplay::renderSync(const RenderSyncContext &context) {
   _material->color().g() = color().g();
   _material->color().b() = color().b();
   _material->opacity() = color().a();
+  if (message) {
+    node()->frame(message->header.frame_id);
+  }
   if (_watcher.changed(message, radius)) {
     // LOG_DEBUG("laserscan changed");
     if (message) {
@@ -27,6 +30,7 @@ void LaserScanDisplay::renderSync(const RenderSyncContext &context) {
               mesh.indices.push_back(mesh.positions.size() + 0);
               mesh.indices.push_back(mesh.positions.size() + 1);
               mesh.indices.push_back(mesh.positions.size() + 2);
+
               mesh.indices.push_back(mesh.positions.size() + 0);
               mesh.indices.push_back(mesh.positions.size() + 2);
               mesh.indices.push_back(mesh.positions.size() + 3);
@@ -54,5 +58,5 @@ void LaserScanDisplay::renderSync(const RenderSyncContext &context) {
       _mesh_renderer.reset();
     }
   }
-  FrameDisplayBase::renderSync(context);
+  MeshDisplayBase::renderSync(context);
 }

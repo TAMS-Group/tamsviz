@@ -46,6 +46,8 @@ public:
   Workspace();
   ~Workspace();
   std::vector<std::string> listTopics(const std::string &type_name);
+  std::vector<std::string>
+  listTopics(const std::initializer_list<std::string> &type_names);
 };
 DECLARE_TYPE(Workspace, Object);
 

@@ -113,6 +113,16 @@ std::vector<std::string> Workspace::listTopics(const std::string &type_name) {
     return TopicManager::instance()->listTopics(type_name);
   }
 }
+std::vector<std::string>
+Workspace::listTopics(const std::initializer_list<std::string> &type_names) {
+  std::set<std::string> ret;
+  for (auto &type_name : type_names) {
+    for (auto &v : listTopics(type_name)) {
+      ret.insert(v);
+    }
+  }
+  return std::vector<std::string>(ret.begin(), ret.end());
+}
 
 ObjectScope::ObjectScope() { Property::unlockScope(+1); }
 ObjectScope::~ObjectScope() { Property::unlockScope(-1); }

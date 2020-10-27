@@ -33,10 +33,10 @@ TimeSeriesSubscriber::Impl::Impl() {
           _condition.wait(lock);
         }
       }
-      if (player) {
+      if (player && _topic->isFromBag()) {
         double bag_time = player->time();
         player->readMessageSamples(
-            _topic, bag_time - duration, bag_time,
+            _topic->name(), bag_time - duration, bag_time,
             [&](const std::shared_ptr<const Message> &message) {
               double playback_time = player->time();
               for (auto &listener : listeners) {
@@ -69,7 +69,7 @@ void TimeSeriesSubscriber::Impl::handleMessage(
     const std::shared_ptr<const Message> &message) {
   PROFILER("TimeSeriesSubscriber");
   std::unique_lock<std::mutex> lock(_mutex);
-  if (_player && !_player->isPlaying()) {
+  if (_player && _topic->isFromBag() && !_player->isPlaying()) {
     _refresh = true;
     _condition.notify_one();
   } else {
@@ -106,7 +106,7 @@ void TimeSeriesSubscriber::Impl::handleMessage(
 }
 
 TimeSeriesSubscriber::TimeSeriesSubscriber(const std::string &topic) {
-  _impl->_topic = topic;
+  _impl->_topic = Topic::instance(topic);
   auto *impl = _impl.get();
   {
     auto player = LockScope()->player;
@@ -121,7 +121,7 @@ TimeSeriesSubscriber::TimeSeriesSubscriber(const std::string &topic) {
     auto player = LockScope()->player;
     std::unique_lock<std::mutex> lock(impl->_mutex);
     if (impl->_player != player) {
-      if (player) {
+      if (player && impl->_topic->isFromBag()) {
         impl->_refresh = true;
       }
       impl->_player = player;
@@ -129,7 +129,9 @@ TimeSeriesSubscriber::TimeSeriesSubscriber(const std::string &topic) {
   });
 }
 
-const std::string &TimeSeriesSubscriber::topic() const { return _impl->_topic; }
+const std::string &TimeSeriesSubscriber::topic() const {
+  return _impl->_topic->name();
+}
 
 const double TimeSeriesSubscriber::duration() const {
   std::unique_lock<std::mutex> lock(_impl->_mutex);

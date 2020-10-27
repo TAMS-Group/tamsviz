@@ -16,6 +16,6 @@ protected:
 public:
   PROPERTY(Color3, color, Color3());
   PROPERTY(double, brightness, 1.0, min = 0.0);
-  PROPERTY(double, angle, 90, min = 0.0, max = 180);
+  PROPERTY(bool, viewSpace, false);
 };
 DECLARE_TYPE(LightDisplayBase, FrameDisplayBase);

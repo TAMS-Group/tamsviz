@@ -123,13 +123,32 @@ void Renderer::prepare(const CameraBlock &camera_block,
   camera_uniform_buffer.update(camera_block);
   camera_uniform_buffer.bind();
 
+  Eigen::Matrix4f view_to_world = camera_block.view_matrix.inverse();
+
   LightArrayBlock light_array;
   light_array.light_count = std::min(sizeof(light_array.light_array) /
                                          sizeof(light_array.light_array[0]),
                                      render_list._lights.size());
   for (size_t light_index = 0; light_index < light_array.light_count;
        light_index++) {
+
+    auto &light = light_array.light_array[light_index];
+
     light_array.light_array[light_index] = render_list._lights[light_index];
+
+    if (light.type & uint32_t(LightType::ViewSpace)) {
+      Eigen::Vector4f p;
+      p.head(3) = light_array.light_array[light_index].position;
+      p.w() = 1.0f;
+      p = view_to_world * p;
+      p /= p.w();
+      light_array.light_array[light_index].position = p.head(3);
+
+      light_array.light_array[light_index].pose =
+          light_array.light_array[light_index].pose * camera_block.view_matrix;
+    }
+
+    light.type = (light.type & 0xff);
   }
   light_buffer.update(light_array);
   light_buffer.bind();

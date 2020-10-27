@@ -22,6 +22,7 @@ enum class LightType : uint32_t {
   Directional = 1,
   Point = 2,
   Spot = 3,
+  ViewSpace = (1 << 20),
 };
 
 struct LightBlock {
