@@ -394,10 +394,16 @@ InteractivePoseDisplayBase::~InteractivePoseDisplayBase() {
 
 void InteractivePoseDisplayBase::publish() {
   if (auto m = _markers->marker("")) {
+    auto pose = m->pose();
+    // Eigen::Vector3d pos = pose.translation();
+    // Eigen::Quaterniond rot = pose.linear();
+    pose.linear().col(0).normalize();
+    pose.linear().col(1).normalize();
+    pose.linear().col(2).normalize();
     publish(frame().empty()
                 ? LockScope()->document()->display()->transformer->root()
                 : frame().name(),
-            Eigen::Isometry3d(m->pose().matrix()));
+            Eigen::Isometry3d(pose.matrix()));
   }
 }
 
