@@ -386,15 +386,21 @@ void RobotDisplayBase::renderAsync(const RenderAsyncContext &context) {
 class RobotStateTimeSeriesListener : public TimeSeriesListener {
   std::mutex _mutex;
   std::unordered_map<std::string, double> _positions, _temp;
+  void push(const sensor_msgs::JointState &message) {
+    for (size_t i = 0; i < message.name.size() && i < message.position.size();
+         i++) {
+      _temp[message.name.at(i)] = message.position.at(i);
+    }
+  }
 
 public:
   virtual void push(const std::shared_ptr<const Message> &msg, int64_t start,
                     int64_t end) override {
     if (auto message = msg->instantiate<sensor_msgs::JointState>()) {
-      for (size_t i = 0;
-           i < message->name.size() && i < message->position.size(); i++) {
-        _temp[message->name.at(i)] = message->position.at(i);
-      }
+      push(*message);
+    }
+    if (auto message = msg->instantiate<moveit_msgs::DisplayRobotState>()) {
+      push(message->state.joint_state);
     }
   }
   virtual void commit() override {
@@ -409,16 +415,16 @@ public:
   }
 };
 
-void RobotStateDisplay::refresh() {
-  if (!_subscriber || topic().topic() != _subscriber->topic()) {
-    _subscriber = std::make_shared<TimeSeriesSubscriber>(topic().topic());
+void RobotStateDisplayBase::refreshTopic(const std::string &topic) {
+  if (!_subscriber || topic != _subscriber->topic()) {
+    _subscriber = std::make_shared<TimeSeriesSubscriber>(topic);
     _subscriber->duration(0.5);
     _listener = std::make_shared<RobotStateTimeSeriesListener>();
     _subscriber->addListener(_listener);
   }
 }
 
-void RobotStateDisplay::renderSync(const RenderSyncContext &context) {
+void RobotStateDisplayBase::renderSync(const RenderSyncContext &context) {
   if (_robot_state && _listener) {
     _listener->apply(_robot_state->moveit_state);
     for (size_t i = 0; i < _robot_state->robot_model->links.size(); i++) {
@@ -438,8 +444,123 @@ void RobotStateDisplay::renderSync(const RenderSyncContext &context) {
   RobotDisplayBase::renderSync(context);
 }
 
-void RobotStateDisplay::renderAsync(const RenderAsyncContext &context) {
-  RobotDisplayBase::renderAsync(context);
+/*
+void RobotTrajectoryDisplay::renderSync(const RenderSyncContext &context) {
+
+  auto display_trajectory_message = topic().message();
+  if (_trajectory_watcher.changed(display_trajectory_message)) {
+    _frame_index = 0;
+  }
+
+  size_t frame_index = 0;
+  if (_robot_state && display_trajectory_message) {
+    for (auto &robot_trajectory : display_trajectory_message->trajectory) {
+      auto &joint_trajectory = robot_trajectory.joint_trajectory;
+      for (auto &point : joint_trajectory.points) {
+        if (_frame_index == frame_index) {
+          for (size_t ijoint = 0; ijoint < joint_trajectory.joint_names.size();
+               ijoint++) {
+            if (ijoint < point.positions.size()) {
+              _robot_state->moveit_state.setVariablePosition(
+                  joint_trajectory.joint_names[ijoint],
+                  point.positions[ijoint]);
+            }
+          }
+        }
+        frame_index++;
+      }
+    }
+  }
+  _frame_index++;
+  if (_frame_index >= frame_index) {
+    _frame_index = 0;
+  }
+
+  if (_robot_state) {
+    for (size_t i = 0; i < _robot_state->robot_model->links.size(); i++) {
+      auto &link = _robot_state->robot_model->links[i];
+      _robot_state->mesh_renderers.at(i)->pose(
+          pose_temp *
+          Eigen::Isometry3d(
+              _robot_state->moveit_state
+                  .getGlobalLinkTransform(
+                      _robot_state->robot_model->moveit_robot->getLinkModel(
+                          link->link_index))
+                  .matrix()) *
+          link->pose);
+      _robot_state->mesh_renderers.at(i)->show();
+    }
+  }
+
+  RobotDisplayBase::renderSync(context);
+}
+*/
+
+void RobotTrajectoryDisplay::renderSync(const RenderSyncContext &context) {
+  _display_trajectory_message = topic().message();
+  _max_steps = maxSteps();
+  RobotDisplayBase::renderSync(context);
+}
+
+void RobotTrajectoryDisplay::renderAsync(const RenderAsyncContext &context) {
+  std::shared_ptr<RobotModel> robot_model;
+  if (_robot_model_loader) {
+    robot_model = _robot_model_loader->load();
+  }
+  if (_trajectory_watcher.changed(_display_trajectory_message, _max_steps,
+                                  robot_model)) {
+    _trajectory.clear();
+    if (robot_model && _display_trajectory_message) {
+      LOG_DEBUG("new trajectory");
+      if (robot_model->moveit_robot) {
+        int frame_count = 0;
+        for (auto &robot_trajectory : _display_trajectory_message->trajectory) {
+          auto &joint_trajectory = robot_trajectory.joint_trajectory;
+          for (auto &point : joint_trajectory.points) {
+            frame_count++;
+          }
+        }
+        int frame_index = 0;
+        for (auto &robot_trajectory : _display_trajectory_message->trajectory) {
+          auto &joint_trajectory = robot_trajectory.joint_trajectory;
+          for (auto &point : joint_trajectory.points) {
+            if ((frame_index - 1) * _max_steps / std::max(1, frame_count - 1) !=
+                frame_index * _max_steps / std::max(1, frame_count - 1)) {
+              auto robot_state =
+                  node()->create<RobotState>(robot_model, _material_override);
+              for (size_t ijoint = 0;
+                   ijoint < joint_trajectory.joint_names.size(); ijoint++) {
+                if (ijoint < point.positions.size()) {
+                  robot_state->moveit_state.setVariablePosition(
+                      joint_trajectory.joint_names[ijoint],
+                      point.positions[ijoint]);
+                }
+              }
+              robot_state->moveit_state.update();
+              for (size_t i = 0; i < robot_state->robot_model->links.size();
+                   i++) {
+                auto &link = robot_state->robot_model->links[i];
+                robot_state->mesh_renderers.at(i)->pose(
+                    pose_temp *
+                    Eigen::Isometry3d(
+                        robot_state->moveit_state
+                            .getGlobalLinkTransform(
+                                robot_state->robot_model->moveit_robot
+                                    ->getLinkModel(link->link_index))
+                            .matrix()) *
+                    link->pose);
+                robot_state->mesh_renderers.at(i)->show();
+              }
+              _trajectory.push_back(robot_state);
+            }
+            frame_index++;
+          }
+        }
+      }
+    }
+    GlobalEvents::instance()->redraw();
+  }
+  MeshDisplayBase::renderAsync(context);
 }
 
 void RobotModelDisplay::renderSync(const RenderSyncContext &c) {
