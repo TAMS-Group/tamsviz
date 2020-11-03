@@ -17,6 +17,8 @@ protected:
   MeshDisplayBase() {}
 
 public:
+  PROPERTY(bool, visible, true);
+  // PROPERTY(bool, interactive, true);
   const std::shared_ptr<SceneNode> &node() { return _node; }
   virtual void renderSync(const RenderSyncContext &context) override;
   virtual void renderAsync(const RenderAsyncContext &context) override;

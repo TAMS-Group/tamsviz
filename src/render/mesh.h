@@ -63,7 +63,7 @@ public:
   Mesh(const std::function<MeshData()> &loader);
   ~Mesh();
   void bind();
-  bool transparent() const { return _transparent; }
+  bool transparent();
   GLuint vertexArrayObject();
   const MeshData &data() const { return _data; }
 };

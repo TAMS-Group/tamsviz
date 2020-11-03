@@ -130,6 +130,7 @@ Mesh::Mesh(const std::function<MeshData()> &loader)
     : _loader([loader](MeshData &d) { d = loader(); }) {}
 
 void Mesh::init() {
+  _transparent = false;
   for (auto &c : _data.colors) {
     if (c.w() < 1.0) {
       _transparent = true;
@@ -227,6 +228,13 @@ Mesh::~Mesh() {
   }
   _destructed = true;
   destroy();
+}
+
+bool Mesh::transparent() {
+  if (!_vao) {
+    create();
+  }
+  return _transparent;
 }
 
 GLuint Mesh::vertexArrayObject() {

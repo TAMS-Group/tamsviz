@@ -184,8 +184,9 @@ void SceneWindow::handleEvent(QEvent *event) {
         _pick_depth = pick_result.depth;
         _pick_id = pick_result.id;
         _picked.reset();
+        LockScope ws;
+        _picked = ws->document()->display();
         if (pick_result.id) {
-          LockScope ws;
           {
             ws->document()->display()->recurse(
                 [&](const std::shared_ptr<Display> &display) {
@@ -222,7 +223,6 @@ void SceneWindow::handleEvent(QEvent *event) {
             }
           }
         }
-
       });
       GlobalEvents::instance()->redraw();
     }
