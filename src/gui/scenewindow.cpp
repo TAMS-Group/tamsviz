@@ -47,7 +47,7 @@ SceneWindow::SceneWindow()
                   for (auto &track_base : timeline->tracks()) {
                     if (auto track = std::dynamic_pointer_cast<AnnotationTrack>(
                             track_base)) {
-                      if (auto branch = track->branch()) {
+                      if (auto branch = track->branch(ws(), false)) {
                         for (auto &span : branch->spans()) {
                           if (span->start() <= current_time &&
                               span->start() + span->duration() >=
@@ -78,7 +78,7 @@ SceneWindow::SceneWindow()
                 }
                 ws->currentAnnotationTrack() = current_track;
                 std::shared_ptr<AnnotationSpan> current_span;
-                if (auto branch = current_track->branch()) {
+                if (auto branch = current_track->branch(ws(), false)) {
                   for (auto &span : branch->spans()) {
                     if (span->start() <= current_time &&
                         span->start() + span->duration() >= current_time) {
@@ -91,7 +91,9 @@ SceneWindow::SceneWindow()
                   current_span = std::make_shared<AnnotationSpan>();
                   current_span->start() = current_time;
                   current_span->duration() = 0.1;
-                  current_track->branch(true)->spans().push_back(current_span);
+                  current_track->branch(ws(), true)
+                      ->spans()
+                      .push_back(current_span);
                 }
                 auto annotation = type->instantiate<SceneAnnotationBase>();
                 current_span->annotations().push_back(annotation);
@@ -202,7 +204,7 @@ void SceneWindow::handleEvent(QEvent *event) {
               for (auto &track : ws->document()->timeline()->tracks()) {
                 if (auto annotation_track =
                         std::dynamic_pointer_cast<AnnotationTrack>(track)) {
-                  if (auto branch = annotation_track->branch()) {
+                  if (auto branch = annotation_track->branch(ws(), false)) {
                     for (auto &span : branch->spans()) {
                       if (span->start() <= current_time &&
                           span->start() + span->duration() >= current_time) {

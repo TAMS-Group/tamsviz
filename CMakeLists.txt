@@ -4,6 +4,8 @@ cmake_minimum_required(VERSION 3.1)
 
 project(tamsviz)
 
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
+
 set(CMAKE_CXX_STANDARD 11)
 
 find_package(OpenCV REQUIRED)
@@ -77,6 +79,7 @@ add_executable(${PROJECT_NAME}
     src/core/struct.cpp
     src/core/timeseries.cpp
     src/core/topic.cpp
+    src/core/tracks.cpp
     src/core/transformer.cpp
     src/core/type.cpp
     src/core/variant.cpp
@@ -123,4 +126,3 @@ add_executable(${PROJECT_NAME}
 )
 add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES} ${OpenCV_LIBS} ${Boost_LIBRARIES} ${QT_LIBRARIES} ${ASSIMP_LIBRARIES} -lGL -lEGL -lGLEW yaml-cpp)
-

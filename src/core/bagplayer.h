@@ -67,11 +67,11 @@ public:
   bool findMessageTimeSpan(const std::string &topic, double time, double *start,
                            double *duration) const;
   const ros::Time &startTime() const { return _bag_start_time; }
-  std::vector<std::shared_ptr<const Message>>
-  readMessageSamples(const std::string &topic, double start, double stop);
+  // std::vector<std::shared_ptr<const Message>>
+  // readMessageSamples(const std::string &topic, double start, double stop);
   void readMessageSamples(
       const std::string &topic, double start, double stop,
-      const std::function<void(const std::shared_ptr<const Message> &)>
+      const std::function<bool(const std::shared_ptr<const Message> &)>
           &callback);
   bool isPlaying() const { return _is_playing; }
   ~BagPlayer();

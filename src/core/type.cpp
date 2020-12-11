@@ -3,10 +3,16 @@
 
 #include "type.h"
 
+#include "object.h"
+
 #include <atomic>
 #include <mutex>
 #include <unordered_map>
 #include <unordered_set>
+
+uint64_t handleObjectId(const Object *object) {
+  return object ? object->id() : 0;
+}
 
 struct TypeRegistry {
   std::mutex mutex;

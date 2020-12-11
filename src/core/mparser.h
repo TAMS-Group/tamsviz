@@ -422,5 +422,5 @@ public:
       return _node->toInteger(*this);
     }
   }
-  operator bool() const { return !isNull(); }
+  // operator bool() const { return !isNull(); }
 };

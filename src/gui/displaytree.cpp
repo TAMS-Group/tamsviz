@@ -110,7 +110,9 @@ DisplayTreeWidget::DisplayTreeWidget() : QDockWidget("Display Tree") {
       if (!type->constructable()) {
         continue;
       }
-      actions[QString(type->name().c_str()).replace("Display", "")] = [type]() {
+      // QString name = QString(type->name().c_str()).replace("Display", "");
+      QString name = QString(type->name().c_str());
+      actions[name] = [type]() {
         ActionScope ws(std::string("Create ") + type->name());
         auto new_display = type->instantiate<Display>();
         static size_t counter = 1;

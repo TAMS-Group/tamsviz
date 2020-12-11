@@ -4,6 +4,7 @@
 #pragma once
 
 #include "../core/document.h"
+#include "../core/tracks.h"
 
 class SceneNode;
 

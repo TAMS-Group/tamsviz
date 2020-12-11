@@ -175,20 +175,24 @@ void BagPlayer::publish(const std::string &topic,
   }
 }
 
+/*
 std::vector<std::shared_ptr<const Message>>
 BagPlayer::readMessageSamples(const std::string &topic, double start,
                               double stop) {
   std::unique_lock<std::mutex> lock(_view_mutex);
   std::vector<std::shared_ptr<const Message>> ret;
-  readMessageSamples(
-      topic, start, stop,
-      [&](const std::shared_ptr<const Message> &msg) { ret.push_back(msg); });
+  readMessageSamples(topic, start, stop,
+                     [&](const std::shared_ptr<const Message> &msg) {
+                       ret.push_back(msg);
+                       return true;
+                     });
   return ret;
 }
+*/
 
 void BagPlayer::readMessageSamples(
     const std::string &topic, double start, double stop,
-    const std::function<void(const std::shared_ptr<const Message> &)>
+    const std::function<bool(const std::shared_ptr<const Message> &)>
         &callback) {
   RosBagView::Iterator it;
   RosBagView::Iterator it_end;
@@ -197,13 +201,22 @@ void BagPlayer::readMessageSamples(
     it = RosBagView::Iterator(*_view, start);
   }
   while (it != it_end) {
-    std::unique_lock<std::mutex> lock(_view_mutex);
-    auto p = *it;
-    if ((p.second->time() - _bag_start_time).toSec() > stop) {
+    std::pair<std::string, std::shared_ptr<const Message>> p;
+    {
+      std::unique_lock<std::mutex> lock(_view_mutex);
+      p = *it;
+      if ((p.second->time() - _bag_start_time).toSec() > stop) {
+        break;
+      }
+    }
+    bool ok = callback(p.second);
+    if (!ok) {
       break;
     }
-    callback(p.second);
-    ++it;
+    {
+      std::unique_lock<std::mutex> lock(_view_mutex);
+      ++it;
+    }
   }
   {
     std::unique_lock<std::mutex> lock(_view_mutex);

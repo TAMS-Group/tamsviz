@@ -24,6 +24,7 @@ public:
   void openDocument(const QString &path);
   void openAny(const QString &path);
   void updateRecentMenu();
+  void findAndOpenBag(const std::string &name);
 
   MainWindow();
   ~MainWindow();

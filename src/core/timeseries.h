@@ -15,7 +15,7 @@ struct TimeSeriesListener {
 class TimeSeriesSubscriber {
   struct Impl {
     std::vector<std::weak_ptr<TimeSeriesListener>> _listeners;
-    bool _stop_flag = false;
+    volatile bool _stop_flag = false;
     std::mutex _mutex;
     bool _refresh = false;
     std::condition_variable _condition;

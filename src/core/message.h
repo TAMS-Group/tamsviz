@@ -24,26 +24,31 @@ public:
   const std::string &definition() const { return _definition; }
 };
 
-class Message {
+class Message : public std::enable_shared_from_this<Message> {
   std::shared_ptr<const MessageType> _type;
   std::vector<uint8_t> _data;
   ros::Time _time;
-  template <class T> std::shared_ptr<const T> instantiateImpl() const {
+  template <class T> void instantiateImpl(std::shared_ptr<const T> &ret) const {
     if (_data.empty() || _type == nullptr ||
         ros::message_traits::datatype<T>() != _type->name() ||
         ros::message_traits::md5sum<T>() != _type->hash()) {
-      return nullptr;
+      ret = nullptr;
     } else {
       auto m = std::make_shared<T>();
       ros::serialization::IStream s((uint8_t *)_data.data(), _data.size());
       ros::serialization::deserialize(s, *m);
-      return std::move(m);
+      ret = std::move(m);
     }
+  }
+  void instantiateImpl(std::shared_ptr<const Message> &ret) const {
+    ret = shared_from_this();
   }
 
 public:
   template <class T> std::shared_ptr<const T> instantiate() const {
-    return std::move(instantiateImpl<typename std::decay<T>::type>());
+    std::shared_ptr<const typename std::decay<T>::type> ret;
+    instantiateImpl(ret);
+    return std::move(ret);
   }
   template <class Stream> void read(Stream &stream) {
     _data.resize(stream.getLength());

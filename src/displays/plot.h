@@ -16,66 +16,6 @@
 
 #include <QPainter>
 
-class MessageQueryProperty {
-  mutable std::mutex _subscriber_mutex;
-  std::shared_ptr<Subscriber<Message>> _subscriber;
-  std::string _query;
-
-public:
-  MessageQueryProperty() {}
-  MessageQueryProperty(const std::string &query) : _query(query) {}
-  MessageQueryProperty(const MessageQueryProperty &other) {
-    _query = other._query;
-  }
-  MessageQueryProperty &operator=(const MessageQueryProperty &other) {
-    _query = other._query;
-    return *this;
-  }
-  MessageQuery query() const { return MessageQuery(_query); };
-  const std::string &str() const { return _query; }
-  void assign(const std::string &query) { _query = query; }
-  void subscriber(const std::shared_ptr<Subscriber<Message>> &subscriber) {
-    std::unique_lock<std::mutex> lock(_subscriber_mutex);
-    _subscriber = subscriber;
-  }
-  std::shared_ptr<Subscriber<Message>> subscriber() const {
-    std::unique_lock<std::mutex> lock(_subscriber_mutex);
-    return _subscriber;
-  }
-  bool empty() const { return _query.empty(); }
-};
-static void toString(const MessageQueryProperty &x, std::string &str) {
-  str = x.str();
-}
-static void fromString(MessageQueryProperty &x, const std::string &str) {
-  x.assign(str);
-}
-static bool operator==(const MessageQueryProperty &a,
-                       const MessageQueryProperty &b) {
-  return a.str() == b.str();
-}
-static bool operator!=(const MessageQueryProperty &a,
-                       const MessageQueryProperty &b) {
-  return a.str() != b.str();
-}
-template <> struct DefaultPropertyAttributes<MessageQueryProperty> {
-  static void initialize(PropertyAttributes *attributes) {
-    attributes->complete = [](const Property &property,
-                              const std::string &text) {
-      LOG_DEBUG("complete");
-      if (auto sub = property.get<MessageQueryProperty>().subscriber()) {
-        LOG_DEBUG("subscriber found");
-        if (auto msg = sub->topic()->message()) {
-          LOG_DEBUG("message found");
-          return MessageQuery(text).complete(MessageParser(msg));
-        }
-      }
-      LOG_DEBUG("no subscriber");
-      return std::vector<std::string>();
-    };
-  }
-};
-
 AUTO_STRUCT_BEGIN(PlotMargins);
 AUTO_STRUCT_FIELD(double, left, 0.0, step_scale = 10, min = 0);
 AUTO_STRUCT_FIELD(double, bottom, 0.0, step_scale = 10, min = 0);

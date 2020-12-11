@@ -7,6 +7,7 @@
 #include "../core/bagplayer.h"
 #include "../core/log.h"
 #include "../core/topic.h"
+#include "../core/tracks.h"
 #include "../core/workspace.h"
 #include "mainwindow.h"
 
@@ -209,7 +210,7 @@ class AnnotationSpanItem : public EditableText {
         if (_drag_start_rect != rect()) {
           if (rect().width() < 2.5) {
             ActionScope ws("Delete annotation");
-            auto &spans = _parent->_track->branch(true)->spans();
+            auto &spans = _parent->_track->branch(ws(), true)->spans();
             spans.erase(
                 std::remove(spans.begin(), spans.end(), _parent->_annotation),
                 spans.end());
@@ -217,6 +218,7 @@ class AnnotationSpanItem : public EditableText {
           } else {
             ActionScope ws("Resize Annotation Span");
             _parent->commit();
+            ws->modified();
           }
         }
       }
@@ -230,7 +232,7 @@ class AnnotationSpanItem : public EditableText {
         if (_side < 0) {
           double x = event->scenePos().x() - _drag_offset;
           _parent->snap(x);
-          if (auto branch = _parent->_track->branch()) {
+          if (auto branch = _parent->_track->branch(ws(), false)) {
             for (auto &span : branch->spans()) {
               if (timeToPosition(span->start() + span->duration()) <
                   _drag_start_rect.center().x()) {
@@ -244,7 +246,7 @@ class AnnotationSpanItem : public EditableText {
         if (_side > 0) {
           double x = event->scenePos().x() - _drag_offset;
           _parent->snap(x);
-          if (auto branch = _parent->_track->branch()) {
+          if (auto branch = _parent->_track->branch(ws(), false)) {
             for (auto &span : branch->spans()) {
               if (timeToPosition(span->start()) >
                   _drag_start_rect.center().x()) {
@@ -295,7 +297,7 @@ class AnnotationSpanItem : public EditableText {
     for (size_t itrack = 0; itrack < trackCount(ws()); itrack++) {
       if (auto track = std::dynamic_pointer_cast<AnnotationTrack>(
               trackAt(ws(), itrack))) {
-        if (auto branch = track->branch()) {
+        if (auto branch = track->branch(ws(), false)) {
           for (auto &other_span : branch->spans()) {
             if (!filter(other_span)) {
               continue;
@@ -590,16 +592,30 @@ public:
   }
   virtual void mouseReleaseEvent(QGraphicsSceneMouseEvent *event) override {
     QGraphicsRectItem::mouseReleaseEvent(event);
+    if (instances().find(this) == instances().end()) {
+      throw std::runtime_error("already deleted");
+    }
+    LOG_DEBUG("mouse release event " << this);
     if (event->button() == Qt::LeftButton) {
       if (!_dragged_spans.empty() && _dragged) {
         LOG_DEBUG("finished dragging annotation span");
         event->accept();
         {
           ActionScope ws("Drag Annotation Spans");
+          std::vector<QPointer<AnnotationSpanItem>> insts;
           for (auto &view : instances()) {
-            if (_dragged_spans.find(view->_annotation) !=
-                _dragged_spans.end()) {
-              view->commit();
+            insts.emplace_back(view);
+          }
+          LOG_DEBUG("count " << insts.size());
+          for (auto &view : insts) {
+            if (view) {
+              if (_dragged_spans.find(view->_annotation) !=
+                  _dragged_spans.end()) {
+                LOG_DEBUG("commit");
+                view->commit();
+              }
+            } else {
+              LOG_DEBUG("view gone");
             }
           }
           QTimer::singleShot(0, []() {
@@ -631,17 +647,16 @@ public:
         if (itrack >= 0 && itrack < trackCount(ws())) {
           // ActionScope ws("Move annotation");
           if (trackAt(ws(), itrack) != _track) {
-            auto &spans = _track->branch(true)->spans();
+            auto &spans = _track->branch(ws(), true)->spans();
             spans.erase(std::remove(spans.begin(), spans.end(), _annotation),
                         spans.end());
             if (auto track = std::dynamic_pointer_cast<AnnotationTrack>(
                     trackAt(ws(), itrack))) {
-              track->branch(true)->spans().push_back(_annotation);
+              track->branch(ws(), true)->spans().push_back(_annotation);
             }
           }
           annotation->start() = start;
           annotation->duration() = duration;
-          ws->modified();
         } else {
           LOG_ERROR("failed to move annotation");
         }
@@ -828,21 +843,222 @@ public:
   }
 };
 
+class GraphTree {
+  struct Item {
+    double xmin = 0, xmax = 0, ymin = 0, ymax = 0;
+    void merge(const Item &other) {
+      xmin = std::min(xmin, other.xmin);
+      ymin = std::min(ymin, other.ymin);
+      xmax = std::max(xmax, other.xmax);
+      ymax = std::max(ymax, other.ymax);
+    }
+  };
+  struct Level {
+    std::vector<Item> items;
+  };
+  struct Data {
+    std::deque<Level> levels;
+  };
+  std::shared_ptr<Data> _data;
+
+public:
+  struct Sample {
+    double x = 0;
+    double ymin = 0;
+    double ymax = 0;
+  };
+
+private:
+  void sample(size_t ilevel, size_t iitem, double xmin, double xmax,
+              double xstep, std::vector<Sample> &samples) {
+    auto &item = _data->levels[ilevel].items[iitem];
+    double item_end = item.xmax;
+    if (iitem + 1 < _data->levels[ilevel].items.size()) {
+      auto &item2 = _data->levels[ilevel].items[iitem + 1];
+      item_end = item2.xmin;
+    }
+    double prev_x = item.xmin;
+    if (iitem > 0) {
+      prev_x = _data->levels[ilevel].items[iitem - 1].xmax;
+    }
+    if (item_end < xmin || prev_x > xmax) {
+      return;
+    }
+    if (ilevel >= 1 && (item_end - item.xmin) > xstep) {
+      sample(ilevel - 1, iitem * 2, xmin, xmax, xstep, samples);
+      if (iitem * 2 + 1 < _data->levels[ilevel - 1].items.size()) {
+        sample(ilevel - 1, iitem * 2 + 1, xmin, xmax, xstep, samples);
+      }
+    } else {
+      Sample sample;
+      sample.x = (item.xmin + item.xmax) / 2;
+      sample.ymin = item.ymin;
+      sample.ymax = item.ymax;
+      samples.push_back(sample);
+    }
+  }
+
+public:
+  void clear() { _data.reset(); }
+  void push(double x, double y) {
+    // LOG_DEBUG("push " << x << " " << y);
+    if (!_data) {
+      _data = std::make_shared<Data>();
+    }
+    if (_data.use_count() > 1) {
+      _data = std::make_shared<Data>(*_data);
+    }
+    {
+      Item item;
+      item.xmin = item.xmax = x;
+      item.ymin = item.ymax = y;
+      if (_data->levels.empty()) {
+        _data->levels.emplace_back();
+      }
+      _data->levels.front().items.push_back(item);
+    }
+    for (size_t ilevel = 1;; ilevel++) {
+      if (_data->levels[ilevel - 1].items.size() <= 1) {
+        break;
+      }
+      if (_data->levels.size() <= ilevel) {
+        _data->levels.emplace_back();
+      }
+      size_t iitem = (_data->levels[ilevel - 1].items.size() - 1) / 2;
+      _data->levels[ilevel].items.resize(iitem + 1);
+      _data->levels[ilevel].items[iitem] =
+          _data->levels[ilevel - 1].items[iitem * 2];
+      if (iitem * 2 + 1 < _data->levels[ilevel - 1].items.size()) {
+        _data->levels[ilevel].items[iitem].merge(
+            _data->levels[ilevel - 1].items[iitem * 2 + 1]);
+      }
+      // LOG_DEBUG("level " << ilevel << " "
+      //                     << _data->levels[ilevel].items.size());
+      if (ilevel > 100) {
+        throw std::runtime_error("graph tree overflow");
+      }
+    }
+  }
+  void sample(double xmin, double xmax, double xstep,
+              std::vector<Sample> &samples) {
+    if (_data && !_data->levels.empty()) {
+      sample(_data->levels.size() - 1, 0, xmin, xmax, xstep, samples);
+    }
+  }
+  void range(double &ymin, double &ymax) {
+    if (_data && !_data->levels.empty()) {
+      ymin = _data->levels.back().items.front().ymin;
+      ymax = _data->levels.back().items.front().ymax;
+    }
+  }
+};
+
 class GraphTrackView : public TrackViewBase {
-  std::weak_ptr<BagPlayer> _player;
   std::shared_ptr<GraphTrack> _track;
   size_t _track_height = 0;
   double _track_length = 0;
   double _bag_duration = 0.0;
-  QVector<QPointF> _points;
   QPen _pen;
   double timeToPosition(double t) { return t * _track_length / _bag_duration; }
   double positionToTime(double p) { return p / _track_length * _bag_duration; }
+  volatile bool _exit_flag = false;
+  std::mutex _load_mutex;
+  GraphTree _load_data;
+  std::string _load_query, _load_topic;
+  double _load_duration = 0;
+  std::condition_variable _load_condition;
+  std::shared_ptr<BagPlayer> _load_player;
+  Watcher _watcher;
+  bool _load_flag = false;
+  void _update() {
+    QObject o;
+    QObject::connect(&o, &QObject::destroyed, this,
+                     [this](QObject *o) { LockScope()->modified(); });
+  }
+  std::thread _load_thread{[this]() {
+    while (true) {
+      std::string topic;
+      MessageQuery query;
+      MessageParser parser;
+      std::shared_ptr<BagPlayer> player;
+      double duration = 0;
+      {
+        std::unique_lock<std::mutex> lock(_load_mutex);
+        while (true) {
+          if (_exit_flag) {
+            LOG_DEBUG("exit");
+            return;
+          }
+          if (_load_flag) {
+            _load_flag = false;
+            topic = _load_topic;
+            duration = _load_duration;
+            query = MessageQuery(_load_query);
+            player = _load_player;
+            _load_data.clear();
+            _update();
+            if (topic.empty() || query.str().empty() || player == nullptr) {
+              LOG_DEBUG("empty");
+              continue;
+            } else {
+              break;
+            }
+          }
+          LOG_DEBUG("wait");
+          _load_condition.wait(lock);
+        }
+      }
+      LOG_DEBUG("load graph track data");
+      {
+        LOG_DEBUG("begin loading graph track data");
+        GraphTree data;
+        auto t0 = std::chrono::steady_clock::now();
+        player->readMessageSamples(
+            topic, 0, duration, [&](const std::shared_ptr<const Message> &msg) {
+              // LOG_DEBUG("a");
+              parser.parse(msg);
+              double x = (msg->time() - player->startTime()).toSec() / duration;
+              double y = query(parser).toDouble();
+              data.push(x, y);
+              if (std::chrono::steady_clock::now() >
+                  t0 + std::chrono::milliseconds(250)) {
+                {
+                  std::unique_lock<std::mutex> lock(_load_mutex);
+                  _load_data = data;
+                }
+                _update();
+                t0 = std::chrono::steady_clock::now();
+              }
+              return !_exit_flag && !_load_flag;
+            });
+        // LOG_DEBUG("b");
+        {
+          {
+            std::unique_lock<std::mutex> lock(_load_mutex);
+            _load_data = data;
+          }
+          _update();
+        }
+        LOG_DEBUG("graph track data loaded");
+      }
+    }
+  }};
 
 public:
   GraphTrackView(size_t track_index, std::shared_ptr<GraphTrack> track)
       : TrackViewBase(track_index, track), _track_height(track_index),
         _track(track) {}
+  ~GraphTrackView() {
+    LOG_DEBUG("stop");
+    {
+      std::unique_lock<std::mutex> lock(_load_mutex);
+      _exit_flag = true;
+      _load_condition.notify_all();
+    }
+    LOG_DEBUG("join");
+    _load_thread.join();
+    LOG_DEBUG("ready");
+  }
   virtual void update(const std::shared_ptr<Workspace> &ws,
                       double width) override {
     TrackViewBase::update(ws, width);
@@ -850,42 +1066,100 @@ public:
     _bag_duration = timelineDuration(ws);
     _pen = QPen(QBrush(QColor::fromHsvF(_track->color(), 1.0, 0.5)), 1.5,
                 Qt::SolidLine, Qt::SquareCap, Qt::RoundJoin);
-
-    if (ws->player != _player.lock()) {
-      _player = ws->player;
-      _points.clear();
-      if (auto player = ws->player) {
-        auto messages =
-            player->readMessageSamples(_track->label(), 0, _bag_duration);
-        for (auto &msg : messages) {
-          if (auto m = msg->instantiate<std_msgs::Float64>()) {
-            double x =
-                (msg->time() - player->startTime()).toSec() / _bag_duration;
-            double y = m->data;
-            _points.push_back(QPointF(x, y));
-          }
-        }
-      }
+    if (_watcher.changed(ws->player, _bag_duration, _track->query().str(),
+                         _track->query().str())) {
+      LOG_DEBUG("load graph track");
+      std::unique_lock<std::mutex> lock(_load_mutex);
+      _load_flag = true;
+      _load_player = ws->player;
+      _load_duration = _bag_duration;
+      _load_query = _track->query().str();
+      _load_topic = _track->topic().topic();
+      _load_condition.notify_all();
     }
+    // LOG_DEBUG(__LINE__);
   }
   virtual void paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
                      QWidget *widget) override {
     QPolygonF polygon;
-    if (!_points.isEmpty()) {
-      QVector<QPointF> points2;
-      double lo = _points[0].y();
-      double hi = _points[0].y();
-      for (auto &p : _points) {
-        lo = std::min(lo, p.y());
-        hi = std::max(hi, p.y());
+    {
+      GraphTree data;
+      {
+        std::unique_lock<std::mutex> lock(_load_mutex);
+        data = _load_data;
       }
-      for (auto p : _points) {
-        p.setX(p.x() * _track_length);
-        p.setY((0.9 - (p.y() - lo) / (hi - lo) * 0.8) * track_height +
-               track_height + _track_index * track_height);
-        points2.push_back(p);
+      std::vector<GraphTree::Sample> samples;
+      auto *view = scene()->views().first();
+      auto view_top_left = view->mapToScene(view->viewport()->rect().topLeft());
+      auto view_top_right =
+          view->mapToScene(view->viewport()->rect().topRight());
+      data.sample(view_top_left.x() / _track_length,
+                  view_top_right.x() / _track_length, 1.5 / _track_length,
+                  samples);
+      LOG_DEBUG("graph track samples " << samples.size());
+      if (!samples.empty()) {
+        QVector<QPointF> points;
+        /*
+        double lo = samples.front().ymin;
+        double hi = samples.front().ymax;
+        for (auto &sample : samples) {
+          lo = std::min(lo, sample.ymin);
+          hi = std::max(hi, sample.ymax);
+        }
+        */
+        double hi = 0, lo = 0;
+        data.range(lo, hi);
+        for (size_t isample = 0; isample < samples.size(); isample++) {
+          auto &sample = samples[isample];
+          points.push_back(QPointF(
+              sample.x * _track_length,
+              (0.9 - (sample.ymax - lo) / (hi - lo) * 0.8) * track_height +
+                  track_height + _track_index * track_height));
+        }
+        for (ssize_t isample = ssize_t(samples.size()) - 1; isample >= 0;
+             isample--) {
+          auto &sample = samples[isample];
+          points.push_back(QPointF(
+              sample.x * _track_length,
+              (0.9 - (sample.ymin - lo) / (hi - lo) * 0.8) * track_height +
+                  track_height + _track_index * track_height));
+        }
+        polygon = QPolygonF(points);
       }
-      polygon = QPolygonF(points2);
+    }
+    painter->save();
+    painter->setRenderHints(QPainter::Antialiasing);
+    painter->setPen(_pen);
+    // painter->setBrush(QBrush(Qt::transparent));
+    painter->setBrush(_pen.brush());
+    // painter->drawPolyline(polygon);
+    painter->drawPolygon(polygon);
+    painter->restore();
+  }
+  /*
+  virtual void paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
+                     QWidget *widget) override {
+    QPolygonF polygon;
+    {
+      std::unique_lock<std::mutex> lock(_load_mutex);
+      if (!_points.isEmpty()) {
+        LOG_DEBUG("draw graph track " << _points.size());
+        QVector<QPointF> points2;
+        double lo = _points[0].y();
+        double hi = _points[0].y();
+        for (auto &p : _points) {
+          lo = std::min(lo, p.y());
+          hi = std::max(hi, p.y());
+        }
+        LOG_DEBUG("yrange " << lo << " " << hi);
+        for (auto p : _points) {
+          p.setX(p.x() * _track_length);
+          p.setY((0.9 - (p.y() - lo) / (hi - lo) * 0.8) * track_height +
+                 track_height + _track_index * track_height);
+          points2.push_back(p);
+        }
+        polygon = QPolygonF(points2);
+      }
     }
     painter->save();
     painter->setRenderHints(QPainter::Antialiasing);
@@ -894,6 +1168,7 @@ public:
     painter->drawPolyline(polygon);
     painter->restore();
   }
+  */
 };
 
 class AnnotationTrackView : public TrackViewBase {
@@ -914,7 +1189,7 @@ private:
       x += wmin;
     }
     x = std::min(x, track_length);
-    if (auto branch = _track->branch()) {
+    if (auto branch = _track->branch(ws(), false)) {
       for (auto &span : branch->spans()) {
         double left = span->start() * track_length / timelineDuration(ws());
         double right = (span->start() + span->duration()) * track_length /
@@ -946,7 +1221,7 @@ protected:
                                  event->scenePos().x()));
       {
         double t = _new_item_start * timelineDuration(ws()) / track_length;
-        if (auto branch = _track->branch()) {
+        if (auto branch = _track->branch(ws(), false)) {
           for (auto &span : branch->spans()) {
             if (t > span->start() && t < span->start() + span->duration()) {
               return;
@@ -987,7 +1262,7 @@ protected:
                           track_length;
           span->duration() = _item_prototype->rect().width() *
                              timelineDuration(ws()) / track_length;
-          _track->branch(true)->spans().push_back(span);
+          _track->branch(ws(), true)->spans().push_back(span);
           _item_prototype->hide();
           ws->selection() = span;
           ws->currentAnnotationTrack() = _track;
@@ -1031,7 +1306,7 @@ public:
 
     QRectF rect = scene()->sceneRect();
     double y = track_height * (_track_index + 1);
-    if (auto branch = _track->branch()) {
+    if (auto branch = _track->branch(ws, false)) {
       for (size_t i = 0; i < branch->spans().size(); i++) {
         if (_span_items.size() <= i) {
           auto *item = new AnnotationSpanItem();
@@ -1570,8 +1845,7 @@ TimelineWidget::TimelineWidget() : QDockWidget("Timeline") {
     playback_bar_left->addWidget(button);
   }
 
-  if (1) {
-
+  if (0) {
     auto *open_button = new FlatButton("Open");
     always_active_widgets.insert(open_button);
     connect(open_button, &QPushButton::clicked, this, [this]() {
@@ -1583,6 +1857,113 @@ TimelineWidget::TimelineWidget() : QDockWidget("Timeline") {
       }
       MainWindow::instance()->openBag(path);
     });
+    playback_bar_left->addWidget(open_button);
+  }
+
+  if (1) {
+    auto *open_button = new FlatButton("Data");
+    QMenu *menu = new QMenu(this);
+    connect(menu, &QMenu::aboutToShow, [menu, this]() {
+      LOG_DEBUG("update timeline bag menu");
+      menu->clear();
+      connect(menu->addAction("Open Bag"), &QAction::triggered, this,
+              [this](bool checked) {
+                QString path = QFileDialog::getOpenFileName(
+                    this, tr("Open Bag"), QString(),
+                    tr("Bag files (*.bag);;All files (*.*)"));
+                if (path.isNull()) {
+                  return;
+                }
+                MainWindow::instance()->openBag(path);
+              });
+      LockScope ws;
+      {
+        auto action = menu->addAction("Close Bag");
+        connect(action, &QAction::triggered, this,
+                [this](bool checked) { MainWindow::instance()->closeBag(); });
+        action->setEnabled(ws->player != nullptr);
+      }
+      std::set<std::string> branches;
+      for (auto &track : ws->document()->timeline()->tracks()) {
+        LOG_DEBUG("track " << track->label());
+        if (auto annotation_track =
+                std::dynamic_pointer_cast<AnnotationTrack>(track)) {
+          for (auto &branch : annotation_track->branches()) {
+            branches.insert(branch->name());
+          }
+        }
+      }
+      // if (ws->player) {
+      //    branches.insert(ws->player->fileName());
+      //}
+      if (!branches.empty()) {
+        menu->addSeparator();
+        for (auto &branch : branches) {
+          auto *action = menu->addAction(QString::fromStdString(branch));
+          connect(action, &QAction::triggered, this,
+                  [this, branch](bool checked) {
+                    if (checked) {
+                      MainWindow::instance()->findAndOpenBag(branch);
+                    } else {
+                      MainWindow::instance()->closeBag();
+                    }
+                  });
+          action->setCheckable(true);
+          if (auto player = ws->player) {
+            action->setChecked(branch == ws->player->fileName());
+          }
+        }
+      }
+      /*
+      std::map<QString, QString> files;
+      for (auto &track : ws->document()->timeline()->tracks()) {
+        LOG_DEBUG("track " << track->label());
+        if (auto annotation_track =
+                std::dynamic_pointer_cast<AnnotationTrack>(track)) {
+          LOG_DEBUG("annotation track " << track->label());
+          for (auto &branch : annotation_track->branches()) {
+            {
+              QFileInfo f(
+                  QFileInfo(QString::fromStdString(ws->document()->path)).dir(),
+                  QString::fromStdString(branch->name()));
+              LOG_DEBUG("df " << f.absoluteFilePath().toStdString());
+              if (f.exists()) {
+                files[f.fileName()] = f.absoluteFilePath();
+              }
+            }
+            if (auto player = ws->player) {
+              QFileInfo f(
+                  QFileInfo(QString::fromStdString(player->path())).dir(),
+                  QString::fromStdString(branch->name()));
+              LOG_DEBUG("pf " << f.absoluteFilePath().toStdString());
+              if (f.exists()) {
+                files[f.fileName()] = f.absoluteFilePath();
+              }
+            }
+          }
+        }
+      }
+      if (!files.empty()) {
+        menu->addSeparator();
+        for (auto f : files) {
+          auto *action = menu->addAction(f.first);
+          connect(action, &QAction::triggered, this, [this, f](bool checked) {
+            if (checked) {
+              MainWindow::instance()->openBag(f.second);
+            } else {
+              MainWindow::instance()->closeBag();
+            }
+          });
+          action->setCheckable(true);
+          if (auto player = ws->player) {
+            action->setChecked(f.first.toStdString() == ws->player->fileName());
+          }
+        }
+      }
+      */
+    });
+    open_button->setMenu(menu);
+    always_active_widgets.insert(open_button);
     playback_bar_left->addWidget(open_button);
   }
 
@@ -1731,7 +2112,7 @@ TimelineWidget::TimelineWidget() : QDockWidget("Timeline") {
     playback_bar_left->addWidget(button);
   }
 
-  {
+  if (0) {
     auto *close_button = new FlatButton("Close");
     connect(close_button, &QPushButton::clicked, this,
             [this]() { MainWindow::instance()->closeBag(); });
@@ -1761,7 +2142,7 @@ TimelineWidget::TimelineWidget() : QDockWidget("Timeline") {
         for (size_t i = 0; i < trackCount(ws()); i++) {
           if (auto track = std::dynamic_pointer_cast<AnnotationTrack>(
                   trackAt(ws(), i))) {
-            if (auto branch = track->branch()) {
+            if (auto branch = track->branch(ws(), false)) {
               for (auto &span : branch->spans()) {
                 for (double span_time : {
                          span->start(),
@@ -1803,7 +2184,7 @@ TimelineWidget::TimelineWidget() : QDockWidget("Timeline") {
         for (auto &track : ws->document()->timeline()->tracks()) {
           if (auto annotation_track =
                   std::dynamic_pointer_cast<AnnotationTrack>(track)) {
-            if (auto branch = annotation_track->branch()) {
+            if (auto branch = annotation_track->branch(ws(), false)) {
               for (auto &span : branch->spans()) {
                 annotation_times.push_back(span->start());
                 annotation_times.push_back(span->start() + span->duration());
@@ -1831,7 +2212,7 @@ TimelineWidget::TimelineWidget() : QDockWidget("Timeline") {
         for (size_t i = 0; i < trackCount(ws()); i++) {
           if (auto track = std::dynamic_pointer_cast<AnnotationTrack>(
                   trackAt(ws(), i))) {
-            if (auto branch = track->branch()) {
+            if (auto branch = track->branch(ws(), false)) {
               for (auto &span : branch->spans()) {
                 for (double span_time : {
                          span->start(),

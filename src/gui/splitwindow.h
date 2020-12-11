@@ -6,6 +6,7 @@
 #include "guicommon.h"
 
 #include "../core/document.h"
+#include "../core/tracks.h"
 
 #include <atomic>
 #include <typeindex>
@@ -26,7 +27,7 @@ class ContentWindowBase : public WindowBase {
   QVBoxLayout *layout = nullptr;
   QWidget *spacer = nullptr;
   QWidget *content_window = nullptr;
-  QStaticText _annotation_hud_text;
+  // QStaticText _annotation_hud_text;
   std::string _annotation_hud_string;
 
 protected:

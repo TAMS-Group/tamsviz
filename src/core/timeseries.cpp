@@ -46,7 +46,11 @@ TimeSeriesSubscriber::Impl::Impl() {
                                player->startTime().toNSec() +
                                    playback_time * 1000000000.0);
               }
+              return !_stop_flag;
             });
+        if (_stop_flag) {
+          return;
+        }
         for (auto &listener : listeners) {
           listener->commit();
         }
@@ -158,7 +162,8 @@ bool TimeSeriesQuery::transform(const std::shared_ptr<const Message> &message,
                                 std::pair<int64_t, double> &output) {
   PROFILER("TimeSeriesQuery");
   MessageParser parser(message);
-  if (auto value_result = _query(parser)) {
+  auto value_result = _query(parser);
+  if (!value_result.isNull()) {
     output.second = value_result.toDouble();
     auto stamp_result = _stamp_query(parser);
     if (stamp_result.isTime()) {

@@ -194,6 +194,8 @@ public:
       } else {
         _message_instance = nullptr;
       }
+      LOG_DEBUG("message instance " << msg.get() << " "
+                                    << _message_instance.get());
     }
     return _message_instance;
   }

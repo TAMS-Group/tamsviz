@@ -8,6 +8,11 @@
 
 #include <limits>
 
+struct AutoCompletion {
+  std::vector<std::string> items;
+  bool completed = false;
+};
+
 struct PropertyAttributes {
   double min = std::numeric_limits<double>::quiet_NaN();
   double max = std::numeric_limits<double>::quiet_NaN();
@@ -15,7 +20,7 @@ struct PropertyAttributes {
   double wrap = false;
   bool hidden = false;
   std::function<std::vector<std::string>(const Property &)> list;
-  std::function<std::vector<std::string>(const Property &, const std::string &)>
+  std::function<void(const Property &, const std::string &, AutoCompletion &)>
       complete;
 };
 

@@ -113,13 +113,16 @@ struct StopObjectRecursionTag {};
 
 typedef std::function<bool(const std::shared_ptr<Object> &o)> SnapshotFilter;
 
+uint64_t handleObjectId(const Object *object);
 template <class T> class Handle {
   uint64_t _id = 0;
 
 public:
   Handle(const std::shared_ptr<T> &p = nullptr) { reset(p); }
   void reset(uint64_t id) { _id = id; }
-  void reset(const std::shared_ptr<T> &p = nullptr) { _id = (p ? p->id() : 0); }
+  void reset(const std::shared_ptr<T> &p = nullptr) {
+    _id = handleObjectId(p ? (Object *)p.get() : nullptr);
+  }
   void operator=(const std::shared_ptr<T> &p) { reset(p); }
   template <class R>
   std::shared_ptr<T> resolve(const std::shared_ptr<R> &root) {
@@ -128,8 +131,8 @@ public:
     }
     std::shared_ptr<T> r;
     root->recurse([&r, this](const std::shared_ptr<Object> &o) {
-      if (auto x = std::dynamic_pointer_cast<T>(o)) {
-        if (x->id() == _id) {
+      if (handleObjectId(o.get()) == _id) {
+        if (auto x = std::dynamic_pointer_cast<T>(o)) {
           r = x;
         }
       }

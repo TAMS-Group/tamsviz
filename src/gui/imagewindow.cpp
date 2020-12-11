@@ -688,7 +688,7 @@ ImageWindow::ImageWindow() {
             for (auto &track_base : timeline->tracks()) {
               if (auto track =
                       std::dynamic_pointer_cast<AnnotationTrack>(track_base)) {
-                if (auto branch = track->branch()) {
+                if (auto branch = track->branch(ws(), false)) {
                   for (auto &span : branch->spans()) {
                     if (span->start() > current_time ||
                         span->start() + span->duration() <= current_time) {
@@ -863,7 +863,7 @@ ImageWindow::ImageWindow() {
                 for (auto &track_base : timeline->tracks()) {
                   if (auto track = std::dynamic_pointer_cast<AnnotationTrack>(
                           track_base)) {
-                    if (auto branch = track->branch()) {
+                    if (auto branch = track->branch(ws(), false)) {
                       for (auto &span : branch->spans()) {
                         if (span->start() <= current_time &&
                             span->start() + span->duration() >= current_time) {
@@ -893,7 +893,7 @@ ImageWindow::ImageWindow() {
               }
               ws->currentAnnotationTrack() = current_track;
               std::shared_ptr<AnnotationSpan> current_span;
-              if (auto branch = current_track->branch()) {
+              if (auto branch = current_track->branch(ws(), false)) {
                 for (auto &span : branch->spans()) {
                   if (span->start() <= current_time &&
                       span->start() + span->duration() >= current_time) {
@@ -915,7 +915,9 @@ ImageWindow::ImageWindow() {
                     current_span->duration() = duration;
                   }
                 }
-                current_track->branch(true)->spans().push_back(current_span);
+                current_track->branch(ws(), true)
+                    ->spans()
+                    .push_back(current_span);
               }
               ws->selection() = current_span;
               _parent->new_annotation_span = current_span;

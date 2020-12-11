@@ -223,14 +223,6 @@ public:
 };
 DECLARE_TYPE(AnnotationBase, Object);
 
-struct AnnotationSpan : Object {
-  PROPERTY(std::string, label, "");
-  PROPERTY(double, start, 0.0);
-  PROPERTY(double, duration, 1.0);
-  PROPERTY(std::vector<std::shared_ptr<AnnotationBase>>, annotations, {});
-};
-DECLARE_TYPE(AnnotationSpan, Object);
-
 struct TrackBase : Object {
 protected:
   TrackBase();
@@ -240,23 +232,6 @@ public:
   PROPERTY(std::string, label, "Label");
 };
 DECLARE_TYPE(TrackBase, Object);
-
-struct AnnotationBranch : Object {
-  PROPERTY(std::string, name);
-  PROPERTY(std::vector<std::shared_ptr<AnnotationSpan>>, spans, {},
-           hidden = true);
-};
-DECLARE_TYPE(AnnotationBranch, Object);
-
-struct AnnotationTrack : TrackBase {
-  PROPERTY(std::vector<std::shared_ptr<AnnotationBranch>>, branches, {},
-           hidden = true);
-  std::shared_ptr<AnnotationBranch> branch(bool create = false);
-};
-DECLARE_TYPE(AnnotationTrack, TrackBase);
-
-struct GraphTrack : TrackBase {};
-DECLARE_TYPE(GraphTrack, TrackBase);
 
 struct Timeline : Object {
   PROPERTY(std::vector<std::shared_ptr<TrackBase>>, tracks, {}, hidden = true);

@@ -11,6 +11,7 @@
 #include <unordered_set>
 
 class BagPlayer;
+class AnnotationTrack;
 
 struct Selection {
   std::vector<uint64_t> _objects;

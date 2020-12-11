@@ -333,23 +333,26 @@ MessageParser MessageQuery::operator()(const MessageParser &parser) const {
   }
 }
 
-std::vector<std::string>
-MessageQuery::complete(const MessageParser &parser) const {
+void MessageQuery::complete(const MessageParser &parser,
+                            AutoCompletion &completion) const {
   LOG_DEBUG("complete query");
   LOG_DEBUG("query " << _query);
   std::set<std::string> ret;
   TokenIterator current_token = _tokens.begin();
-  query(parser, current_token,
-        [&](const TokenIterator &token, const std::string &completion) {
-          std::string prefix;
-          if (token != _tokens.begin()) {
-            TokenIterator tok = token;
-            tok--;
-            LOG_DEBUG("token end " << tok->end);
-            prefix = _query.substr(0, tok->end);
-          }
-          LOG_DEBUG("completion " << prefix << completion);
-          ret.insert(prefix + completion);
-        });
-  return std::vector<std::string>(ret.begin(), ret.end());
+  auto value =
+      query(parser, current_token,
+            [&](const TokenIterator &token, const std::string &completion) {
+              std::string prefix;
+              if (token != _tokens.begin()) {
+                TokenIterator tok = token;
+                tok--;
+                LOG_DEBUG("token end " << tok->end);
+                prefix = _query.substr(0, tok->end);
+              }
+              LOG_DEBUG("completion " << prefix << completion);
+              ret.insert(prefix + completion);
+            });
+  completion.completed = value.isPrimitive();
+  LOG_DEBUG("completed " << (completion.completed ? "true" : "false"));
+  completion.items.assign(ret.begin(), ret.end());
 }

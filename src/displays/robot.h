@@ -75,6 +75,7 @@ class RobotStateDisplayBase : public GenericFrameDisplay<RobotDisplayBase> {
 
 protected:
   virtual void refreshTopic(const std::string &topic);
+  RobotStateDisplayBase() {}
 
 public:
   virtual void renderSync(const RenderSyncContext &context) override;
@@ -92,6 +93,7 @@ public:
 };
 DECLARE_TYPE(RobotStateDisplay, RobotStateDisplayBase);
 
+/*
 class DisplayRobotStateDisplay : public RobotStateDisplayBase {
 
 public:
@@ -103,6 +105,19 @@ public:
   }
 };
 DECLARE_TYPE(DisplayRobotStateDisplay, RobotStateDisplayBase);
+*/
+
+class DisplayRobotStateDisplay : public GenericFrameDisplay<RobotDisplayBase> {
+  // std::shared_ptr<const moveit_msgs::DisplayRobotState>
+  //      _display_robot_state_message;
+
+public:
+  PROPERTY(TopicProperty<moveit_msgs::DisplayRobotState>, topic,
+           "/display_robot_state");
+  virtual void renderSync(const RenderSyncContext &context) override;
+  virtual void renderAsync(const RenderAsyncContext &context) override;
+};
+DECLARE_TYPE(DisplayRobotStateDisplay, RobotDisplayBase);
 
 /*
 class RobotTrajectoryDisplay : public GenericFrameDisplay<RobotDisplayBase> {

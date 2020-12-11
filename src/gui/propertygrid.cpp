@@ -319,23 +319,23 @@ PropertyGridWidget::PropertyGridWidget() : QDockWidget("Properties") {
               completer->setMaxVisibleItems(20);
               completer->setWidget(editor);
               auto update = [current_property, completion_model, complete,
-                             editor, completer]() {
+                             editor, completer](bool show) {
                 QString text = editor->text();
                 QStringList l;
+                AutoCompletion completion;
                 {
                   LockScope ws;
-                  for (auto &s :
-                       complete(current_property, text.toStdString())) {
+                  complete(current_property, text.toStdString(), completion);
+                  for (auto &s : completion.items) {
                     QString qs = QString(s.c_str());
-
-                    { l.push_back(qs); }
+                    l.push_back(qs);
                   }
                 }
                 l.sort();
                 {
                   QStringList a, b;
                   for (auto &s : l) {
-                    if (s.startsWith(text)) {
+                    if (s.startsWith(text) && s.size() > text.size()) {
                       a.push_back(s);
                     } else {
                       b.push_back(s);
@@ -346,22 +346,31 @@ PropertyGridWidget::PropertyGridWidget() : QDockWidget("Properties") {
                 if (!l.isEmpty()) {
                   completion_model->setStringList(l);
                   completer->complete();
-                  completer->popup()->show();
+                  if (!completion.completed || show) {
+                    LOG_DEBUG("show auto completion list");
+                    completer->popup()->show();
+                  } else {
+                    LOG_DEBUG("hide auto completion list");
+                    completer->popup()->hide();
+                  }
+                } else {
+                  LOG_DEBUG("not auto completions, hide list");
+                  completer->popup()->hide();
                 }
               };
               connect(editor, &QLineEdit::textEdited, editor,
-                      [update, completer](const QString &) { update(); });
+                      [update, completer](const QString &) { update(false); });
               connect(completer,
                       static_cast<void (QCompleter::*)(const QString &text)>(
                           &QCompleter::activated),
                       [editor, update, completer](const QString &text) {
                         if (text != editor->text()) {
                           editor->setText(text);
-                          update();
+                          update(false);
                         }
                       });
               QTimer::singleShot(0, completer,
-                                 [completer, update]() { update(); });
+                                 [completer, update]() { update(true); });
             }
 
             return editor;

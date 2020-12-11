@@ -7,6 +7,7 @@
 #include "../scene/node.h"
 #include "bagplayer.h"
 #include "interaction.h"
+#include "tracks.h"
 #include "transformer.h"
 #include "workspace.h"
 
@@ -130,27 +131,6 @@ void Pose::fromIsometry3d(const Eigen::Isometry3d &pose) {
   orientation().yaw() = angles.x() * (180.0 / M_PI);
   orientation().pitch() = angles.y() * (180.0 / M_PI);
   orientation().roll() = angles.z() * (180.0 / M_PI);
-}
-
-std::shared_ptr<AnnotationBranch> AnnotationTrack::branch(bool create) {
-  LockScope ws;
-  std::string name = "";
-  if (ws->player) {
-    name = ws->player->fileName();
-  }
-  for (auto &branch : branches()) {
-    if (branch->name() == name) {
-      return branch;
-    }
-  }
-  if (create) {
-    auto branch = std::make_shared<AnnotationBranch>();
-    branch->name() = name;
-    branches().push_back(branch);
-    return branch;
-  } else {
-    return nullptr;
-  }
 }
 
 void Display::refreshRecursive() { refresh(); }

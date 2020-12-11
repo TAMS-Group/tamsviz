@@ -113,7 +113,7 @@ void RenderThread::run() {
           for (auto &track : ws->document()->timeline()->tracks()) {
             if (auto annotation_track =
                     std::dynamic_pointer_cast<AnnotationTrack>(track)) {
-              if (auto branch = annotation_track->branch()) {
+              if (auto branch = annotation_track->branch(ws(), false)) {
                 for (auto &span : branch->spans()) {
                   if (span->start() <= current_time &&
                       span->start() + span->duration() >= current_time) {

@@ -328,16 +328,23 @@ void ContentWindowBase::paintAnnotationHUD(
         return font;
       }();
       _annotation_hud_string = type->name();
+      /*
       _annotation_hud_text = QStaticText(_annotation_hud_string.c_str());
       _annotation_hud_text.setPerformanceHint(QStaticText::AggressiveCaching);
       _annotation_hud_text.prepare(QTransform(), font);
+      */
     }
     int padding_x = 8;
     int padding_y = 4;
     auto c = QColor::fromHsvF(color, 1, 0.7, 0.9);
     int frame = 5;
-    double text_right = padding_x * 2 + _annotation_hud_text.size().width();
-    double text_bottom = padding_y * 2 + _annotation_hud_text.size().height();
+    // double text_right = padding_x * 2 + _annotation_hud_text.size().width();
+    // double text_bottom = padding_y * 2 +
+    // _annotation_hud_text.size().height();
+    QString str = QString::fromStdString(_annotation_hud_string);
+    double text_right =
+        padding_x * 2 + painter->fontMetrics().boundingRect(str).width();
+    double text_bottom = padding_y * 2 + painter->fontMetrics().height();
     painter->fillRect(0, 0, text_right, text_bottom, QBrush(c));
     painter->fillRect(text_right, 0, size.width() - text_right, frame,
                       QBrush(c));
@@ -348,6 +355,8 @@ void ContentWindowBase::paintAnnotationHUD(
     painter->fillRect(frame, size.height() - frame, size.width() - 2 * frame,
                       frame, QBrush(c));
     painter->setPen(QPen(QBrush(Qt::white), 0));
-    painter->drawStaticText(padding_x, padding_y, _annotation_hud_text);
+    // painter->drawStaticText(padding_x, padding_y, _annotation_hud_text);
+    painter->drawText(QRectF(0, 0, text_right, text_bottom), Qt::AlignCenter,
+                      str);
   }
 }

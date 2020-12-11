@@ -129,6 +129,36 @@ void MainWindow::openDocument(const QString &path) {
   LOG_SUCCESS("opened " << displays->path);
 }
 
+void MainWindow::findAndOpenBag(const std::string &name) {
+  LockScope ws;
+  {
+    QFileInfo f(QFileInfo(QString::fromStdString(ws->document()->path)).dir(),
+                QString::fromStdString(name));
+    if (f.exists()) {
+      openBag(f.absoluteFilePath());
+      return;
+    }
+  }
+  if (auto player = ws->player) {
+    QFileInfo f(QFileInfo(QString::fromStdString(player->path())).dir(),
+                QString::fromStdString(name));
+    if (f.exists()) {
+      openBag(f.absoluteFilePath());
+      return;
+    }
+  }
+  {
+    QString path = QFileDialog::getOpenFileName(this, tr("Locate Bag File"),
+                                                QString::fromStdString(name),
+                                                tr("Bags (*.bag)"));
+    if (path.isNull()) {
+      return;
+    }
+    openBag(path);
+    return;
+  }
+}
+
 void MainWindow::openBrowse() {
   LockScope ws;
   QString path = QFileDialog::getOpenFileName(

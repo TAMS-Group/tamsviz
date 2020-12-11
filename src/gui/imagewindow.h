@@ -7,6 +7,7 @@
 
 #include "../annotations/image.h"
 #include "../core/topic.h"
+#include "../core/tracks.h"
 #include "../render/renderer.h"
 #include "../render/texture.h"
 
