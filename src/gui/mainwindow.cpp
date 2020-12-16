@@ -15,6 +15,7 @@
 #include "propertygrid.h"
 #include "renderwindow.h"
 #include "scenewindow.h"
+#include "searchwidget.h"
 #include "splitwindow.h"
 #include "timeline.h"
 
@@ -131,6 +132,9 @@ void MainWindow::openDocument(const QString &path) {
 
 void MainWindow::findAndOpenBag(const std::string &name) {
   LockScope ws;
+  if (ws->player && ws->player->fileName() == name) {
+    return;
+  }
   {
     QFileInfo f(QFileInfo(QString::fromStdString(ws->document()->path)).dir(),
                 QString::fromStdString(name));
@@ -337,6 +341,7 @@ MainWindow::MainWindow() {
   addDockWidget(Qt::BottomDockWidgetArea, timeline_widget);
   ws->modified.connect(this, [this]() {
     LockScope ws;
+    /*
     if (ws->document()->path.empty()) {
       setWindowTitle(QString("%1").arg(qApp->applicationName()));
     } else {
@@ -345,6 +350,23 @@ MainWindow::MainWindow() {
               .arg(QFileInfo(ws->document()->path.c_str()).fileName())
               .arg(qApp->applicationName()));
     }
+    */
+    QString title;
+    if (!ws->document()->path.empty()) {
+      title =
+          QFileInfo(QString::fromStdString(ws->document()->path)).fileName();
+    }
+    if (ws->player) {
+      if (!title.isEmpty()) {
+        title += " - ";
+      }
+      title += QString::fromStdString(ws->player->fileName());
+    }
+    if (!title.isEmpty()) {
+      title += " - ";
+    }
+    title += qApp->applicationName();
+    setWindowTitle(title);
   });
 
   menuBar()->setNativeMenuBar(false);
@@ -579,6 +601,11 @@ MainWindow::MainWindow() {
                              })
         ->setShortcut(QKeySequence(Qt::Key_F5));
   }
+  auto *search_widget = new SearchWidget();
+  addDockWidget(Qt::RightDockWidgetArea, search_widget);
+  search_widget->hide();
+  search_widget->toggleViewAction()->setIcon(QIcon::fromTheme("edit-find"));
+  toolbar->addAction(search_widget->toggleViewAction());
 
   {
     auto *menu = menuBar()->addMenu(tr("&Windows"));

@@ -107,6 +107,7 @@ add_executable(${PROJECT_NAME}
     src/gui/renderthread.cpp
     src/gui/renderwindow.cpp
     src/gui/scenewindow.cpp
+    src/gui/searchwidget.cpp
     src/gui/splitwindow.cpp
     src/gui/timeline.cpp
     src/render/framebuffer.cpp
