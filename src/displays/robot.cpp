@@ -454,8 +454,12 @@ void DisplayRobotStateDisplay::renderSync(const RenderSyncContext &context) {
   // _display_robot_state_message = topic().message();
   auto message = topic().message();
   if (_robot_state && message) {
-    moveit::core::robotStateMsgToRobotState(message->state,
-                                            _robot_state->moveit_state);
+    try {
+      moveit::core::robotStateMsgToRobotState(message->state,
+                                              _robot_state->moveit_state);
+    } catch (const std::exception &ex) {
+      LOG_ERROR(ex.what());
+    }
     for (size_t i = 0; i < _robot_state->robot_model->links.size(); i++) {
       auto &link = _robot_state->robot_model->links[i];
       _robot_state->mesh_renderers.at(i)->pose(
@@ -532,6 +536,13 @@ void RobotTrajectoryDisplay::renderSync(const RenderSyncContext &context) {
 void RobotTrajectoryDisplay::renderSync(const RenderSyncContext &context) {
   _display_trajectory_message = topic().message();
   _max_steps = maxSteps();
+  _show_all = showAllStates();
+  if (_update_parameter_watcher.changed(showAllStates(), speed())) {
+    std::unique_lock<std::mutex> lock(_update_mutex);
+    _update_show_all = showAllStates();
+    _update_speed = speed();
+    _update_condition.notify_all();
+  }
   RobotDisplayBase::renderSync(context);
 }
 
@@ -540,6 +551,13 @@ void RobotTrajectoryDisplay::renderAsync(const RenderAsyncContext &context) {
   if (_robot_model_loader) {
     robot_model = _robot_model_loader->load();
   }
+  /*
+  size_t current_frame = 0;
+  if (!_show_all) {
+    current_frame =
+        (size_t)std::fmod(ros::WallTime::now().toSec(), _frame_time);
+  }
+  */
   if (_trajectory_watcher.changed(_display_trajectory_message, _max_steps,
                                   robot_model)) {
     _trajectory.clear();
@@ -547,63 +565,146 @@ void RobotTrajectoryDisplay::renderAsync(const RenderAsyncContext &context) {
       // LOG_DEBUG("new trajectory");
       if (robot_model->moveit_robot) {
 
-        std::map<ros::Duration, std::shared_ptr<RobotState>> states;
-        for (auto &robot_trajectory : _display_trajectory_message->trajectory) {
-          auto &joint_trajectory = robot_trajectory.joint_trajectory;
-          for (size_t iframe = 0; iframe < joint_trajectory.points.size();
-               iframe++) {
-            auto &point = joint_trajectory.points[iframe];
-            auto &robot_state = states[point.time_from_start];
-            if (!robot_state) {
-              robot_state =
-                  node()->create<RobotState>(robot_model, _material_override);
-              robot_state->moveit_state.setToDefaultValues();
-              moveit::core::robotStateMsgToRobotState(
-                  _display_trajectory_message->trajectory_start,
-                  robot_state->moveit_state);
+        /*
+        ros::Time current_frame_time;
+        {
+          {
+            size_t joint_frame_count = 0;
+            size_t md_frame_count = 0;
+            for (auto &robot_trajectory :
+                 _display_trajectory_message->trajectory) {
+              joint_frame_count +=
+                  robot_trajectory.joint_trajectory.points.size();
+              md_frame_count +=
+                  robot_trajectory.multi_dof_joint_trajectory.points.size();
             }
-            for (size_t ijoint = 0;
-                 ijoint < robot_trajectory.joint_trajectory.joint_names.size();
-                 ijoint++) {
-              if (ijoint < point.positions.size()) {
-                if (robot_state->variable_names.find(
-                        robot_trajectory.joint_trajectory
-                            .joint_names[ijoint]) !=
-                    robot_state->variable_names.end()) {
-                  robot_state->moveit_state.setVariablePosition(
-                      robot_trajectory.joint_trajectory.joint_names[ijoint],
-                      point.positions[ijoint]);
+            size_t frame_count = std::max(
+                size_t(1), std::max(md_frame_count, joint_frame_count));
+            current_frame = current_frame % frame_count;
+          }
+        }
+        */
+
+        /*
+        ros::Duration display_time = ros::Duration(0);
+        if (!_show_all) {
+          ros::Duration trajectory_duration = ros::Duration(0.0);
+          {
+            for (auto &robot_trajectory :
+                 _display_trajectory_message->trajectory) {
+              ros::Duration duration = ros::Duration(0.0);
+              if (!robot_trajectory.joint_trajectory.points.empty()) {
+                duration = std::max(
+                    duration, robot_trajectory.joint_trajectory.points.back()
+                                  .time_from_start);
+              }
+              if (!robot_trajectory.multi_dof_joint_trajectory.points.empty()) {
+                duration = std::max(
+                    duration,
+                    robot_trajectory.multi_dof_joint_trajectory.points.back()
+                        .time_from_start);
+              }
+              trajectory_duration += duration;
+            }
+          }
+          display_time = ros::Duration(
+              std::fmod(ros::Time::now().toSec(),
+                        std::max(0.001, trajectory_duration.toSec())));
+        }
+        */
+
+        std::map<ros::Duration, std::shared_ptr<RobotState>> states;
+        {
+          ros::Duration start_time = ros::Duration(0.0);
+
+          for (auto &robot_trajectory :
+               _display_trajectory_message->trajectory) {
+
+            {
+              auto &joint_trajectory = robot_trajectory.joint_trajectory;
+              for (size_t iframe = 0; iframe < joint_trajectory.points.size();
+                   iframe++) {
+                auto &point = joint_trajectory.points[iframe];
+                auto &robot_state = states[start_time + point.time_from_start];
+                if (!robot_state) {
+                  robot_state = node()->create<RobotState>(robot_model,
+                                                           _material_override);
+                  robot_state->moveit_state.setToDefaultValues();
+                  try {
+                    moveit::core::robotStateMsgToRobotState(
+                        _display_trajectory_message->trajectory_start,
+                        robot_state->moveit_state);
+                  } catch (const std::exception &ex) {
+                    LOG_ERROR(ex.what());
+                  }
+                }
+                for (size_t ijoint = 0;
+                     ijoint <
+                     robot_trajectory.joint_trajectory.joint_names.size();
+                     ijoint++) {
+                  if (ijoint < point.positions.size()) {
+                    if (robot_state->variable_names.find(
+                            robot_trajectory.joint_trajectory
+                                .joint_names[ijoint]) !=
+                        robot_state->variable_names.end()) {
+                      robot_state->moveit_state.setVariablePosition(
+                          robot_trajectory.joint_trajectory.joint_names[ijoint],
+                          point.positions[ijoint]);
+                    }
+                  }
                 }
               }
             }
-          }
-        }
 
-        for (auto &robot_trajectory : _display_trajectory_message->trajectory) {
-          auto &md_trajectory = robot_trajectory.multi_dof_joint_trajectory;
-          for (size_t iframe = 0; iframe < md_trajectory.points.size();
-               iframe++) {
-            for (size_t ijoint = 0; ijoint < md_trajectory.joint_names.size();
-                 ijoint++) {
-              auto &joint_name = md_trajectory.joint_names[ijoint];
-              auto &transform = md_trajectory.points[iframe].transforms[ijoint];
-              auto &time_from_start =
-                  md_trajectory.points[iframe].time_from_start;
-              auto &robot_state = states[time_from_start];
-              if (!robot_state) {
-                robot_state =
-                    node()->create<RobotState>(robot_model, _material_override);
-                robot_state->moveit_state.setToDefaultValues();
-                moveit::core::robotStateMsgToRobotState(
-                    _display_trajectory_message->trajectory_start,
-                    robot_state->moveit_state);
+            {
+              auto &md_trajectory = robot_trajectory.multi_dof_joint_trajectory;
+              for (size_t iframe = 0; iframe < md_trajectory.points.size();
+                   iframe++) {
+                for (size_t ijoint = 0;
+                     ijoint < md_trajectory.joint_names.size(); ijoint++) {
+                  auto &joint_name = md_trajectory.joint_names[ijoint];
+                  auto &transform =
+                      md_trajectory.points[iframe].transforms[ijoint];
+                  auto &robot_state =
+                      states[start_time +
+                             md_trajectory.points[iframe].time_from_start];
+                  if (!robot_state) {
+                    robot_state = node()->create<RobotState>(
+                        robot_model, _material_override);
+                    robot_state->moveit_state.setToDefaultValues();
+                    try {
+                      moveit::core::robotStateMsgToRobotState(
+                          _display_trajectory_message->trajectory_start,
+                          robot_state->moveit_state);
+                    } catch (const std::exception &ex) {
+                      LOG_ERROR(ex.what());
+                    }
+                  }
+                  if (auto *joint_model =
+                          robot_state->moveit_state.getJointModel(joint_name)) {
+                    Eigen::Affine3d pose = Eigen::Affine3d::Identity();
+                    tf::transformMsgToEigen(transform, pose);
+                    robot_state->moveit_state.setJointPositions(joint_model,
+                                                                pose);
+                  }
+                }
               }
-              if (auto *joint_model =
-                      robot_state->moveit_state.getJointModel(joint_name)) {
-                Eigen::Affine3d pose = Eigen::Affine3d::Identity();
-                tf::transformMsgToEigen(transform, pose);
-                robot_state->moveit_state.setJointPositions(joint_model, pose);
+            }
+
+            {
+              ros::Duration duration = ros::Duration(0.0);
+              if (!robot_trajectory.joint_trajectory.points.empty()) {
+                duration = std::max(
+                    duration, robot_trajectory.joint_trajectory.points.back()
+                                  .time_from_start);
               }
+              if (!robot_trajectory.multi_dof_joint_trajectory.points.empty()) {
+                duration = std::max(
+                    duration,
+                    robot_trajectory.multi_dof_joint_trajectory.points.back()
+                        .time_from_start);
+              }
+              start_time += duration;
             }
           }
         }
@@ -622,19 +723,88 @@ void RobotTrajectoryDisplay::renderAsync(const RenderAsyncContext &context) {
                                               ->getLinkModel(link->link_index))
                                       .matrix()) *
                 link->pose);
-            // LOG_DEBUG(robot_state->mesh_renderers.at(i)->pose().translation());
-            robot_state->mesh_renderers.at(i)->show();
+            // robot_state->mesh_renderers.at(i)->show();
           }
-          _trajectory.push_back(robot_state);
+          _trajectory.emplace_back((pair.first - states.begin()->first).toSec(),
+                                   robot_state);
         }
-
       } else {
         LOG_WARN("no robot model");
       }
     }
     GlobalEvents::instance()->redraw();
+    {
+      std::unique_lock<std::mutex> lock(_update_mutex);
+      _update_times.clear();
+      for (ssize_t i = 0; i < _trajectory.size(); i++) {
+        _update_times.push_back(_trajectory[i].first -
+                                _trajectory[std::max(ssize_t(0), i - 1)].first);
+      }
+      _update_condition.notify_all();
+    }
   }
+
   MeshDisplayBase::renderAsync(context);
+
+  if (!_trajectory.empty()) {
+    size_t j = 0;
+    {
+      std::unique_lock<std::mutex> lock(_update_mutex);
+      j = _frame_update;
+    }
+    j = (j % _trajectory.size());
+    for (size_t i = 0; i < _trajectory.size(); i++) {
+      auto &pair = _trajectory[i];
+      bool vis = (_show_all || i == j);
+      for (auto &renderer : pair.second->mesh_renderers) {
+        renderer->visible(vis);
+      }
+    }
+  }
+}
+
+RobotTrajectoryDisplay::RobotTrajectoryDisplay() {
+  _update_thread = std::thread([this]() {
+    LOG_DEBUG("start robot trajectory update thread");
+    size_t current_frame_index = 0;
+    std::chrono::steady_clock::time_point last_tick =
+        std::chrono::steady_clock::now();
+    std::unique_lock<std::mutex> lock(_update_mutex);
+    while (true) {
+      if (_update_exit) {
+        break;
+      }
+      if (_update_times.size() < 2 || _update_show_all || _update_speed == 0) {
+        _update_condition.wait(lock);
+      } else {
+        current_frame_index = (current_frame_index % _update_times.size());
+        double update_time = _update_times[current_frame_index];
+        auto timeout =
+            (last_tick + std::chrono::duration<double>(
+                             update_time / std::max(1e-12, _update_speed)));
+        if (std::chrono::steady_clock::now() >= timeout) {
+          current_frame_index++;
+          current_frame_index = (current_frame_index % _update_times.size());
+          _frame_update = current_frame_index;
+          last_tick = std::chrono::steady_clock::now();
+          GlobalEvents::instance()->redraw();
+          // LOG_DEBUG("redraw robot trajectory display");
+        } else {
+          _update_condition.wait_until(lock, timeout);
+        }
+      }
+    }
+    LOG_DEBUG("exit robot trajectory update thread");
+  });
+}
+
+RobotTrajectoryDisplay::~RobotTrajectoryDisplay() {
+  {
+    std::unique_lock<std::mutex> lock(_update_mutex);
+    _update_exit = true;
+    _update_condition.notify_all();
+  }
+  _update_thread.join();
 }
 
 void RobotModelDisplay::renderSync(const RenderSyncContext &c) {

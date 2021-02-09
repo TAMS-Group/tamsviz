@@ -116,9 +116,7 @@ void Renderer::prepare(const CameraBlock &camera_block,
   V_GL(glDisable(GL_BLEND));
   V_GL(glDepthMask(GL_TRUE));
 
-  glEnable(GL_SAMPLE_SHADING);
   glEnable(GL_MULTISAMPLE);
-  glMinSampleShading(1.0);
 
   camera_uniform_buffer.update(camera_block);
   camera_uniform_buffer.bind();
@@ -229,6 +227,13 @@ void Renderer::render(RenderTarget &render_target,
   V_GL(glClearColor(0, 0, 0, 0));
   V_GL(glClear(GL_COLOR_BUFFER_BIT));
 
+  if (camera_block.flags & CameraBlock::SampleShadingFlag) {
+    glEnable(GL_SAMPLE_SHADING);
+    glMinSampleShading(1.0);
+  } else {
+    glDisable(GL_SAMPLE_SHADING);
+  }
+
   render_target._opaque_framebuffer.bind();
   V_GL(glDepthMask(GL_TRUE));
   V_GL(glDisable(GL_BLEND));
@@ -260,6 +265,13 @@ void Renderer::render(RenderTarget &render_target,
     V_GL(glFinish());
 
   } else {
+
+    if (camera_block.flags & CameraBlock::TransparentSampleShadingFlag) {
+      glEnable(GL_SAMPLE_SHADING);
+      glMinSampleShading(1.0);
+    } else {
+      glDisable(GL_SAMPLE_SHADING);
+    }
 
     render_target._transparent_framebuffer_tail.bind();
     V_GL(glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE, GL_ZERO,

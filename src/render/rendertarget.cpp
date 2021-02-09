@@ -5,11 +5,12 @@
 
 #include "../core/log.h"
 
-void RenderTarget::update(int width, int height) {
-  if (_watcher.changed(width, height)) {
+void RenderTarget::update(int width, int height, int samples) {
+  samples = std::max(1, samples);
+  if (_watcher.changed(width, height, samples)) {
     std::lock_guard<std::mutex> lock(_mutex);
 
-    int samples = 4;
+    // int samples = 4;
     {
       int gl_max_samples = 1;
       int gl_max_integer_samples = 1;

@@ -198,6 +198,12 @@ public:
 };
 DECLARE_TYPE(Window, Object);
 
+struct RenderingParameters : Object {
+  PROPERTY(int, multiSampling, 4, min = 0, max = 16);
+  PROPERTY(int, sampleShading, 1, min = 0, max = 2);
+};
+DECLARE_TYPE(RenderingParameters, Object);
+
 class Transformer;
 struct WorldDisplay : DisplayGroupBase {
 private:
@@ -208,6 +214,8 @@ public:
   PROPERTY(std::string, fixedFrame, "world", list = &WorldDisplay::_listFrames);
   PROPERTY(Color4, backgroundColor, Color4(0.3, 0.3, 0.3, 1.0));
   PROPERTY(double, ambientLighting, 1.0, min = 0.0, max = 1.0);
+  PROPERTY(std::shared_ptr<RenderingParameters>, rendering,
+           std::make_shared<RenderingParameters>());
   virtual void renderSync(const RenderSyncContext &context) override;
   virtual void renderAsync(const RenderAsyncContext &context) override;
   WorldDisplay();

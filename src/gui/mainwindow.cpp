@@ -706,7 +706,9 @@ int main(int argc, char **argv) {
 
     QApplication app(argc, argv);
 
-    ros::init(argc, argv, ROS_PACKAGE_NAME, ros::init_options::NoSigintHandler);
+    ros::init(argc, argv, ROS_PACKAGE_NAME,
+              ros::init_options::AnonymousName |
+                  ros::init_options::NoSigintHandler);
     ros::NodeHandle node("~");
     signal(SIGINT, [](int sig) {
       LOG_DEBUG("shutting down");

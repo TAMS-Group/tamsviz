@@ -15,6 +15,9 @@ class Mesh;
 struct CameraBlock {
   Eigen::Matrix4f view_matrix = Eigen::Matrix4f::Identity();
   Eigen::Matrix4f projection_matrix = Eigen::Matrix4f::Identity();
+  static constexpr uint32_t SampleShadingFlag = 1;
+  static constexpr uint32_t TransparentSampleShadingFlag = 2;
+  uint32_t flags = 0;
 };
 
 enum class LightType : uint32_t {

@@ -21,6 +21,7 @@ class SceneWindow : public RenderWindowBase {
   QPoint _mouse_position;
   bool _left_dragged = false;
   int _mouse_buttons = 0;
+  int _multi_sampling = 0;
   std::mutex _action_mutex;
   std::vector<std::function<void(const RenderWindowAsyncContext &)>>
       _action_queue;

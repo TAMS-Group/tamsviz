@@ -19,6 +19,9 @@
 #include <moveit_msgs/DisplayTrajectory.h>
 #include <sensor_msgs/JointState.h>
 
+#include <condition_variable>
+#include <mutex>
+
 class RobotModel;
 class RobotState;
 
@@ -134,17 +137,33 @@ DECLARE_TYPE(RobotTrajectoryDisplay, RobotDisplayBase);
 
 class RobotTrajectoryDisplay : public GenericFrameDisplay<RobotDisplayBase> {
   Watcher _trajectory_watcher;
-  std::vector<std::shared_ptr<RobotState>> _trajectory;
+  std::vector<std::pair<double, std::shared_ptr<RobotState>>> _trajectory;
   std::shared_ptr<const moveit_msgs::DisplayTrajectory>
       _display_trajectory_message;
   int _max_steps = 10;
+  bool _show_all = false;
+  double _frame_time = 0;
+  bool _update_show_all = false;
+  std::thread _update_thread;
+  std::condition_variable _update_condition;
+  std::mutex _update_mutex;
+  std::vector<double> _update_times;
+  volatile size_t _frame_update = 0;
+  volatile bool _update_exit = false;
+  Watcher _update_parameter_watcher;
+  double _update_speed = 1;
 
 public:
   PROPERTY(TopicProperty<moveit_msgs::DisplayTrajectory>, topic,
            "/move_group/display_planned_path");
   PROPERTY(int, maxSteps, 10, min = 1);
+  PROPERTY(bool, showAllStates, false);
+  PROPERTY(double, speed, 1, min = 0);
+  // PROPERTY(double, stateDisplayTime, 0.1);
   virtual void renderSync(const RenderSyncContext &context) override;
   virtual void renderAsync(const RenderAsyncContext &context) override;
+  RobotTrajectoryDisplay();
+  ~RobotTrajectoryDisplay();
 };
 DECLARE_TYPE(RobotTrajectoryDisplay, RobotDisplayBase);
 

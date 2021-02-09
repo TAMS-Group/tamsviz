@@ -52,6 +52,7 @@ public:
   Transformer(bool subscribe = true);
   Transformer(const Transformer &) = delete;
   Transformer &operator=(const Transformer &) = delete;
+  ~Transformer();
   void update(const std::string &root);
   void clear();
   void push(const std::shared_ptr<const Message> &message);

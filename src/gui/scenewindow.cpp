@@ -112,16 +112,31 @@ void SceneWindow::updateViewMatrix() {
 
 void SceneWindow::renderWindowSync(const RenderWindowSyncContext &context) {
   LockScope ws;
+
   _bgcolor = ws->document()->display()->backgroundColor().toLinearVector4f();
+
   updateViewMatrix();
   float far = (100.0 + (viewPosition() - viewTarget()).norm() * 2.0);
   float near = far * 0.0001f;
   _projection_matrix = projectionMatrix(1.0, _height * 1.0 / _width, near, far);
   _camera_block.projection_matrix = _projection_matrix.cast<float>();
+
+  _multi_sampling = ws->document()->display()->rendering()->multiSampling();
+
+  _camera_block.flags = 0;
+  switch (ws->document()->display()->rendering()->sampleShading()) {
+  case 1:
+    _camera_block.flags |= CameraBlock::SampleShadingFlag;
+    break;
+  case 2:
+    _camera_block.flags |= CameraBlock::SampleShadingFlag;
+    _camera_block.flags |= CameraBlock::TransparentSampleShadingFlag;
+    break;
+  }
 }
 
 void SceneWindow::renderWindowAsync(const RenderWindowAsyncContext &context) {
-  renderTarget().update(_width, _height);
+  renderTarget().update(_width, _height, _multi_sampling);
   renderTarget().bind();
   V_GL(glViewport(0, 0, _width, _height));
   V_GL(glClearColor(_bgcolor.x(), _bgcolor.y(), _bgcolor.z(), _bgcolor.w()));

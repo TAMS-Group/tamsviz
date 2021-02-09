@@ -363,7 +363,7 @@ void VisualizationMarker::renderSync(const RenderSyncContext &context) {
     if (_mesh) {
       auto mesh_renderer = std::dynamic_pointer_cast<MeshRenderer>(_renderer);
       if (!mesh_renderer || _mesh != mesh_renderer->mesh()) {
-        _renderer = create<MeshRenderer>(_mesh, _material);
+        _renderer = create<MeshRenderer>(_mesh, _material, _material_override);
       }
     } else if (_text.size()) {
       auto text_renderer = std::dynamic_pointer_cast<TextRenderer>(_renderer);
@@ -394,7 +394,7 @@ void VisualizationMarkerArray::_update_nolock(
       marker.action == visualization_msgs::Marker::MODIFY) {
     auto &m = _markers[std::make_pair(marker.ns, marker.id)];
     if (!m) {
-      m = create<VisualizationMarker>();
+      m = create<VisualizationMarker>(_material_override);
     }
     m->update(marker);
   }

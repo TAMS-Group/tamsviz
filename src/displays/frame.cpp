@@ -3,6 +3,7 @@
 
 #include "frame.h"
 
+#include "../core/log.h"
 #include "../core/transformer.h"
 #include "../core/workspace.h"
 
@@ -10,9 +11,17 @@ void FrameDisplayMixin::renderSyncRecursiveImpl(
     const RenderSyncContext &context, Display *display, Frame &frame,
     const Pose &transform) {
   RenderSyncContext c = context;
+  // LOG_DEBUG("a");
   if (!frame.empty()) {
-    if (auto f = frame.pose(LockScope()->document()->display()->transformer)) {
-      c.pose = Eigen::Affine3d(*f);
+    if (auto transformer = LockScope()->document()->display()->transformer) {
+      if (auto f = frame.pose(transformer)) {
+        c.pose = Eigen::Affine3d(*f);
+        //  LOG_DEBUG(c.pose.translation());
+      } else {
+        LOG_WARN_THROTTLE(1, "frame not found: " << frame.name());
+      }
+    } else {
+      LOG_ERROR("no transformer");
     }
   }
   _frame_pose = c.pose;

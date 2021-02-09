@@ -338,6 +338,7 @@ struct Transformer::Data {
 };
 
 Transformer::Transformer(bool subscribe) {
+  LOG_DEBUG("Transformer ctor");
   _data = std::make_shared<Data>();
   if (subscribe) {
     auto _data = this->_data;
@@ -380,6 +381,8 @@ Transformer::Transformer(bool subscribe) {
         .detach();
   }
 }
+
+Transformer::~Transformer() { LOG_DEBUG("Transformer dtor"); }
 
 void Transformer::clear() { _data->clear(); }
 

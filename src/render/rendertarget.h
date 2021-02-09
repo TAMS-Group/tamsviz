@@ -12,7 +12,7 @@ class RenderTarget : public ResourceBase {
   bool _can_present = false;
 
 public:
-  void update(int width, int height);
+  void update(int width, int height, int multisampling);
   void bind();
   void present(int target = 0);
 
