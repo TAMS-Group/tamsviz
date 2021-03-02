@@ -15,7 +15,8 @@
 - Transparency without order inversion
 - Options to fix mesh normals
 - Normal mapping
-- Multi-threaded architecture, renderer can't freeze GUI, asynchronous loading, asynchronous rendering
+- Multi-threaded architecture, renderer can't freeze GUI
+- Asynchronous loading, asynchronous rendering
 
 ### Screenshots
 
