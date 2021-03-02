@@ -1,0 +1,9 @@
+<map id="InteractivePoseDisplayBase" name="InteractivePoseDisplayBase">
+<area shape="rect" id="node7" href="$structPointPublisherDisplay.html" title="PointPublisherDisplay" alt="" coords="5,468,156,495"/>
+<area shape="rect" id="node8" href="$structPosePublisherDisplay.html" title="PosePublisherDisplay" alt="" coords="180,468,331,495"/>
+<area shape="rect" id="node9" href="$structTransformPublisherDisplay.html" title="TransformPublisherDisplay" alt="" coords="355,468,534,495"/>
+<area shape="rect" id="node2" href="$classInteractiveMarkerDisplayBase.html" title="InteractiveMarkerDisplayBase" alt="" coords="157,319,354,345"/>
+<area shape="rect" id="node3" href="$classMeshDisplayBase.html" title="MeshDisplayBase" alt="" coords="191,244,319,271"/>
+<area shape="rect" id="node4" href="$structDisplay.html" title="Display" alt="" coords="222,169,289,196"/>
+<area shape="rect" id="node5" href="$classObject.html" title="Object" alt="" coords="225,95,285,121"/>
+</map>

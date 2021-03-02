@@ -1,0 +1,5 @@
+<map id="Topic" name="Topic">
+<area shape="rect" id="node2" href="$classEvent.html" title="Event\&lt; void(const std\l::shared_ptr\&lt; const Message \&gt; &amp;)\&gt;" alt="" coords="5,81,235,123"/>
+<area shape="rect" id="node3" href="$classEventBase.html" title="EventBase" alt="" coords="193,5,279,32"/>
+<area shape="rect" id="node4" href="$classEvent.html" title="Event\&lt; void()\&gt;" alt="" coords="259,89,367,115"/>
+</map>

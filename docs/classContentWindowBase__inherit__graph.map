@@ -1,0 +1,10 @@
+<map id="ContentWindowBase" name="ContentWindowBase">
+<area shape="rect" id="node7" href="$classEmptyWindow.html" title="EmptyWindow" alt="" coords="5,393,112,420"/>
+<area shape="rect" id="node8" href="$classImageWindow.html" title="ImageWindow" alt="" coords="137,393,242,420"/>
+<area shape="rect" id="node9" href="$classRenderWindowBase.html" title="RenderWindowBase" alt="" coords="265,393,407,420"/>
+<area shape="rect" id="node2" href="$classWindowBase.html" title="WindowBase" alt="" coords="140,244,239,271"/>
+<area shape="rect" id="node3" href="$structWindow.html" title="Window" alt="" coords="108,169,177,196"/>
+<area shape="rect" id="node4" href="$classObject.html" title="Object" alt="" coords="113,95,173,121"/>
+<area shape="rect" id="node10" href="$classPlotWindow.html" title="PlotWindow" alt="" coords="229,468,321,495"/>
+<area shape="rect" id="node11" href="$classSceneWindow.html" title="SceneWindow" alt="" coords="345,468,452,495"/>
+</map>

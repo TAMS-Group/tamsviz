@@ -1,0 +1,11 @@
+<map id="SceneNode" name="SceneNode">
+<area shape="rect" id="node3" href="$classInteractiveMarker.html" title="InteractiveMarker" alt="" coords="389,5,511,32"/>
+<area shape="rect" id="node4" href="$classInteractiveMarkerArray.html" title="InteractiveMarkerArray" alt="" coords="373,56,527,83"/>
+<area shape="rect" id="node5" href="$classInteractiveMarkerControl.html" title="InteractiveMarkerControl" alt="" coords="367,107,533,133"/>
+<area shape="rect" id="node6" href="$classMeshRenderer.html" title="MeshRenderer" alt="" coords="397,157,503,184"/>
+<area shape="rect" id="node8" href="$structRobotState.html" title="RobotState" alt="" coords="406,208,494,235"/>
+<area shape="rect" id="node9" href="$classTextRenderer.html" title="TextRenderer" alt="" coords="399,259,501,285"/>
+<area shape="rect" id="node10" href="$classVisualizationMarker.html" title="VisualizationMarker" alt="" coords="382,309,518,336"/>
+<area shape="rect" id="node11" href="$classVisualizationMarkerArray.html" title="VisualizationMarkerArray" alt="" coords="367,360,533,387"/>
+<area shape="rect" id="node7" href="$classInstancedMeshRenderer.html" title="InstancedMeshRenderer" alt="" coords="581,157,745,184"/>
+</map>

@@ -1,0 +1,5 @@
+<map id="SnapshotBase" name="SnapshotBase">
+<area shape="rect" id="node2" href="$structSnapshot_3_01Handle_3_01T_01_4_01_4.html" title="Snapshot\&lt; Handle\&lt; T \&gt; \&gt;" alt="" coords="160,5,335,32"/>
+<area shape="rect" id="node3" href="$structSnapshot_3_01std_1_1shared__ptr_3_01T_01_4_01_4.html" title="Snapshot\&lt; std::shared\l_ptr\&lt; T \&gt; \&gt;" alt="" coords="170,57,325,98"/>
+<area shape="rect" id="node4" href="$structSnapshot_3_01std_1_1vector_3_01T_01_4_01_4.html" title="Snapshot\&lt; std::vector\l\&lt; T \&gt; \&gt;" alt="" coords="172,122,323,163"/>
+</map>
