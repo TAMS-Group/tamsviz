@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['visualization_20and_20annotation_20tool_20for_20robotics',['Visualization and annotation tool for robotics',['../index.html',1,'']]]
+  ['visualization_20and_20annotation_20tool_20for_20ros',['Visualization and annotation tool for ROS',['../index.html',1,'']]]
 ];
