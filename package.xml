@@ -3,12 +3,12 @@
     
     <name>tamsviz</name>
     <version>0.0.0</version>
-    <description>-</description>
+    <description>Visualization and annotation tool for ROS</description>
 
     <maintainer email="ruppel@informatik.uni-hamburg.de">Philipp Ruppel</maintainer>
     <author email="ruppel@informatik.uni-hamburg.de">Philipp Ruppel</author>
 
-    <license>-</license>
+    <license>BSD</license>
 
     <buildtool_depend>catkin</buildtool_depend>
 
