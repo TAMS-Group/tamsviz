@@ -17,15 +17,23 @@
 - Normal mapping
 - Multi-threaded architecture, renderer can't freeze GUI
 - Asynchronous loading, asynchronous rendering
+- High-quality text rendering
+- Anti-aliasing
 
 ### Screenshots
 
 ![](screenshots/1.png)
 
-![](screenshots/2.png)
+![](screenshots/hand-tracking.png)
 
 ![](screenshots/5.png)
 
-![](screenshots/3.png)
+![](screenshots/hand-transparent.png)
+
+![](screenshots/plots.png)
+
+![](screenshots/markers-text.png)
+
+![](screenshots/image-annotation.png)
 
 ![](screenshots/4.png)
