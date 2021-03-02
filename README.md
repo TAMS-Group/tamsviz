@@ -1,4 +1,4 @@
-# Visualization and annotation tool for robotics
+# Visualization and annotation tool for ROS
 
 ### Features
 
