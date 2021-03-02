@@ -19,6 +19,7 @@
 - Asynchronous loading, asynchronous rendering
 - High-quality text rendering
 - Anti-aliasing
+- ROS integration
 
 ### Screenshots
 
