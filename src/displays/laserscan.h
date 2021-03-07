@@ -18,7 +18,8 @@
 class LaserScanDisplay : public MeshDisplayBase {
   std::shared_ptr<MeshRenderer> _mesh_renderer;
   std::shared_ptr<Material> _material = std::make_shared<Material>();
-  laser_geometry::LaserProjection _projector;
+  std::shared_ptr<laser_geometry::LaserProjection> _projector =
+      std::make_shared<laser_geometry::LaserProjection>();
   Watcher _watcher;
 
 public:
@@ -28,4 +29,4 @@ public:
   virtual void renderSync(const RenderSyncContext &context) override;
   LaserScanDisplay() {}
 };
-DECLARE_TYPE(LaserScanDisplay, MeshDisplayBase);
+DECLARE_TYPE_C(LaserScanDisplay, MeshDisplayBase, Sensor);

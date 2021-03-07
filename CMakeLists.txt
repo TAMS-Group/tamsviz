@@ -5,6 +5,7 @@ cmake_minimum_required(VERSION 3.1)
 project(tamsviz)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O3")
 
 set(CMAKE_CXX_STANDARD 11)
 
@@ -87,6 +88,7 @@ add_executable(${PROJECT_NAME}
     src/core/workspace.cpp
     src/displays/axes.cpp
     src/displays/frame.cpp
+    src/displays/geometry.cpp
     src/displays/grid.cpp
     src/displays/interactive.cpp
     src/displays/laserscan.cpp
@@ -94,6 +96,7 @@ add_executable(${PROJECT_NAME}
     src/displays/marker.cpp
     src/displays/mesh.cpp
     src/displays/plot.cpp
+    src/displays/pointcloud.cpp
     src/displays/robot.cpp
     src/displays/shapes.cpp
     src/displays/text.cpp

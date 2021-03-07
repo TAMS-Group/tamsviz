@@ -224,6 +224,7 @@ protected:
   std::shared_ptr<Type> _base;
   bool _constructable = false;
   std::function<std::shared_ptr<void>()> _create;
+  std::string _category;
 
   static void _registerType(const std::shared_ptr<Type> &t);
 
@@ -250,6 +251,7 @@ public:
   const std::string &name() const { return _name; }
   const std::shared_ptr<Type> &base() const { return _base; }
   bool constructable() const { return _constructable; }
+  const std::string &category() const { return _category; }
 
   template <class T> std::shared_ptr<T> instantiate() const {
     for (const Type *t = this; t; t = t->_base.get()) {
@@ -276,11 +278,12 @@ public:
   template <class T>
   static std::shared_ptr<Type>
   global(const std::string &name = "",
-         const std::shared_ptr<Type> &base = nullptr) {
+         const std::shared_ptr<Type> &base = nullptr,
+         const std::string &category = "") {
     if (auto ret = tryFind<T>()) {
       return ret;
     }
-    auto ret = create<T>(name, base);
+    auto ret = create<T>(name, base, category);
     _registerType(ret);
     return ret;
   }
@@ -288,7 +291,8 @@ public:
   template <class T>
   static std::shared_ptr<Type>
   create(const std::string &name = "",
-         const std::shared_ptr<Type> &base = nullptr);
+         const std::shared_ptr<Type> &base = nullptr,
+         const std::string &category = "");
 
   virtual bool tryToString(const void *p, std::string &s) const = 0;
   virtual bool fromStringSupported() const = 0;
@@ -330,9 +334,11 @@ public:
 template <class T> class TypeImpl : public Type {
 
 public:
-  TypeImpl(const std::string &name, const std::shared_ptr<Type> &base) {
+  TypeImpl(const std::string &name, const std::shared_ptr<Type> &base,
+           const std::string &category) {
     _name = name;
     _base = base;
+    _category = category;
     _type_id = typeid(T);
     _initConstructor<T>(0);
   }
@@ -364,9 +370,13 @@ public:
 
 template <class T>
 std::shared_ptr<Type> Type::create(const std::string &name,
-                                   const std::shared_ptr<Type> &base) {
-  return std::shared_ptr<Type>(new TypeImpl<T>(name, base));
+                                   const std::shared_ptr<Type> &base,
+                                   const std::string &category) {
+  return std::shared_ptr<Type>(new TypeImpl<T>(name, base, category));
 }
+
+#define DECLARE_TYPE_STRINGIFY_2(x) #x
+#define DECLARE_TYPE_STRINGIFY(x) DECLARE_TYPE_STRINGIFY_2(x)
 
 #define DECLARE_TYPE_IMPL(Derived, Base, ...)                                  \
   static_assert(std::is_base_of<Base, Derived>::value,                         \
@@ -375,3 +385,9 @@ std::shared_ptr<Type> Type::create(const std::string &name,
       #Derived,                                                                \
       (typeid(Base) != typeid(Derived)) ? Type::find(typeid(Base)) : nullptr);
 #define DECLARE_TYPE(Type, ...) DECLARE_TYPE_IMPL(Type, ##__VA_ARGS__, Type)
+
+#define DECLARE_TYPE_C(Derived, Base, Category)                                \
+  static_assert(std::is_base_of<Base, Derived>::value,                         \
+                "incorrect base class");                                       \
+  static std::shared_ptr<Type> _##Base##_##Derived = Type::global<Derived>(    \
+      #Derived, Type::find(typeid(Base)), DECLARE_TYPE_STRINGIFY_2(Category));

@@ -15,4 +15,4 @@ struct TransformationsDisplay : MeshDisplayBase {
   Watcher _watcher;
   virtual void renderSync(const RenderSyncContext &context) override;
 };
-DECLARE_TYPE(TransformationsDisplay, MeshDisplayBase);
+DECLARE_TYPE_C(TransformationsDisplay, MeshDisplayBase, Transform);

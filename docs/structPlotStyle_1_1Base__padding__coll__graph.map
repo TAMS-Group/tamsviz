@@ -1,0 +1,8 @@
+<map id="PlotStyle::Base_padding" name="PlotStyle::Base_padding">
+<area shape="rect" id="node2" href="$structPlotStyle_1_1Base__graphWidth.html" title="PlotStyle::Base_graphWidth" alt="" coords="5,379,192,405"/>
+<area shape="rect" id="node3" href="$structPlotStyle_1_1Base__frameWidth.html" title="PlotStyle::Base_frameWidth" alt="" coords="5,304,192,331"/>
+<area shape="rect" id="node4" href="$structPlotStyle_1_1Base__ticks.html" title="PlotStyle::Base_ticks" alt="" coords="25,229,173,256"/>
+<area shape="rect" id="node5" href="$structPlotStyle_1_1Base__spacing.html" title="PlotStyle::Base_spacing" alt="" coords="16,155,181,181"/>
+<area shape="rect" id="node6" href="$structPlotStyle_1_1Base__margins.html" title="PlotStyle::Base_margins" alt="" coords="15,80,182,107"/>
+<area shape="rect" id="node7" href="$structPlotStyle_1_1Base__axes.html" title="PlotStyle::Base_axes" alt="" coords="25,5,173,32"/>
+</map>

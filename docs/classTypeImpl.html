@@ -108,9 +108,9 @@ Collaboration diagram for TypeImpl&lt; T &gt;:</div>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:ac781a98ab9736fe7fc61e445e808c4c9"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ac781a98ab9736fe7fc61e445e808c4c9"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>TypeImpl</b> (const std::string &amp;name, const std::shared_ptr&lt; <a class="el" href="structType.html">Type</a> &gt; &amp;base)</td></tr>
-<tr class="separator:ac781a98ab9736fe7fc61e445e808c4c9"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a257ed3ca46e14c91cdcc705aec2a6e04"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a257ed3ca46e14c91cdcc705aec2a6e04"></a>
+&#160;</td><td class="memItemRight" valign="bottom"><b>TypeImpl</b> (const std::string &amp;name, const std::shared_ptr&lt; <a class="el" href="structType.html">Type</a> &gt; &amp;base, const std::string &amp;category)</td></tr>
+<tr class="separator:a257ed3ca46e14c91cdcc705aec2a6e04"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a0da4bc3b8978cb81a786778852e18234"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a0da4bc3b8978cb81a786778852e18234"></a>
 virtual bool&#160;</td><td class="memItemRight" valign="bottom"><b>tryToString</b> (const void *p, std::string &amp;s) const override</td></tr>
 <tr class="separator:a0da4bc3b8978cb81a786778852e18234"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -142,6 +142,9 @@ const std::shared_ptr&lt; <a class="el" href="structType.html">Type</a> &gt; &am
 <tr class="memitem:a08dc75650419f64aa818990f0fe917ee inherit pub_methods_structType"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a08dc75650419f64aa818990f0fe917ee"></a>
 bool&#160;</td><td class="memItemRight" valign="bottom"><b>constructable</b> () const </td></tr>
 <tr class="separator:a08dc75650419f64aa818990f0fe917ee inherit pub_methods_structType"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a76e1c7c07b1adde98061a0e38e2e81dc inherit pub_methods_structType"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a76e1c7c07b1adde98061a0e38e2e81dc"></a>
+const std::string &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>category</b> () const </td></tr>
+<tr class="separator:a76e1c7c07b1adde98061a0e38e2e81dc inherit pub_methods_structType"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a98a5f08e375d1fed00334f6a7f57a68c inherit pub_methods_structType"><td class="memTemplParams" colspan="2"><a class="anchor" id="a98a5f08e375d1fed00334f6a7f57a68c"></a>
 template&lt;class T &gt; </td></tr>
 <tr class="memitem:a98a5f08e375d1fed00334f6a7f57a68c inherit pub_methods_structType"><td class="memTemplItemLeft" align="right" valign="top">std::shared_ptr&lt; T &gt;&#160;</td><td class="memTemplItemRight" valign="bottom"><b>instantiate</b> () const </td></tr>
@@ -173,14 +176,14 @@ template&lt;class T &gt; </td></tr>
 template&lt;class T &gt; </td></tr>
 <tr class="memitem:a059673aa51dd526dee22f6cc31d4eb45 inherit pub_static_methods_structType"><td class="memTemplItemLeft" align="right" valign="top">static std::shared_ptr&lt; <a class="el" href="structType.html">Type</a> &gt;&#160;</td><td class="memTemplItemRight" valign="bottom"><b>tryFind</b> ()</td></tr>
 <tr class="separator:a059673aa51dd526dee22f6cc31d4eb45 inherit pub_static_methods_structType"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ae3802a742a2ee7b203b57b6d3657ee19 inherit pub_static_methods_structType"><td class="memTemplParams" colspan="2"><a class="anchor" id="ae3802a742a2ee7b203b57b6d3657ee19"></a>
+<tr class="memitem:a21ed203be996ba9acd8df7bc2dad0bfd inherit pub_static_methods_structType"><td class="memTemplParams" colspan="2"><a class="anchor" id="a21ed203be996ba9acd8df7bc2dad0bfd"></a>
 template&lt;class T &gt; </td></tr>
-<tr class="memitem:ae3802a742a2ee7b203b57b6d3657ee19 inherit pub_static_methods_structType"><td class="memTemplItemLeft" align="right" valign="top">static std::shared_ptr&lt; <a class="el" href="structType.html">Type</a> &gt;&#160;</td><td class="memTemplItemRight" valign="bottom"><b>global</b> (const std::string &amp;name=&quot;&quot;, const std::shared_ptr&lt; <a class="el" href="structType.html">Type</a> &gt; &amp;base=nullptr)</td></tr>
-<tr class="separator:ae3802a742a2ee7b203b57b6d3657ee19 inherit pub_static_methods_structType"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a8bb97b8aba0bb650ce4db07419af7994 inherit pub_static_methods_structType"><td class="memTemplParams" colspan="2"><a class="anchor" id="a8bb97b8aba0bb650ce4db07419af7994"></a>
+<tr class="memitem:a21ed203be996ba9acd8df7bc2dad0bfd inherit pub_static_methods_structType"><td class="memTemplItemLeft" align="right" valign="top">static std::shared_ptr&lt; <a class="el" href="structType.html">Type</a> &gt;&#160;</td><td class="memTemplItemRight" valign="bottom"><b>global</b> (const std::string &amp;name=&quot;&quot;, const std::shared_ptr&lt; <a class="el" href="structType.html">Type</a> &gt; &amp;base=nullptr, const std::string &amp;category=&quot;&quot;)</td></tr>
+<tr class="separator:a21ed203be996ba9acd8df7bc2dad0bfd inherit pub_static_methods_structType"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ad25c0a60c939c838235d5e83d9282392 inherit pub_static_methods_structType"><td class="memTemplParams" colspan="2"><a class="anchor" id="ad25c0a60c939c838235d5e83d9282392"></a>
 template&lt;class T &gt; </td></tr>
-<tr class="memitem:a8bb97b8aba0bb650ce4db07419af7994 inherit pub_static_methods_structType"><td class="memTemplItemLeft" align="right" valign="top">static std::shared_ptr&lt; <a class="el" href="structType.html">Type</a> &gt;&#160;</td><td class="memTemplItemRight" valign="bottom"><b>create</b> (const std::string &amp;name=&quot;&quot;, const std::shared_ptr&lt; <a class="el" href="structType.html">Type</a> &gt; &amp;base=nullptr)</td></tr>
-<tr class="separator:a8bb97b8aba0bb650ce4db07419af7994 inherit pub_static_methods_structType"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ad25c0a60c939c838235d5e83d9282392 inherit pub_static_methods_structType"><td class="memTemplItemLeft" align="right" valign="top">static std::shared_ptr&lt; <a class="el" href="structType.html">Type</a> &gt;&#160;</td><td class="memTemplItemRight" valign="bottom"><b>create</b> (const std::string &amp;name=&quot;&quot;, const std::shared_ptr&lt; <a class="el" href="structType.html">Type</a> &gt; &amp;base=nullptr, const std::string &amp;category=&quot;&quot;)</td></tr>
+<tr class="separator:ad25c0a60c939c838235d5e83d9282392 inherit pub_static_methods_structType"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="inherit_header pro_methods_structType"><td colspan="2" onclick="javascript:toggleInherit('pro_methods_structType')"><img src="closed.png" alt="-"/>&#160;Protected Member Functions inherited from <a class="el" href="structType.html">Type</a></td></tr>
 <tr class="memitem:ab574b1f46c9ed7a7896ab07b04e4f500 inherit pro_methods_structType"><td class="memTemplParams" colspan="2"><a class="anchor" id="ab574b1f46c9ed7a7896ab07b04e4f500"></a>
 template&lt;class T &gt; </td></tr>
@@ -230,13 +233,16 @@ bool&#160;</td><td class="memItemRight" valign="bottom"><b>_constructable</b> = 
 <tr class="memitem:a337830f5706d344eda7f6efd4f7b9ad9 inherit pro_attribs_structType"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a337830f5706d344eda7f6efd4f7b9ad9"></a>
 std::function&lt; std::shared_ptr&lt; void &gt;)&gt;&#160;</td><td class="memItemRight" valign="bottom"><b>_create</b></td></tr>
 <tr class="separator:a337830f5706d344eda7f6efd4f7b9ad9 inherit pro_attribs_structType"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aaef7c7dbab404d117455636f192e7ef3 inherit pro_attribs_structType"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="aaef7c7dbab404d117455636f192e7ef3"></a>
+std::string&#160;</td><td class="memItemRight" valign="bottom"><b>_category</b></td></tr>
+<tr class="separator:aaef7c7dbab404d117455636f192e7ef3 inherit pro_attribs_structType"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><h3>template&lt;class T&gt;<br />
 class TypeImpl&lt; T &gt;</h3>
 
 
-<p>Definition at line <a class="el" href="type_8h_source.html#l00330">330</a> of file <a class="el" href="type_8h_source.html">type.h</a>.</p>
+<p>Definition at line <a class="el" href="type_8h_source.html#l00334">334</a> of file <a class="el" href="type_8h_source.html">type.h</a>.</p>
 </div><hr/>The documentation for this class was generated from the following file:<ul>
 <li>src/core/<a class="el" href="type_8h_source.html">type.h</a></li>
 </ul>

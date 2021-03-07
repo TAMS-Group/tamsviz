@@ -92,6 +92,7 @@ protected:
   InteractiveMarkerDisplayBase();
   visualization_msgs::InteractiveMarker makePointMarker();
   visualization_msgs::InteractiveMarker makePoseMarker();
+  visualization_msgs::InteractiveMarker makeRotationMarker();
 
 public:
   virtual void renderSync(const RenderSyncContext &context) override;
@@ -121,7 +122,7 @@ public:
   InteractiveMarkerDisplay();
   virtual void renderSync(const RenderSyncContext &context) override;
 };
-DECLARE_TYPE(InteractiveMarkerDisplay, InteractiveMarkerDisplayBase);
+DECLARE_TYPE_C(InteractiveMarkerDisplay, InteractiveMarkerDisplayBase, Marker);
 
 class InteractivePoseDisplayBase : public InteractiveMarkerDisplayBase {
   void publish();
@@ -154,24 +155,6 @@ public:
 };
 DECLARE_TYPE(InteractivePoseDisplayBase, InteractiveMarkerDisplayBase);
 
-struct PointPublisherDisplay : InteractivePoseDisplayBase {
-  Publisher<geometry_msgs::PointStamped> _publisher;
-  PROPERTY(std::string, topic);
-  PointPublisherDisplay();
-  virtual void publish(const std::string &frame,
-                       const Eigen::Isometry3d &pose) override;
-};
-DECLARE_TYPE(PointPublisherDisplay, InteractivePoseDisplayBase);
-
-struct PosePublisherDisplay : InteractivePoseDisplayBase {
-  Publisher<geometry_msgs::PoseStamped> _publisher;
-  PROPERTY(std::string, topic);
-  PosePublisherDisplay();
-  virtual void publish(const std::string &frame,
-                       const Eigen::Isometry3d &pose) override;
-};
-DECLARE_TYPE(PosePublisherDisplay, InteractivePoseDisplayBase);
-
 struct TransformPublisherDisplay : InteractivePoseDisplayBase {
   Publisher<tf2_msgs::TFMessage> _publisher{"/tf"};
   PROPERTY(std::string, childFrame);
@@ -179,4 +162,15 @@ struct TransformPublisherDisplay : InteractivePoseDisplayBase {
   virtual void publish(const std::string &frame,
                        const Eigen::Isometry3d &pose) override;
 };
-DECLARE_TYPE(TransformPublisherDisplay, InteractivePoseDisplayBase);
+DECLARE_TYPE_C(TransformPublisherDisplay, InteractivePoseDisplayBase,
+               Transform);
+
+static std::array<double, 16> poseToArray(const Eigen::Isometry3d &pose) {
+  std::array<double, 16> ret;
+  for (size_t row = 0; row < pose.matrix().rows(); row++) {
+    for (size_t col = 0; col < pose.matrix().cols(); col++) {
+      ret.at(row * pose.matrix().cols() + col) = pose.matrix()(row, col);
+    }
+  }
+  return ret;
+}

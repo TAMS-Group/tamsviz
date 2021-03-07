@@ -395,8 +395,6 @@ InteractivePoseDisplayBase::~InteractivePoseDisplayBase() {
 void InteractivePoseDisplayBase::publish() {
   if (auto m = _markers->marker("")) {
     auto pose = m->pose();
-    // Eigen::Vector3d pos = pose.translation();
-    // Eigen::Quaterniond rot = pose.linear();
     pose.linear().col(0).normalize();
     pose.linear().col(1).normalize();
     pose.linear().col(2).normalize();
@@ -480,6 +478,21 @@ InteractiveMarkerDisplayBase::makePoseMarker() {
     visualization_msgs::InteractiveMarkerControl control;
     control.orientation.w = 1;
     control.orientation.x = 0;
+    control.orientation.y = 0;
+    control.orientation.z = 1;
+    control.name = "rotate_y";
+    control.interaction_mode =
+        visualization_msgs::InteractiveMarkerControl::ROTATE_AXIS;
+    marker.controls.push_back(control);
+    control.name = "move_y";
+    control.interaction_mode =
+        visualization_msgs::InteractiveMarkerControl::MOVE_AXIS;
+    marker.controls.push_back(control);
+  }
+  {
+    visualization_msgs::InteractiveMarkerControl control;
+    control.orientation.w = 1;
+    control.orientation.x = 0;
     control.orientation.y = 1;
     control.orientation.z = 0;
     control.name = "rotate_z";
@@ -489,6 +502,42 @@ InteractiveMarkerDisplayBase::makePoseMarker() {
     control.name = "move_z";
     control.interaction_mode =
         visualization_msgs::InteractiveMarkerControl::MOVE_AXIS;
+    marker.controls.push_back(control);
+  }
+  return marker;
+}
+
+visualization_msgs::InteractiveMarker
+InteractiveMarkerDisplayBase::makeRotationMarker() {
+  visualization_msgs::InteractiveMarker marker;
+  {
+    visualization_msgs::InteractiveMarkerControl control;
+    control.interaction_mode =
+        visualization_msgs::InteractiveMarkerControl::ROTATE_3D;
+    control.always_visible = true;
+    {
+      visualization_msgs::Marker marker;
+      marker.type = visualization_msgs::Marker::CUBE;
+      marker.scale.x = 0.45;
+      marker.scale.y = 0.45;
+      marker.scale.z = 0.45;
+      marker.color.r = 0.5;
+      marker.color.g = 0.5;
+      marker.color.b = 0.5;
+      marker.color.a = 1.0;
+      control.markers.push_back(marker);
+    }
+    marker.controls.push_back(control);
+  }
+  {
+    visualization_msgs::InteractiveMarkerControl control;
+    control.orientation.w = 1;
+    control.orientation.x = 1;
+    control.orientation.y = 0;
+    control.orientation.z = 0;
+    control.name = "rotate_x";
+    control.interaction_mode =
+        visualization_msgs::InteractiveMarkerControl::ROTATE_AXIS;
     marker.controls.push_back(control);
   }
   {
@@ -501,9 +550,16 @@ InteractiveMarkerDisplayBase::makePoseMarker() {
     control.interaction_mode =
         visualization_msgs::InteractiveMarkerControl::ROTATE_AXIS;
     marker.controls.push_back(control);
-    control.name = "move_y";
+  }
+  {
+    visualization_msgs::InteractiveMarkerControl control;
+    control.orientation.w = 1;
+    control.orientation.x = 0;
+    control.orientation.y = 1;
+    control.orientation.z = 0;
+    control.name = "rotate_z";
     control.interaction_mode =
-        visualization_msgs::InteractiveMarkerControl::MOVE_AXIS;
+        visualization_msgs::InteractiveMarkerControl::ROTATE_AXIS;
     marker.controls.push_back(control);
   }
   return marker;
@@ -546,9 +602,9 @@ InteractiveMarkerDisplayBase::makePointMarker() {
     visualization_msgs::InteractiveMarkerControl control;
     control.orientation.w = 1;
     control.orientation.x = 0;
-    control.orientation.y = 1;
-    control.orientation.z = 0;
-    control.name = "move_z";
+    control.orientation.y = 0;
+    control.orientation.z = 1;
+    control.name = "move_y";
     control.interaction_mode =
         visualization_msgs::InteractiveMarkerControl::MOVE_AXIS;
     marker.controls.push_back(control);
@@ -557,58 +613,14 @@ InteractiveMarkerDisplayBase::makePointMarker() {
     visualization_msgs::InteractiveMarkerControl control;
     control.orientation.w = 1;
     control.orientation.x = 0;
-    control.orientation.y = 0;
-    control.orientation.z = 1;
-    control.name = "move_y";
+    control.orientation.y = 1;
+    control.orientation.z = 0;
+    control.name = "move_z";
     control.interaction_mode =
         visualization_msgs::InteractiveMarkerControl::MOVE_AXIS;
     marker.controls.push_back(control);
   }
   return marker;
-}
-
-PointPublisherDisplay::PointPublisherDisplay() {
-  visualization_msgs::InteractiveMarkerInit init;
-  init.markers.push_back(makePointMarker());
-  _markers->init(init);
-}
-
-static std::array<double, 16> poseArray(const Eigen::Isometry3d &pose) {
-  std::array<double, 16> ret;
-  for (size_t row = 0; row < pose.matrix().rows(); row++) {
-    for (size_t col = 0; col < pose.matrix().cols(); col++) {
-      ret.at(row * pose.matrix().cols() + col) = pose.matrix()(row, col);
-    }
-  }
-  return ret;
-}
-
-void PointPublisherDisplay::publish(const std::string &frame,
-                                    const Eigen::Isometry3d &pose) {
-  if (_publish_watcher.changed(topic(), frame, poseArray(pose),
-                               publisherClock())) {
-    geometry_msgs::PointStamped m;
-    tf::pointEigenToMsg(pose.translation(), m.point);
-    m.header.frame_id = frame;
-    _publisher.publish(topic(), m);
-  }
-}
-
-PosePublisherDisplay::PosePublisherDisplay() {
-  visualization_msgs::InteractiveMarkerInit init;
-  init.markers.push_back(makePoseMarker());
-  _markers->init(init);
-}
-
-void PosePublisherDisplay::publish(const std::string &frame,
-                                   const Eigen::Isometry3d &pose) {
-  if (_publish_watcher.changed(topic(), frame, poseArray(pose),
-                               publisherClock())) {
-    geometry_msgs::PoseStamped m;
-    tf::poseEigenToMsg(pose, m.pose);
-    m.header.frame_id = frame;
-    _publisher.publish(topic(), m);
-  }
 }
 
 TransformPublisherDisplay::TransformPublisherDisplay() {
@@ -619,7 +631,7 @@ TransformPublisherDisplay::TransformPublisherDisplay() {
 
 void TransformPublisherDisplay::publish(const std::string &frame,
                                         const Eigen::Isometry3d &pose) {
-  if (_publish_watcher.changed(childFrame(), frame, poseArray(pose),
+  if (_publish_watcher.changed(childFrame(), frame, poseToArray(pose),
                                publisherClock())) {
     tf2_msgs::TFMessage m;
     m.transforms.emplace_back();

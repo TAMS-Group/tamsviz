@@ -73,6 +73,8 @@ struct RenderOptions {
   GLuint primitive_type = GL_TRIANGLES;
   bool transparent = false;
   bool double_sided = false;
+  // bool colors_linear = true;
+  float point_size = 1;
 };
 
 struct RenderCommand {

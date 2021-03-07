@@ -102,7 +102,7 @@ DisplayTreeWidget::DisplayTreeWidget() : QDockWidget("Display Tree") {
     button->setIcon(TEXT_ICON("+"));
     bar->addWidget(button);
     QMenu *menu = new QMenu(button);
-    std::map<QString, std::function<void()>> actions;
+    std::map<QString, std::map<QString, std::function<void()>>> actions;
     for (auto &type : Type::find<Display>()->list()) {
       if (type->typeId() == typeid(WorldDisplay)) {
         continue;
@@ -110,9 +110,18 @@ DisplayTreeWidget::DisplayTreeWidget() : QDockWidget("Display Tree") {
       if (!type->constructable()) {
         continue;
       }
-      // QString name = QString(type->name().c_str()).replace("Display", "");
       QString name = QString(type->name().c_str());
-      actions[name] = [type]() {
+      {
+        QString str = "Display";
+        int index = name.lastIndexOf(str);
+        if (index >= 0) {
+          name = name.remove(index, str.size());
+        }
+      }
+      if (Type::tryFind(name.toStdString() + "PublisherDisplay")) {
+        name += "Display";
+      }
+      actions[QString(type->category().c_str())][name] = [type]() {
         ActionScope ws(std::string("Create ") + type->name());
         auto new_display = type->instantiate<Display>();
         static size_t counter = 1;
@@ -123,9 +132,17 @@ DisplayTreeWidget::DisplayTreeWidget() : QDockWidget("Display Tree") {
         ws->modified();
       };
     }
-    for (auto p : actions) {
-      connect(menu->addAction(p.first), &QAction::triggered, this,
-              [p](bool checked) { p.second(); });
+    actions["ZZZZZZ"] = actions[""];
+    actions.erase("");
+    for (auto category : actions) {
+      auto *cmenu = menu;
+      if (category.first != "ZZZZZZ") {
+        cmenu = menu->addMenu(category.first);
+      }
+      for (auto p : category.second) {
+        connect(cmenu->addAction(p.first), &QAction::triggered, this,
+                [p](bool checked) { p.second(); });
+      }
     }
     button->setMenu(menu);
   }

@@ -701,14 +701,30 @@ int main(int argc, char **argv) {
       QSurfaceFormat::setDefaultFormat(format);
     }
 
-    QCoreApplication::setOrganizationName("TAMS");
-    QCoreApplication::setApplicationName(QString(ROS_PACKAGE_NAME).toUpper());
-
-    QApplication app(argc, argv);
-
     ros::init(argc, argv, ROS_PACKAGE_NAME,
               ros::init_options::AnonymousName |
                   ros::init_options::NoSigintHandler);
+
+    QApplication app(argc, argv);
+    app.setOrganizationName("TAMS");
+    app.setApplicationName(QString(ROS_PACKAGE_NAME).toUpper());
+
+    QCommandLineParser parser;
+    parser.setApplicationDescription(
+        "TAMSVIZ - Visualization and annotation tool for ROS");
+    parser.addHelpOption();
+
+    parser.addPositionalArgument("files", "Bag and visualization files to open",
+                                 "[files...]");
+
+    QCommandLineOption opt_profiler("profiler", "Run with profiler enabled");
+    parser.addOption(opt_profiler);
+
+    QCommandLineOption opt_maximize("maximize", "Maximize window");
+    parser.addOption(opt_maximize);
+
+    parser.process(app);
+
     ros::NodeHandle node("~");
     signal(SIGINT, [](int sig) {
       LOG_DEBUG("shutting down");
@@ -723,13 +739,26 @@ int main(int argc, char **argv) {
     LOG_DEBUG("package name " << ROS_PACKAGE_NAME);
     LOG_DEBUG("package path " << ros::package::getPath(ROS_PACKAGE_NAME));
 
-    // ProfilerThread profiler_thread;
+    std::unique_ptr<ProfilerThread> profiler_thread;
+    if (parser.isSet(opt_profiler)) {
+      profiler_thread.reset(new ProfilerThread());
+    }
 
     {
       {
         RenderThread::instance();
         MainWindow main_window;
-        qDebug() << "styles" << QStyleFactory::keys();
+        // qDebug() << "styles" << QStyleFactory::keys();
+        if (parser.isSet(opt_maximize)) {
+          main_window.showMaximized();
+        }
+        for (size_t i = 0; i < parser.positionalArguments().size(); i++) {
+          QString file = parser.positionalArguments()[i];
+          if (!file.isEmpty()) {
+            qDebug() << "opening file" << file;
+            main_window.openAny(file);
+          }
+        }
         {
           ros::AsyncSpinner spinner(0);
           spinner.start();

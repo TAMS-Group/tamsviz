@@ -188,7 +188,7 @@ struct PlaneDisplay : ShapeDisplay {
     ShapeDisplay::renderSync(context);
   }
 };
-DECLARE_TYPE(PlaneDisplay, ShapeDisplay);
+DECLARE_TYPE_C(PlaneDisplay, ShapeDisplay, Primitive);
 
 struct DiskDisplay : ShapeDisplay {
   DiskDisplay() {}
@@ -204,7 +204,7 @@ struct DiskDisplay : ShapeDisplay {
     ShapeDisplay::renderSync(context);
   }
 };
-DECLARE_TYPE(DiskDisplay, ShapeDisplay);
+DECLARE_TYPE_C(DiskDisplay, ShapeDisplay, Primitive);
 
 struct BoxDisplay : ShapeDisplay {
   BoxDisplay()
@@ -216,7 +216,7 @@ struct BoxDisplay : ShapeDisplay {
     ShapeDisplay::renderSync(context);
   }
 };
-DECLARE_TYPE(BoxDisplay, ShapeDisplay);
+DECLARE_TYPE_C(BoxDisplay, ShapeDisplay, Primitive);
 
 struct SphereDisplay : ShapeDisplay {
   SphereDisplay() {}
@@ -232,7 +232,7 @@ struct SphereDisplay : ShapeDisplay {
     ShapeDisplay::renderSync(context);
   }
 };
-DECLARE_TYPE(SphereDisplay, ShapeDisplay);
+DECLARE_TYPE_C(SphereDisplay, ShapeDisplay, Primitive);
 
 struct CylinderDisplay : ShapeDisplay {
   CylinderDisplay() {}
@@ -249,7 +249,7 @@ struct CylinderDisplay : ShapeDisplay {
     ShapeDisplay::renderSync(context);
   }
 };
-DECLARE_TYPE(CylinderDisplay, ShapeDisplay);
+DECLARE_TYPE_C(CylinderDisplay, ShapeDisplay, Primitive);
 
 struct ConeDisplay : ShapeDisplay {
   ConeDisplay() {}
@@ -266,4 +266,4 @@ struct ConeDisplay : ShapeDisplay {
     ShapeDisplay::renderSync(context);
   }
 };
-DECLARE_TYPE(ConeDisplay, ShapeDisplay);
+DECLARE_TYPE_C(ConeDisplay, ShapeDisplay, Primitive);

@@ -25,6 +25,8 @@ STRUCT_PROPERTY(y);
 STRUCT_PROPERTY(z);
 STRUCT_END();
 
+float srgbGamma2Linear(float srgb);
+
 struct Color4 {
   DECLARE_STRUCT_PROPERTY(double, r, 0.8);
   DECLARE_STRUCT_PROPERTY(double, g, 0.8);

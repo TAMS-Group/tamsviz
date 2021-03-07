@@ -3,6 +3,16 @@
 
 #version 150
 
+layout(std140) uniform material_block {
+    vec4 color;
+    float roughness;
+    float metallic;
+    int color_texture;
+    int normal_texture;
+    uint id;
+    int flags;
+} material;
+
 layout(std140) uniform camera_block {
     mat4 view_matrix;
     mat4 projection_matrix;
@@ -28,6 +38,14 @@ out vec3 x_bitangent;
 out vec4 x_color;
 out vec4 x_extra;
 
+float srgb2linear(float srgb) {
+  if (srgb < 0.04045) {
+    return srgb * (25.0 / 232.0);
+  } else {
+    return pow((200.0 * srgb + 11.0) * (1.0f / 211.0), 12.0 / 5.0);
+  }
+}
+
 void main() {
     mat4 world_matrix = transpose(mat4(pose_x, pose_y, pose_z, vec4(0.0, 0.0, 0.0, 1.0)));
     mat3 normal_matrix = mat3(world_matrix);
@@ -52,6 +70,12 @@ void main() {
     x_position = world_position;
     x_view_position = -vec3(camera.view_matrix[3]) * mat3(camera.view_matrix);
     x_texcoord = texcoord;
-    x_color = color;
     x_extra = extra;
+    if((material.flags & 4) != 0) { // sbgr colors
+        x_color.b = srgb2linear(color.r);
+        x_color.g = srgb2linear(color.g);
+        x_color.r = srgb2linear(color.b);
+    } else {
+        x_color = color;
+    }
 }

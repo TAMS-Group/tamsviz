@@ -4,6 +4,7 @@
 #include "mesh.h"
 
 #include "../core/log.h"
+#include "../core/profiler.h"
 #include "shader.h"
 
 #include <map>
@@ -52,14 +53,9 @@ void MeshData::_transform(const Eigen::Affine3f &transform) {
 
 template <class T>
 static void appendMeshComponent(const MeshData &mesh, std::vector<T> &a,
-                                const std::vector<T> &b) {
+                                const std::vector<T> &b, const T &def) {
   if (!b.empty()) {
     if (a.size() < mesh.positions.size()) {
-      T def;
-      def.setZero();
-      if (def.size() >= 4) {
-        def[3] = 1.0;
-      }
       a.resize(mesh.positions.size(), def);
     }
     a.insert(a.end(), b.begin(), b.end());
@@ -70,13 +66,17 @@ MeshData &MeshData::append(const MeshData &other) {
   for (auto i : other.indices) {
     indices.push_back(i + positions.size());
   }
-  appendMeshComponent(*this, normals, other.normals);
-  appendMeshComponent(*this, texcoords, other.texcoords);
-  appendMeshComponent(*this, tangents, other.tangents);
-  appendMeshComponent(*this, bitangents, other.bitangents);
-  appendMeshComponent(*this, colors, other.colors);
-  appendMeshComponent(*this, extras, other.extras);
-  appendMeshComponent(*this, positions, other.positions);
+  appendMeshComponent(*this, normals, other.normals, Eigen::Vector3f(0, 0, 0));
+  appendMeshComponent(*this, texcoords, other.texcoords, Eigen::Vector2f(0, 0));
+  appendMeshComponent(*this, tangents, other.tangents,
+                      Eigen::Vector3f(0, 0, 0));
+  appendMeshComponent(*this, bitangents, other.bitangents,
+                      Eigen::Vector3f(0, 0, 0));
+  appendMeshComponent(*this, colors, other.colors, Eigen::Vector4f(0, 0, 0, 1));
+  appendMeshComponent(*this, colors8, other.colors8, uint32_t(0xff000000));
+  appendMeshComponent(*this, extras, other.extras, Eigen::Vector4f(0, 0, 0, 1));
+  appendMeshComponent(*this, positions, other.positions,
+                      Eigen::Vector3f(0, 0, 0));
   return *this;
 }
 
@@ -130,16 +130,26 @@ Mesh::Mesh(const std::function<MeshData()> &loader)
     : _loader([loader](MeshData &d) { d = loader(); }) {}
 
 void Mesh::init() {
-  _transparent = false;
-  for (auto &c : _data.colors) {
-    if (c.w() < 1.0) {
-      _transparent = true;
+  {
+    PROFILER("check mesh transparency");
+    _transparent = false;
+    if (!_data.colors.empty()) {
+      auto *alpha_begin = &(_data.colors[0].w());
+      auto *alpha_end = alpha_begin + _data.colors.size() * 4;
+      for (auto *alpha_pointer = alpha_begin; alpha_pointer < alpha_end;
+           alpha_pointer += 4) {
+        if ((*alpha_pointer) < 1.0) {
+          _transparent = true;
+          break;
+        }
+      }
     }
   }
 }
 
 void Mesh::createBuffer(GLenum type, GLuint index, const void *data,
-                        size_t size, size_t stride) {
+                        size_t size, size_t stride, size_t element_size,
+                        GLenum datatype, bool normalized) {
   GLuint vbo = 0;
   V_GL(glBindVertexArray(_vao));
   V_GL(glGenBuffers(1, &vbo));
@@ -147,7 +157,8 @@ void Mesh::createBuffer(GLenum type, GLuint index, const void *data,
   V_GL(glBufferData(type, size, data, GL_STATIC_DRAW));
   if (type == GL_ARRAY_BUFFER) {
     V_GL(glEnableVertexAttribArray(index));
-    V_GL(glVertexAttribPointer(index, stride / 4, GL_FLOAT, false, stride, 0));
+    V_GL(glVertexAttribPointer(index, stride / element_size, datatype,
+                               normalized, stride, 0));
   }
   V_GL(glBindVertexArray(0));
   V_GL(glDeleteBuffers(1, &vbo));
@@ -156,11 +167,13 @@ void Mesh::createBuffer(GLenum type, GLuint index, const void *data,
 void Mesh::create() {
   if (!_vao) {
     if (_loader) {
+      PROFILER("mesh callback");
       _data = MeshData();
       _loader(_data);
       _loader = nullptr;
       init();
     }
+    PROFILER("create mesh buffers");
     V_GL(glGenVertexArrays(1, &_vao));
     if (!_data.positions.empty()) {
       createBuffer(GL_ARRAY_BUFFER, (GLuint)VertexAttributes::position,
@@ -202,6 +215,11 @@ void Mesh::create() {
                      _data.colors.data(),
                      _data.colors.size() * sizeof(_data.colors[0]),
                      sizeof(_data.colors[0]));
+      } else if (!_data.colors8.empty()) {
+        createBuffer(GL_ARRAY_BUFFER, (GLuint)VertexAttributes::color,
+                     _data.colors8.data(),
+                     _data.colors8.size() * sizeof(_data.colors8[0]),
+                     sizeof(_data.colors8[0]), 1, GL_UNSIGNED_BYTE, true);
       } else {
         V_GL(glVertexAttrib4f((GLuint)VertexAttributes::color, 1, 1, 1, 1));
       }
@@ -217,7 +235,10 @@ void Mesh::create() {
 void Mesh::destroy() {
   if (_vao) {
     GLuint vao = _vao;
-    cleanup([vao]() { V_GL(glDeleteVertexArrays(1, &vao)); });
+    cleanup([vao]() {
+      PROFILER("mesh cleanup");
+      V_GL(glDeleteVertexArrays(1, &vao));
+    });
     _vao = 0;
   }
 }

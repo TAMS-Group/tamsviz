@@ -15,7 +15,7 @@ Display::Display() {}
 
 TrackBase::TrackBase() {}
 
-static float srgbGamma2Linear(float srgb) {
+float srgbGamma2Linear(float srgb) {
   if (srgb < 0.04045f) {
     return srgb * (25.0f / 232.0f);
   } else {

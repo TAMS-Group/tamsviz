@@ -1,0 +1,5 @@
+<?xml version="1.0"?>
+<launch>
+    <arg name="file" default=""/>
+    <node pkg="tamsviz" type="tamsviz" name="$(anon tamsviz)" output="screen" args="$(arg file)"/>
+</launch>

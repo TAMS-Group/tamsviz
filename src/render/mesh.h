@@ -19,6 +19,7 @@ public:
   std::vector<Eigen::Vector3f> tangents;
   std::vector<Eigen::Vector3f> bitangents;
   std::vector<Eigen::Vector4f> colors;
+  std::vector<uint32_t> colors8;
   std::vector<Eigen::Vector4f> extras;
   std::vector<uint32_t> indices;
   MeshData &computeNormals();
@@ -52,7 +53,8 @@ class Mesh : public ResourceBase {
   bool _transparent = false;
   std::function<void(MeshData &)> _loader;
   void createBuffer(GLenum type, GLuint index, const void *data, size_t size,
-                    size_t stride);
+                    size_t stride, size_t element_size = 4,
+                    GLenum datatype = GL_FLOAT, bool normalized = false);
   void create();
   void destroy();
   void init();

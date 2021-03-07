@@ -91,7 +91,7 @@ void Topic::_subscribe(const std::shared_ptr<Topic> &topic) {
   }
   topic->connected();
   topic->_ros_subscriber = _ros_node.subscribe<Message>(
-      topic->_topic_name, 3,
+      topic->_topic_name, 5,
       boost::function<void(const Message &)>([topic_weak](const Message &msg) {
         if (auto topic = topic_weak.lock()) {
           {

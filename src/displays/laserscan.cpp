@@ -18,11 +18,12 @@ void LaserScanDisplay::renderSync(const RenderSyncContext &context) {
   if (_watcher.changed(message, radius)) {
     // LOG_DEBUG("laserscan changed");
     if (message) {
+      auto projector = _projector;
       _mesh_renderer = node()->create<MeshRenderer>(
-          std::make_shared<Mesh>([message, radius, this]() {
+          std::make_shared<Mesh>([message, radius, projector]() {
 
             sensor_msgs::PointCloud cloud;
-            _projector.projectLaser(*message, cloud);
+            projector->projectLaser(*message, cloud);
 
             MeshData mesh;
             for (auto &point : cloud.points) {

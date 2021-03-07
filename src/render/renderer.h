@@ -20,7 +20,7 @@ class Renderer {
   Renderer(const Renderer &) = delete;
   Renderer &operator=(const Renderer &) = delete;
   void render(const RenderList &render_list,
-              const std::vector<RenderCommand> &commands);
+              const std::vector<RenderCommand> &commands, bool picking = false);
   std::shared_ptr<Mesh> screen_quad;
   void prepare(const CameraBlock &camera_block, const RenderList &render_list);
 

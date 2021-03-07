@@ -2,8 +2,10 @@
 
 ### Features
 
-- Visualizing robots and robot trajectories
-- Annotating rosbags, annotating images
+- Visualize robots and robot trajectories
+- Visualize rosbags
+- Annotate rosbags
+- Annotate images
 - Undo/redo
 - Visualization markers, interactive markers
 - Creating interactive markers without writing code
@@ -20,6 +22,7 @@
 - High-quality text rendering
 - Anti-aliasing
 - ROS integration
+- Mouse picking
 
 ### Screenshots
 

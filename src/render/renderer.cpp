@@ -49,7 +49,8 @@ Renderer::Renderer()
 }
 
 void Renderer::render(const RenderList &render_list,
-                      const std::vector<RenderCommand> &commands) {
+                      const std::vector<RenderCommand> &commands,
+                      bool picking) {
 
   int previous_double_sided = -1;
 
@@ -83,6 +84,15 @@ void Renderer::render(const RenderList &render_list,
 
     V_GL(glBindVertexArray(command.vertex_array_object));
 
+    if (command.options.primitive_type == GL_POINTS &&
+        command.options.point_size != 1) {
+      V_GL(glPointSize(std::max(1.0f, command.options.point_size)));
+    }
+
+    // if (!command.options.colors_linear && !picking) {
+    //  V_GL(glDisable(GL_FRAMEBUFFER_SRGB));
+    //}
+
     for (size_t instance_index = command.first_instance;
          instance_index < command.first_instance + command.instance_count;
          instance_index++) {
@@ -102,6 +112,15 @@ void Renderer::render(const RenderList &render_list,
         V_GL(glDrawArrays(command.options.primitive_type, 0,
                           command.element_count));
       }
+    }
+
+    // if (!command.options.colors_linear && !picking) {
+    //  V_GL(glEnable(GL_FRAMEBUFFER_SRGB));
+    //}
+
+    if (command.options.primitive_type == GL_POINTS &&
+        command.options.point_size != 1) {
+      V_GL(glPointSize(1));
     }
   }
 }
@@ -176,7 +195,7 @@ Renderer::PickResult Renderer::pick(RenderTarget &render_target,
   V_GL(glClearColor(0, 0, 0, 0));
   V_GL(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
 
-  render(render_list, render_list._commands);
+  render(render_list, render_list._commands, true);
 
   PickResult ret;
 

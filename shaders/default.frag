@@ -4,14 +4,13 @@
 #version 150
 
 layout(std140) uniform material_block {
-  vec4 color;
-  float roughness;
-  float metallic;
-  int color_texture;
-  int normal_texture;
-  //int shading_method;
-  uint id;
-  int flags;
+    vec4 color;
+    float roughness;
+    float metallic;
+    int color_texture;
+    int normal_texture;
+    uint id;
+    int flags;
 } material;
 
 struct Light {
@@ -29,6 +28,8 @@ layout(std140) uniform light_block {
 uniform sampler2D color_sampler;
 uniform sampler2D normal_sampler;
 
+// uniform sampler2DArrayShadow shadow_2d_sampler;
+
 in vec3 x_normal;
 in vec4 x_position;
 in vec3 x_view_position;
@@ -41,6 +42,14 @@ in vec4 x_extra;
 out vec4 out_color;
 out vec4 out_blend;
 out uint out_id;
+
+float srgb2linear(float srgb) {
+  if (srgb < 0.04045) {
+    return srgb * (25.0 / 232.0);
+  } else {
+    return pow((200.0 * srgb + 11.0) * (1.0f / 211.0), 12.0 / 5.0);
+  }
+}
 
 void main() {
     
@@ -62,15 +71,13 @@ void main() {
     vec3 albedo = material.color.xyz * x_color.xyz;
     float alpha = material.color.w * x_color.w;
     
-    vec3 normal;
-    if(material.normal_texture > 0) {
-        normal = texture2D(normal_sampler, x_texcoord).xyz;
-        normal.xy = normal.xy * 2.0 - 1.0;
-        normal = x_tangent * normal.x + x_bitangent * -normal.y + x_normal * normal.z;
-        normal = normalize(normal);
-    } else {
-        normal = normalize(x_normal);
+    /*
+    if((material.flags & 4) != 0) {
+        albedo.b = srgb2linear(x_color.r);
+        albedo.g = srgb2linear(x_color.g);
+        albedo.r = srgb2linear(x_color.b);
     }
+    */
     
     out_id = material.id;
     
@@ -85,12 +92,21 @@ void main() {
             alpha *= t.w;
             albedo *= t.xyz;
         }
-        //albedo = vec3(t.xxx);
     }
     
     if(((material.flags & 2) != 0) || (x_extra.z > 0.1)) {
         out_color = vec4(albedo, alpha);
         return;
+    }
+    
+    vec3 normal;
+    if(material.normal_texture > 0) {
+        normal = texture2D(normal_sampler, x_texcoord).xyz;
+        normal.xy = normal.xy * 2.0 - 1.0;
+        normal = x_tangent * normal.x + x_bitangent * -normal.y + x_normal * normal.z;
+        normal = normalize(normal);
+    } else {
+        normal = normalize(x_normal);
     }
     
     if(dot(normal, view_direction) < 0.0) {

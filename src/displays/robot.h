@@ -68,7 +68,7 @@ public:
   PROPERTY(RobotModelImportOptions, importOptions);
   PROPERTY(bool, doubleSided, false);
 };
-DECLARE_TYPE(RobotDisplayBase, MeshDisplayBase);
+DECLARE_TYPE_C(RobotDisplayBase, MeshDisplayBase, Robot);
 
 class RobotStateTimeSeriesListener;
 
@@ -83,7 +83,7 @@ protected:
 public:
   virtual void renderSync(const RenderSyncContext &context) override;
 };
-DECLARE_TYPE(RobotStateDisplayBase, RobotDisplayBase);
+DECLARE_TYPE_C(RobotStateDisplayBase, RobotDisplayBase, Robot);
 
 class RobotStateDisplay : public RobotStateDisplayBase {
 
@@ -94,7 +94,7 @@ public:
     RobotStateDisplayBase::refresh();
   }
 };
-DECLARE_TYPE(RobotStateDisplay, RobotStateDisplayBase);
+DECLARE_TYPE_C(RobotStateDisplay, RobotStateDisplayBase, Robot);
 
 /*
 class DisplayRobotStateDisplay : public RobotStateDisplayBase {
@@ -120,7 +120,7 @@ public:
   virtual void renderSync(const RenderSyncContext &context) override;
   virtual void renderAsync(const RenderAsyncContext &context) override;
 };
-DECLARE_TYPE(DisplayRobotStateDisplay, RobotDisplayBase);
+DECLARE_TYPE_C(DisplayRobotStateDisplay, RobotDisplayBase, Robot);
 
 /*
 class RobotTrajectoryDisplay : public GenericFrameDisplay<RobotDisplayBase> {
@@ -165,7 +165,7 @@ public:
   RobotTrajectoryDisplay();
   ~RobotTrajectoryDisplay();
 };
-DECLARE_TYPE(RobotTrajectoryDisplay, RobotDisplayBase);
+DECLARE_TYPE_C(RobotTrajectoryDisplay, RobotDisplayBase, Robot);
 
 class Transformer;
 class RobotModelDisplay : public RobotDisplayBase {
@@ -175,4 +175,4 @@ public:
   virtual void renderSync(const RenderSyncContext &context) override;
   virtual void renderAsync(const RenderAsyncContext &context) override;
 };
-DECLARE_TYPE(RobotModelDisplay, RobotDisplayBase);
+DECLARE_TYPE_C(RobotModelDisplay, RobotDisplayBase, Robot);

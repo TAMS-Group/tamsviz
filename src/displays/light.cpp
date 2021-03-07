@@ -16,7 +16,7 @@ struct AmbientLight : LightDisplayBase {
     }
   }
 };
-DECLARE_TYPE(AmbientLight, LightDisplayBase);
+DECLARE_TYPE_C(AmbientLight, LightDisplayBase, Light);
 
 struct DirectionalLight : LightDisplayBase {
   virtual void renderSync(const RenderSyncContext &context) override {
@@ -37,7 +37,7 @@ struct DirectionalLight : LightDisplayBase {
     }
   }
 };
-DECLARE_TYPE(DirectionalLight, LightDisplayBase);
+DECLARE_TYPE_C(DirectionalLight, LightDisplayBase, Light);
 
 struct PointLight : LightDisplayBase {
   virtual void renderSync(const RenderSyncContext &context) override {
@@ -58,7 +58,7 @@ struct PointLight : LightDisplayBase {
     }
   }
 };
-DECLARE_TYPE(PointLight, LightDisplayBase);
+DECLARE_TYPE_C(PointLight, LightDisplayBase, Light);
 
 struct SpotLight : LightDisplayBase {
   PROPERTY(double, softness, 0.5, min = 0.0, max = 1.0);
@@ -87,4 +87,4 @@ struct SpotLight : LightDisplayBase {
     }
   }
 };
-DECLARE_TYPE(SpotLight, LightDisplayBase);
+DECLARE_TYPE_C(SpotLight, LightDisplayBase, Light);

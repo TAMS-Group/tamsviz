@@ -102,7 +102,7 @@ public:
            "visualization_marker");
   MarkerDisplay();
 };
-DECLARE_TYPE(MarkerDisplay, MarkerDisplayBase);
+DECLARE_TYPE_C(MarkerDisplay, MarkerDisplayBase, Marker);
 
 class MarkerArrayDisplay : public MarkerDisplayBase {
 
@@ -111,4 +111,4 @@ public:
            "visualization_marker_array");
   MarkerArrayDisplay();
 };
-DECLARE_TYPE(MarkerArrayDisplay, MarkerDisplayBase);
+DECLARE_TYPE_C(MarkerArrayDisplay, MarkerDisplayBase, Marker);

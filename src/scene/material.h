@@ -54,6 +54,7 @@ public:
   void renderSync(const RenderSyncContext &context);
   void renderAsync(const RenderAsyncContext &context);
   const MaterialBlock &block() const { return _block; }
+  MaterialBlock &block() { return _block; }
   bool pick(uint32_t id) const { return _block.id == id; }
   uint32_t id() const { return _block.id; }
 };
