@@ -682,7 +682,7 @@ void RobotTrajectoryDisplay::renderAsync(const RenderAsyncContext &context) {
                   }
                   if (auto *joint_model =
                           robot_state->moveit_state.getJointModel(joint_name)) {
-                    Eigen::Affine3d pose = Eigen::Affine3d::Identity();
+                    Eigen::Isometry3d pose = Eigen::Isometry3d::Identity();
                     tf::transformMsgToEigen(transform, pose);
                     robot_state->moveit_state.setJointPositions(joint_model,
                                                                 pose);
