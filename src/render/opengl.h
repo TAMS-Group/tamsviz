@@ -1,5 +1,5 @@
 // TAMSVIZ
-// (c) 2020 Philipp Ruppel
+// (c) 2020-2021 Philipp Ruppel
 
 #pragma once
 
@@ -9,11 +9,10 @@
 
 #include <stdexcept>
 
+void tamsviz_gl_begin(const char *file, int line, const char *cmd);
+void tamsviz_gl_end(const char *file, int line, const char *cmd);
+
 #define V_GL(x)                                                                \
-  while (glGetError()) {                                                       \
-  }                                                                            \
+  tamsviz_gl_begin(__FILE__, __LINE__, #x);                                    \
   x;                                                                           \
-  while (int e = glGetError()) {                                               \
-    throw std::runtime_error(std::string(#x " failed with error #") +          \
-                             std::to_string(e));                               \
-  }
+  tamsviz_gl_end(__FILE__, __LINE__, #x);

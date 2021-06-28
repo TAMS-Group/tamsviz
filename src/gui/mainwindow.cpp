@@ -1,5 +1,5 @@
 // TAMSVIZ
-// (c) 2020 Philipp Ruppel
+// (c) 2020-2021 Philipp Ruppel
 
 #include "mainwindow.h"
 
@@ -697,7 +697,8 @@ int main(int argc, char **argv) {
       QSurfaceFormat format;
       format.setVersion(3, 2);
       format.setProfile(QSurfaceFormat::CompatibilityProfile);
-      format.setSamples(16);
+      // format.setSamples(16);
+      format.setSamples(0);
       QSurfaceFormat::setDefaultFormat(format);
     }
 

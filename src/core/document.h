@@ -1,5 +1,5 @@
 // TAMSVIZ
-// (c) 2020 Philipp Ruppel
+// (c) 2020-2021 Philipp Ruppel
 
 #pragma once
 
@@ -134,7 +134,9 @@ protected:
   virtual ~Display() {}
 
 public:
-  PROPERTY(std::string, name, "Display", hidden = true);
+  // PROPERTY(std::string, name, "Display", hidden = true);
+  PROPERTY(std::string, name,
+           "Display"); // more intuitive e.g. for plot objects
   template <class F>
   auto recurse(const F &f)
       -> decltype(f(std::shared_ptr<Display>(), std::shared_ptr<Display>())) {

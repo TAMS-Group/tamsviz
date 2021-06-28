@@ -1,5 +1,5 @@
 // TAMSVIZ
-// (c) 2020 Philipp Ruppel
+// (c) 2020-2021 Philipp Ruppel
 
 #pragma once
 
@@ -71,6 +71,12 @@ AUTO_STRUCT_FIELD(double, right, 5.0, step_scale = 10, min = 0);
 AUTO_STRUCT_FIELD(double, top, 10.0, step_scale = 10, min = 0);
 AUTO_STRUCT_END();
 
+AUTO_STRUCT_BEGIN(PlotRange);
+AUTO_STRUCT_FIELD(bool, automatic, true);
+AUTO_STRUCT_FIELD(double, min, 0);
+AUTO_STRUCT_FIELD(double, max, 1);
+AUTO_STRUCT_END();
+
 AUTO_STRUCT_BEGIN(PlotStyle);
 AUTO_STRUCT_FIELD(PlotAxes, axes);
 AUTO_STRUCT_FIELD(PlotMargins, margins);
@@ -83,6 +89,7 @@ AUTO_STRUCT_FIELD(Color3, backgroundColor, Color3(1, 1, 1));
 AUTO_STRUCT_FIELD(Color3, foregroundColor, Color3(0.2, 0.2, 0.2));
 AUTO_STRUCT_FIELD(PlotTitle, title);
 AUTO_STRUCT_FIELD(PlotGrid, grid);
+AUTO_STRUCT_FIELD(PlotRange, range);
 AUTO_STRUCT_END();
 
 AUTO_STRUCT_BEGIN(PlotQuery);
@@ -155,6 +162,7 @@ class PlotRenderer {
   double _duration = 1.0;
   std::vector<PlotRendererTopic> _topics_async;
   std::shared_ptr<BagPlayer> _bag_player;
+  QFont _font;
 
 public:
   std::shared_ptr<PlotDisplay> plotDisplay() const { return _data->display; }

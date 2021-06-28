@@ -1,5 +1,5 @@
 // TAMSVIZ
-// (c) 2020 Philipp Ruppel
+// (c) 2020-2021 Philipp Ruppel
 
 #include "plot.h"
 
@@ -98,7 +98,8 @@ void PlotRenderer::renderAsync(QPainter *painter) {
   for (auto &topic : _topics_async) {
     for (auto &query : topic.queries) {
       query.points.clear();
-      for (auto &pair : query.query->data()) {
+      auto data = query.query->data();
+      for (auto &pair : data) {
         int64_t t = pair.first;
         double v = pair.second;
         query.points.emplace_back(t, v);
@@ -114,6 +115,11 @@ void PlotRenderer::renderAsync(QPainter *painter) {
         }
       }
     }
+  }
+
+  if (!_style.range.automatic) {
+    vmin = _style.range.min;
+    vmax = _style.range.max;
   }
 
   QRectF canvas = painter->viewport();
@@ -147,18 +153,18 @@ void PlotRenderer::renderAsync(QPainter *painter) {
 
   if (!(!_style.title.enable || _style.title.text.empty() ||
         _style.title.fontSize == 0)) {
-    QFont font;
-    font.setPixelSize(_style.title.fontSize);
-    painter->setFont(font);
+    // QFont font;
+    _font.setPixelSize(_style.title.fontSize);
+    painter->setFont(_font);
     painter->drawText(QRectF(frame.left(), _style.margins.top, frame.width(),
                              _style.title.fontSize + _style.padding * 2),
                       Qt::AlignCenter, _style.title.text.c_str());
   }
 
   if (_style.axes.fontSize > 0) {
-    QFont font;
-    font.setPixelSize(_style.axes.fontSize);
-    painter->setFont(font);
+    // QFont font;
+    _font.setPixelSize(_style.axes.fontSize);
+    painter->setFont(_font);
 
     painter->drawText(
         QRectF(frame.left(),
@@ -203,9 +209,9 @@ void PlotRenderer::renderAsync(QPainter *painter) {
 
   if (tmax != tmin && vmax != vmin) {
 
-    QFont font;
-    font.setPixelSize(_style.ticks.fontSize);
-    painter->setFont(font);
+    // QFont font;
+    _font.setPixelSize(_style.ticks.fontSize);
+    painter->setFont(_font);
 
     {
       int64_t step = std::round(
@@ -259,6 +265,9 @@ void PlotRenderer::renderAsync(QPainter *painter) {
       }
     }
 
+    painter->save();
+    // painter->setViewport(frame.toRect());
+    painter->setClipRect(frame.toRect());
     double width = frame.width();
     double height = frame.height();
     for (auto &topic : _topics_async) {
@@ -269,11 +278,15 @@ void PlotRenderer::renderAsync(QPainter *painter) {
           double fy = 1.0 - (p.second - vmin) * (1.0 / (vmax - vmin));
           double px = fx * frame.width() + frame.left();
           double py = fy * frame.height() + frame.top();
+          if (!std::isfinite(px) || !std::isfinite(py)) {
+            LOG_ERROR("plot coordinate not finite");
+          }
           points.emplace_back(px, py);
         }
         painter->setPen(QPen(toQColor(query.color), _style.graphWidth));
         painter->drawPolyline(points.data(), points.size());
       }
     }
+    painter->restore();
   }
 }

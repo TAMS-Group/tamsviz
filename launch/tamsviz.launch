@@ -1,5 +1,8 @@
 <?xml version="1.0"?>
 <launch>
     <arg name="file" default=""/>
-    <node pkg="tamsviz" type="tamsviz" name="$(anon tamsviz)" output="screen" args="$(arg file)"/>
+    <arg name="debug" default="false"/>
+    <arg if="$(arg debug)" name="launch_prefix" value="gdb --ex run --args" />
+    <arg unless="$(arg debug)" name="launch_prefix" value="" />
+    <node pkg="tamsviz" type="tamsviz" name="$(anon tamsviz)" output="screen" args="$(arg file)" launch-prefix="$(arg launch_prefix)"/>
 </launch>

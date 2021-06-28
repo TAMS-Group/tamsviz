@@ -115,6 +115,7 @@ add_executable(${PROJECT_NAME}
     src/gui/timeline.cpp
     src/render/framebuffer.cpp
     src/render/mesh.cpp
+    src/render/opengl.cpp
     src/render/renderbuffer.cpp
     src/render/renderer.cpp
     src/render/renderlist.cpp

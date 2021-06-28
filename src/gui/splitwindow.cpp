@@ -1,5 +1,5 @@
 // TAMSVIZ
-// (c) 2020 Philipp Ruppel
+// (c) 2020-2021 Philipp Ruppel
 
 #include "splitwindow.h"
 
@@ -215,6 +215,17 @@ ContentWindowBase::ContentWindowBase() {
     bar->addWidget(spacer);
   }
 
+  {
+    auto *button = new FlatButton();
+    button->setIcon(MATERIAL_ICON("edit"));
+    button->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
+    connect(button, &QPushButton::clicked, this, [this]() {
+      LockScope ws;
+      ws->selection() = shared_from_this();
+      ws->modified();
+    });
+    bar->addWidget(button);
+  }
   {
     auto *button = new FlatButton();
     button->setIcon(MATERIAL_ICON("border_vertical"));

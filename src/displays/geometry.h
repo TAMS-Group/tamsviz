@@ -1,5 +1,5 @@
 // TAMSVIZ
-// (c) 2020 Philipp Ruppel
+// (c) 2020-2021 Philipp Ruppel
 
 #pragma once
 
@@ -420,6 +420,7 @@ protected:
   void _setVector(const Eigen::Vector3d &vector) {
     _node->setVector(vector, length(), radius());
   }
+  Vector3DisplayBase() {}
 
 public:
   PROPERTY(double, radius, 0.1, min = 0.0);

@@ -1,5 +1,5 @@
 // TAMSVIZ
-// (c) 2020 Philipp Ruppel
+// (c) 2020-2021 Philipp Ruppel
 
 #include "plotwindow.h"
 
@@ -70,12 +70,27 @@ PlotWindow::PlotWindow() {
       }
     });
   }
+
+  {
+    auto *button = new FlatButton();
+    button->setIcon(MATERIAL_ICON("multiline_chart"));
+    button->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
+    connect(button, &QPushButton::clicked, this, [this]() {
+      LockScope ws;
+      ws->selection() = plot().resolve(ws->document());
+      ws->modified();
+    });
+    addToolWidgetRight(button);
+  };
 }
 
 void PlotWindow::renderWindowSync(const RenderWindowSyncContext &context) {
+  // LOG_DEBUG(this);
   _renderer_async = _renderer;
   if (_renderer) {
     _renderer->renderSync();
+  } else {
+    LOG_DEBUG("waiting for plot renderer sync");
   }
   if (!LockScope()->player) {
     GlobalEvents::instance()->redraw();
@@ -83,7 +98,8 @@ void PlotWindow::renderWindowSync(const RenderWindowSyncContext &context) {
 }
 
 void PlotWindow::renderWindowAsync(const RenderWindowAsyncContext &context) {
-
+  // LOG_DEBUG(this);
+#if 1
   auto *previous_context = QOpenGLContext::currentContext();
   auto *previous_surface = previous_context->surface();
 
@@ -109,7 +125,7 @@ void PlotWindow::renderWindowAsync(const RenderWindowAsyncContext &context) {
       _fbo_render->height() != _height) {
     QOpenGLFramebufferObjectFormat format;
     // format.setSamples(0);
-    format.setSamples(16);
+    // format.setSamples(16);
     format.setAttachment(QOpenGLFramebufferObject::CombinedDepthStencil);
     _fbo_render =
         std::make_shared<QOpenGLFramebufferObject>(_width, _height, format);
@@ -126,16 +142,26 @@ void PlotWindow::renderWindowAsync(const RenderWindowAsyncContext &context) {
   }
 
   {
+
     QPainter painter(_paint_device.get());
+
+    // painter.endNativePainting();
+    painter.beginNativePainting();
+    V_GL(glClearColor(1, 0, 1, 1));
+    V_GL(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT |
+                 GL_STENCIL_BUFFER_BIT));
     painter.endNativePainting();
 
-    painter.setRenderHint(QPainter::Antialiasing);
+    // painter.setRenderHint(QPainter::Antialiasing);
 
     if (_renderer_async) {
       _renderer_async->renderAsync(&painter);
+    } else {
+      LOG_DEBUG("waiting for plot renderer async");
     }
 
-    painter.beginNativePainting();
+    // painter.endNativePainting();
+    // painter.beginNativePainting();
   }
 
   _fbo_render->release();
@@ -163,15 +189,37 @@ void PlotWindow::renderWindowAsync(const RenderWindowAsyncContext &context) {
   }
 
   previous_context->makeCurrent(previous_surface);
+#endif
 }
 
-void PlotWindow::paintHUD(QPainter *p) {}
+void PlotWindow::paintHUD(QPainter *p) {
+#if 0
+  /*
+    if (_renderer_async) {
+      _renderer_async->renderAsync(p);
+    }
+    */
+  LockScope ws;
+  if (_renderer) {
+    _renderer->renderAsync(p);
+  }
+  /*
+  p->beginNativePainting();
+  V_GL(glFlush());
+  V_GL(glFinish());
+  V_GL(glFlush());
+  p->endNativePainting();
+  */
+#endif
+}
 
 void PlotWindow::composite(int target) {
+  // LOG_DEBUG(this);
+#if 1
   std::unique_lock<std::mutex> lock(_fbo_mutex);
 
   V_GL(glViewport(0, 0, _width, _height));
-  V_GL(glClearColor(0, 0, 0, 1));
+  V_GL(glClearColor(0, 1, 0, 1));
   V_GL(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
 
   if (_fbo_initialized) {
@@ -188,7 +236,10 @@ void PlotWindow::composite(int target) {
                                    GL_RENDERBUFFER, 0));
 
     V_GL(glBindFramebuffer(GL_FRAMEBUFFER, 0));
+  } else {
+    LOG_DEBUG("waiting for fbo " << this);
   }
+#endif
 }
 
 void PlotWindow::handleEvent(QEvent *event) {

@@ -1,5 +1,5 @@
 // TAMSVIZ
-// (c) 2020 Philipp Ruppel
+// (c) 2020-2021 Philipp Ruppel
 
 #include "renderwindow.h"
 
@@ -21,7 +21,7 @@ RenderWindowBase::RenderWindowBase() {
   public:
     RenderWidget(RenderWindowBase *parent)
         : QOpenGLWidget(parent), _parent(parent) {}
-    void initializeGL() override {}
+    void initializeGL() override { V_GL(glClearColor(1, 1, 1, 1)); }
     virtual bool event(QEvent *e) override {
       if (e->type() == QEvent::Show) {
         LOG_DEBUG("show event");
@@ -35,20 +35,30 @@ RenderWindowBase::RenderWindowBase() {
       LOG_DEBUG("resize");
       _parent->_width = w;
       _parent->_height = h;
+      V_GL(glViewport(0, 0, w, h));
       GlobalEvents::instance()->redraw();
     }
     void paintGL() override {
-      V_GL(glClearColor(0, 0, 0, 1));
-      V_GL(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
+      // LOG_DEBUG(this);
+      V_GL(glViewport(0, 0, _parent->_width, _parent->_height));
+      V_GL(glClearColor(0, 0, 1, 1));
+      V_GL(glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT |
+                   GL_DEPTH_BUFFER_BIT));
       if (int target = defaultFramebufferObject()) {
         _parent->composite(target);
+      } else {
+        LOG_ERROR("failed to get framebfufer");
       }
       {
         QPainter painter(this);
-        painter.endNativePainting();
+        // painter.endNativePainting();
         _parent->paintHUD(&painter);
-        painter.beginNativePainting();
+        // painter.beginNativePainting();
       }
+      /*
+      V_GL(glFlush());
+      V_GL(glFinish());
+      */
     }
   };
   auto *render_widget = new RenderWidget(this);

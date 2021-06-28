@@ -1,5 +1,5 @@
 // TAMSVIZ
-// (c) 2020 Philipp Ruppel
+// (c) 2020-2021 Philipp Ruppel
 
 #pragma once
 
@@ -25,7 +25,7 @@ struct RenderWindowAsyncContext {
 class RenderWindowBase : public ContentWindowBase {
 
 protected:
-  int _width = 1, _height = 1;
+  volatile int _width = 1, _height = 1;
 
 protected:
   RenderWindowBase();
