@@ -18,9 +18,21 @@ struct AmbientLight : LightDisplayBase {
 };
 DECLARE_TYPE_C(AmbientLight, LightDisplayBase, Light);
 
-struct DirectionalLight : LightDisplayBase {
+struct ShadowLightDisplayBase : LightDisplayBase {
+protected:
+  ShadowLightDisplayBase() {}
+
+public:
+  PROPERTY(double, shadowBias, 0.01, min = 0.0);
+  PROPERTY(bool, shadowEnable, true);
+};
+DECLARE_TYPE(ShadowLightDisplayBase, LightDisplayBase);
+
+struct DirectionalLight : ShadowLightDisplayBase {
+  PROPERTY(double, shadowDepth, 10, min = 0.0);
+  PROPERTY(double, shadowWidth, 5, min = 0.0);
   virtual void renderSync(const RenderSyncContext &context) override {
-    LightDisplayBase::renderSync(context);
+    ShadowLightDisplayBase::renderSync(context);
     if (visible()) {
       auto pose = context.pose;
       if (viewSpace()) {
@@ -28,20 +40,25 @@ struct DirectionalLight : LightDisplayBase {
       }
       LightBlock light;
       light.position.head(3) = pose.translation().cast<float>();
-      light.pose = pose.inverse().matrix().cast<float>();
+      light.view_matrix = pose.inverse().matrix().cast<float>();
+      light.projection_matrix(0, 0) = 1.0 / shadowWidth();
+      light.projection_matrix(1, 1) = 1.0 / shadowWidth();
+      light.projection_matrix(2, 2) = -1.0 / shadowDepth();
       light.color = color().toLinearVector4f().head(3) * (float)brightness();
       light.type =
-          (uint32_t(LightType::Directional) |
+          (uint32_t(shadowEnable() ? LightType::DirectionalShadow
+                                   : LightType::Directional) |
            (viewSpace() ? uint32_t(LightType::ViewSpace) : uint32_t(0)));
+      light.shadow_bias = shadowBias();
       context.render_list->push(light);
     }
   }
 };
-DECLARE_TYPE_C(DirectionalLight, LightDisplayBase, Light);
+DECLARE_TYPE_C(DirectionalLight, ShadowLightDisplayBase, Light);
 
-struct PointLight : LightDisplayBase {
+struct PointLight : ShadowLightDisplayBase {
   virtual void renderSync(const RenderSyncContext &context) override {
-    LightDisplayBase::renderSync(context);
+    ShadowLightDisplayBase::renderSync(context);
     if (visible()) {
       auto pose = context.pose;
       if (viewSpace()) {
@@ -49,22 +66,24 @@ struct PointLight : LightDisplayBase {
       }
       LightBlock light;
       light.position.head(3) = pose.translation().cast<float>();
-      light.pose = pose.inverse().matrix().cast<float>();
+      light.view_matrix = pose.inverse().matrix().cast<float>();
       light.color = color().toLinearVector4f().head(3) * (float)brightness();
       light.type =
           (uint32_t(LightType::Point) |
            (viewSpace() ? uint32_t(LightType::ViewSpace) : uint32_t(0)));
+      light.shadow_bias = shadowBias();
       context.render_list->push(light);
     }
   }
 };
-DECLARE_TYPE_C(PointLight, LightDisplayBase, Light);
+DECLARE_TYPE_C(PointLight, ShadowLightDisplayBase, Light);
 
-struct SpotLight : LightDisplayBase {
+struct SpotLight : ShadowLightDisplayBase {
+  // Texture _light_map{TextureType::Linear};
   PROPERTY(double, softness, 0.5, min = 0.0, max = 1.0);
   PROPERTY(double, angle, 90, min = 0.0, max = 180);
   virtual void renderSync(const RenderSyncContext &context) override {
-    LightDisplayBase::renderSync(context);
+    ShadowLightDisplayBase::renderSync(context);
     if (visible()) {
       auto pose = context.pose;
       if (viewSpace()) {
@@ -72,19 +91,21 @@ struct SpotLight : LightDisplayBase {
       }
       LightBlock light;
       light.position.head(3) = pose.translation().cast<float>();
-      light.pose =
-          (projectionMatrix(std::max(1e-6, std::min(180.0 - 1e-3, angle())) *
-                                M_PI / 180.0,
-                            1.0, 0.01, 100.0) *
-           pose.inverse().matrix())
+      light.view_matrix = pose.inverse().matrix().cast<float>();
+      light.projection_matrix =
+          projectionMatrix(std::max(1e-6, std::min(180.0 - 1e-3, angle())) *
+                               M_PI / 180.0,
+                           1.0, 0.01, 100.0)
               .cast<float>();
       light.color = color().toLinearVector4f().head(3) * (float)brightness();
       light.type =
-          (uint32_t(LightType::Spot) |
+          (uint32_t(shadowEnable() ? LightType::SpotShadow : LightType::Spot) |
            (viewSpace() ? uint32_t(LightType::ViewSpace) : uint32_t(0)));
       light.softness = std::max(0.0001f, std::min(1.0f, (float)softness()));
+      light.shadow_bias = shadowBias();
+      // light.light_map = _light_map.update(256, 256, GL_DEPTH_COMPONENT);
       context.render_list->push(light);
     }
   }
 };
-DECLARE_TYPE_C(SpotLight, LightDisplayBase, Light);
+DECLARE_TYPE_C(SpotLight, ShadowLightDisplayBase, Light);

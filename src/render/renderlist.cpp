@@ -40,7 +40,23 @@ void RenderList::push(const InstanceBlock &instance) {
   _instances.push_back(instance);
 }
 
+void RenderList::push(const LightBlock &light) {
+  auto l = light;
+  switch (l.type) {
+  case uint32_t(LightType::PointShadow):
+    l.shadow_index = (_shadow_cube_count++);
+    break;
+  case uint32_t(LightType::SpotShadow):
+  case uint32_t(LightType::DirectionalShadow):
+    l.shadow_index = (_shadow_map_count++);
+    break;
+  }
+  _lights.push_back(l);
+}
+
 void RenderList::clear() {
+  _shadow_map_count = 0;
+  _shadow_cube_count = 0;
   _materials.clear();
   _instances.clear();
   _commands.clear();

@@ -143,20 +143,17 @@ void Shader::create() {
     }
 
     V_GL(glUseProgram(_program));
-    {
+    auto bindSampler = [&](const Samplers &sampler, const char *name) {
       GLint index = -1;
-      V_GL(index = glGetUniformLocation(_program, "color_sampler"));
+      V_GL(index = glGetUniformLocation(_program, name));
       if (index != -1) {
-        V_GL(glUniform1i(index, (int)Samplers::color));
+        V_GL(glUniform1i(index, (int)sampler));
       }
-    }
-    {
-      GLint index = -1;
-      V_GL(index = glGetUniformLocation(_program, "normal_sampler"));
-      if (index != -1) {
-        V_GL(glUniform1i(index, (int)Samplers::normal));
-      }
-    }
+    };
+    bindSampler(Samplers::color, "color_sampler");
+    bindSampler(Samplers::normal, "normal_sampler");
+    bindSampler(Samplers::shadowmap, "shadow_map_sampler");
+    bindSampler(Samplers::shadowcube, "shadow_cube_sampler");
     V_GL(glUseProgram(0));
   }
 }

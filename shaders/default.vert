@@ -16,6 +16,7 @@ layout(std140) uniform material_block {
 layout(std140) uniform camera_block {
     mat4 view_matrix;
     mat4 projection_matrix;
+    uint flags;
 } camera;
 
 in vec4 position;
@@ -57,6 +58,10 @@ void main() {
     x_bitangent = normal_matrix * bitangent;
     vec4 world_position = world_matrix * position;
     vec4 view_position = camera.view_matrix * world_position;
+    if((camera.flags & uint(4)) != uint(0)) {
+        gl_Position = (camera.projection_matrix * view_position);
+        return;
+    }
     if(extra.z == 1.0) { // point
         view_position.xy += texcoord * extra.x;
     }

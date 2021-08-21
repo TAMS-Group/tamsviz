@@ -11,6 +11,8 @@
 enum class Samplers : GLuint {
   color = 1,
   normal = 2,
+  shadowmap = 3,
+  shadowcube = 4,
 };
 
 enum class VertexAttributes : GLuint {

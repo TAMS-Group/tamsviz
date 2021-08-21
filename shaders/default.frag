@@ -1,7 +1,8 @@
 // TAMSVIZ
 // (c) 2020 Philipp Ruppel
 
-#version 150
+//#version 150
+#version 400
 
 layout(std140) uniform material_block {
     vec4 color;
@@ -13,12 +14,21 @@ layout(std140) uniform material_block {
     int flags;
 } material;
 
+layout(std140) uniform camera_block {
+    mat4 view_matrix;
+    mat4 projection_matrix;
+    uint flags;
+} camera;
+
 struct Light {
-    mat4 pose;
+    mat4 view_matrix;
+    mat4 projection_matrix;
     vec3 color;
     int type;
     vec3 position;
     float softness;
+    float shadow_bias;
+    int shadow_index;
 };
 layout(std140) uniform light_block {
   Light light_array[16];
@@ -28,7 +38,10 @@ layout(std140) uniform light_block {
 uniform sampler2D color_sampler;
 uniform sampler2D normal_sampler;
 
-// uniform sampler2DArrayShadow shadow_2d_sampler;
+uniform sampler2DArrayShadow shadow_map_sampler;
+
+uniform samplerCubeArrayShadow shadow_cube_sampler;
+//uniform samplerCubeArray shadow_cube_sampler;
 
 in vec3 x_normal;
 in vec4 x_position;
@@ -52,6 +65,14 @@ float srgb2linear(float srgb) {
 }
 
 void main() {
+    
+    if((camera.flags & uint(4)) != uint(0)) {
+        out_color = vec4(0.0);
+        out_blend = vec4(0.0);
+        out_id = uint(0);
+        //discard;
+        return;
+    }
     
     const float pi = 3.14159265359;
     
@@ -126,11 +147,41 @@ void main() {
     vec3 diffuse = (vec3(1.0) - fresnel) * (1.0 - metallic);
     
     for(int light_index = 0; light_index < lights.light_count; light_index++) {
+        
         float light_falloff = 0.0;
+        float shadow = 1.0;
         vec3 light_direction = normal;
         vec3 light_color = lights.light_array[light_index].color.xyz;
         int type = lights.light_array[light_index].type;
-        switch(type) {
+        
+        vec4 p4;
+        if ((type & 32) != 0) {
+            
+            p4 = x_position;
+            p4.xyz += normal * lights.light_array[light_index].shadow_bias;
+            p4 = lights.light_array[light_index].view_matrix * p4;
+            p4 = lights.light_array[light_index].projection_matrix * p4;
+            
+            if((type & 64) != 0) {
+                float smi = float(lights.light_array[light_index].shadow_index);
+                vec2 smxy = p4.xy / p4.w * 0.5 + 0.5;
+                float smz = p4.z / p4.w * 0.5 + 0.5;
+                shadow = texture(shadow_map_sampler, vec4(smxy, smi, smz));
+                if(false) {
+                    shadow = 0.0;
+                    for(int x = -1; x <= 1; x++) {
+                        for(int y = -1; y <= 1; y++) {
+                            vec2 offset = vec2(float(x), float(y)) * (1.0 / 256.0);
+                            shadow += texture(shadow_map_sampler, vec4(smxy + offset, smi, smz));
+                        }
+                    }
+                    shadow *= (1.0 / 9.0);
+                }
+            }
+        }
+        
+        switch(type & 3) {
+            
         case 0: { // ambient
             vec3 radiance = light_color;
             float n_dot_l = 1.0;
@@ -142,27 +193,65 @@ void main() {
             lighting += max(vec3(0.0), (diffuse * albedo / pi + specular) * radiance * max(0.0, n_dot_l));
             continue;
         }
+        
         case 1: { // directional
             light_falloff = 1.0;
-            light_direction = transpose(mat3(lights.light_array[light_index].pose))[2];
+            light_direction = transpose(mat3(lights.light_array[light_index].view_matrix))[2];
             break;
         }
+        
         case 2: { // point
+            
             vec3 p = lights.light_array[light_index].position.xyz - x_position.xyz;
             light_direction = normalize(p);
             light_falloff = 1.0 / dot(p, p);
+            
+            float smi = float(lights.light_array[light_index].shadow_index);
+            
+            p -= normal * lights.light_array[light_index].shadow_bias;
+            
+            float ref = max(abs(p.x), max(abs(p.y), abs(p.z)));
+            
+            ref = -ref;
+            
+            float far = 2.0;
+            float near = 0.1;
+            
+            mat4 proj = mat4(0);
+            proj[0][0] = 0.0;
+            proj[1][1] = 0.0;
+            proj[2][2] = -far / (far - near);
+            proj[2][3] = -far * near / (far - near);
+            proj[3][2] = -1.0;
+            
+            vec4 proj4 = vec4(0.0, 0.0, ref, 1.0) * proj;
+            
+            ref = proj4.z / proj4.w;
+            
+            
+            ref = ref * 0.5 + 0.5;
+            
+            //out_color = vec4(texture(shadow_cube_sampler, vec4(-p, smi), ref));
+            //return;
+            
+            shadow = texture(shadow_cube_sampler, vec4(-p, smi), ref);
+            
             break;
         }
+        
         case 3: { // spot
             vec3 p = lights.light_array[light_index].position.xyz - x_position.xyz;
             light_direction = normalize(p);
-            vec4 p4 = (lights.light_array[light_index].pose * x_position);
             if(p4.w > 0.0) {
                 light_falloff = smoothstep(1.0, 1.0 - lights.light_array[light_index].softness, length(p4.xy / p4.w)) / dot(p, p);
             }
             break;
         }
+        
         }
+        
+        light_falloff *= shadow;
+        
         if(light_falloff > 0.0) {
             
             vec3 half_vector = normalize(view_direction + light_direction);

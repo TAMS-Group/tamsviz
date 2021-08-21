@@ -3,7 +3,9 @@
 
 #pragma once
 
+#include "framebuffer.h"
 #include "renderlist.h"
+#include "texture.h"
 #include "uniformbuffer.h"
 
 class RenderTarget;
@@ -23,9 +25,16 @@ class Renderer {
               const std::vector<RenderCommand> &commands, bool picking = false);
   std::shared_ptr<Mesh> screen_quad;
   void prepare(const CameraBlock &camera_block, const RenderList &render_list);
+  Texture _shadow_map_array;
+  Watcher _shadow_map_watcher;
+  Texture _shadow_cube_array;
+  Watcher _shadow_cube_watcher;
+  Framebuffer _shadow_framebuffer;
+  void _splitTransparentOpaque(const RenderList &render_list);
 
 public:
   Renderer();
+  void renderShadows(const RenderList &render_list);
   void render(RenderTarget &render_target, const CameraBlock &camera_block,
               const RenderList &render_list);
   struct PickResult {

@@ -9,6 +9,7 @@
 #include "rendertarget.h"
 #include "shader.h"
 #include "texture.h"
+#include "transformations.h"
 #include "uniformbuffer.h"
 
 Renderer::Renderer()
@@ -161,8 +162,9 @@ void Renderer::prepare(const CameraBlock &camera_block,
       p /= p.w();
       light_array.light_array[light_index].position = p.head(3);
 
-      light_array.light_array[light_index].pose =
-          light_array.light_array[light_index].pose * camera_block.view_matrix;
+      light_array.light_array[light_index].view_matrix =
+          light_array.light_array[light_index].view_matrix *
+          camera_block.view_matrix;
     }
 
     light.type = (light.type & 0xff);
@@ -220,14 +222,7 @@ Renderer::PickResult Renderer::pick(RenderTarget &render_target,
   return ret;
 }
 
-void Renderer::render(RenderTarget &render_target,
-                      const CameraBlock &camera_block,
-                      const RenderList &render_list) {
-
-  prepare(camera_block, render_list);
-
-  default_shader->use();
-
+void Renderer::_splitTransparentOpaque(const RenderList &render_list) {
   _transparent.clear();
   _opaque.clear();
   for (auto &command : render_list._commands) {
@@ -241,6 +236,171 @@ void Renderer::render(RenderTarget &render_target,
       }
     }
   }
+}
+
+void Renderer::renderShadows(const RenderList &render_list) {
+
+  uint32_t shadow_map_size = 512;
+  uint32_t shadow_cube_size = 256;
+
+  _splitTransparentOpaque(render_list);
+
+  _shadow_framebuffer.create();
+  _shadow_map_array.create();
+  _shadow_cube_array.create();
+
+  default_shader->use();
+
+  V_GL(glActiveTexture(GL_TEXTURE0 + uint32_t(Samplers::shadowmap)));
+  V_GL(glBindTexture(GL_TEXTURE_2D_ARRAY, _shadow_map_array.id()));
+  if (_shadow_map_watcher.changed(render_list._shadow_map_count)) {
+    LOG_DEBUG("shadow map count " << render_list._shadow_map_count);
+    V_GL(glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S,
+                         GL_CLAMP_TO_EDGE));
+    V_GL(glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T,
+                         GL_CLAMP_TO_EDGE));
+    V_GL(
+        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR));
+    V_GL(
+        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
+    V_GL(glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_BASE_LEVEL, 0));
+    V_GL(glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_COMPARE_MODE,
+                         GL_COMPARE_REF_TO_TEXTURE));
+    V_GL(glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_DEPTH_COMPONENT,
+                      shadow_map_size, shadow_map_size,
+                      render_list._shadow_map_count, 0, GL_DEPTH_COMPONENT,
+                      GL_UNSIGNED_BYTE, nullptr));
+  }
+  V_GL(glActiveTexture(GL_TEXTURE0));
+
+  V_GL(glActiveTexture(GL_TEXTURE0 + uint32_t(Samplers::shadowcube)));
+  V_GL(glBindTexture(GL_TEXTURE_CUBE_MAP_ARRAY, _shadow_cube_array.id()));
+  if (_shadow_cube_watcher.changed(render_list._shadow_cube_count)) {
+    LOG_DEBUG("shadow cube count " << render_list._shadow_cube_count);
+    V_GL(glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_WRAP_S,
+                         GL_CLAMP_TO_EDGE));
+    V_GL(glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_WRAP_T,
+                         GL_CLAMP_TO_EDGE));
+    V_GL(glTexParameterf(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_WRAP_R,
+                         GL_CLAMP_TO_EDGE));
+    V_GL(glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_MIN_FILTER,
+                         GL_LINEAR));
+    V_GL(glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_MAG_FILTER,
+                         GL_LINEAR));
+    V_GL(glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_BASE_LEVEL, 0));
+    V_GL(glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_COMPARE_MODE,
+                         GL_COMPARE_REF_TO_TEXTURE));
+    V_GL(glTexImage3D(GL_TEXTURE_CUBE_MAP_ARRAY, 0, GL_DEPTH_COMPONENT,
+                      shadow_cube_size, shadow_cube_size,
+                      render_list._shadow_cube_count * 6, 0, GL_DEPTH_COMPONENT,
+                      GL_UNSIGNED_BYTE, nullptr));
+  }
+  V_GL(glActiveTexture(GL_TEXTURE0));
+
+  for (auto &light : render_list._lights) {
+    switch (light.type) {
+
+    case uint32_t(LightType::SpotShadow):
+    case uint32_t(LightType::DirectionalShadow): {
+      CameraBlock shadow_camera_block;
+      shadow_camera_block.view_matrix = light.view_matrix;
+      shadow_camera_block.projection_matrix = light.projection_matrix;
+      shadow_camera_block.flags = CameraBlock::ShadowCameraFlag;
+      prepare(shadow_camera_block, render_list);
+
+      _shadow_framebuffer.bind();
+      V_GL(glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
+                                     _shadow_map_array.id(), 0,
+                                     light.shadow_index));
+
+      V_GL(glViewport(0, 0, shadow_map_size, shadow_map_size));
+
+      V_GL(glClearColor(0, 0, 0, 0));
+      V_GL(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
+
+      render(render_list, _opaque);
+
+      break;
+    }
+
+    case uint32_t(LightType::PointShadow): {
+
+      static std::array<Eigen::Vector3d, 6> at = {
+          Eigen::Vector3d(+1.0f, 0.0f, 0.0f),
+          Eigen::Vector3d(-1.0f, 0.0f, 0.0f),
+          Eigen::Vector3d(0.0f, +1.0f, 0.0f),
+          Eigen::Vector3d(0.0f, -1.0f, 0.0f),
+          Eigen::Vector3d(0.0f, 0.0f, +1.0f),
+          Eigen::Vector3d(0.0f, 0.0f, -1.0f)};
+
+      static std::array<Eigen::Vector3d, 6> up = {
+          Eigen::Vector3d(0.0f, 1.0f, 0.0f),
+          Eigen::Vector3d(0.0f, 1.0f, 0.0f),
+          Eigen::Vector3d(0.0f, 0.0f, -1.0f),
+          Eigen::Vector3d(0.0f, 0.0f, 1.0f),
+          Eigen::Vector3d(0.0f, 1.0f, 0.0f),
+          Eigen::Vector3d(0.0f, 1.0f, 0.0f)};
+
+      for (size_t face = 0; face < 6; face++) {
+
+        CameraBlock shadow_camera_block;
+
+        {
+          auto &v = shadow_camera_block.view_matrix;
+          v = lookatMatrix(light.position.cast<double>(),
+                           at[face] + light.position.cast<double>(), -up[face])
+                  .cast<float>();
+
+          /*
+  v(2, 0) *= -1.0f;
+  v(2, 1) *= -1.0f;
+  v(2, 2) *= -1.0f;
+  v(2, 3) *= -1.0f;
+  */
+
+          /*v(1, 0) *= -1.0f;
+          v(1, 1) *= -1.0f;
+          v(1, 2) *= -1.0f;
+          v(1, 3) *= -1.0f;*/
+        }
+
+        shadow_camera_block.projection_matrix =
+            projectionMatrix(M_PI / 2, 1, 0.1, 2.0).cast<float>();
+
+        shadow_camera_block.flags = CameraBlock::ShadowCameraFlag;
+        prepare(shadow_camera_block, render_list);
+
+        _shadow_framebuffer.bind();
+        V_GL(glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
+                                       _shadow_cube_array.id(), 0,
+                                       light.shadow_index * 6 + face));
+
+        V_GL(glViewport(0, 0, shadow_cube_size, shadow_cube_size));
+
+        // V_GL(glClearDepth(0));
+        V_GL(glClearColor(0, 0, 0, 0));
+        V_GL(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
+        // V_GL(glClearDepth(1));
+
+        render(render_list, _opaque);
+      }
+      break;
+    }
+    }
+  }
+}
+
+void Renderer::render(RenderTarget &render_target,
+                      const CameraBlock &camera_block,
+                      const RenderList &render_list) {
+
+  V_GL(glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS));
+
+  _splitTransparentOpaque(render_list);
+
+  default_shader->use();
+
+  prepare(camera_block, render_list);
 
   render_target._transparent_framebuffer_head.bind();
   V_GL(glClearColor(0, 0, 0, 0));

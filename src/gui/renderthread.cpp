@@ -154,6 +154,7 @@ void RenderThread::run() {
     }
     // V_GL(glFlush());
     // V_GL(glFinish());
+    renderer.renderShadows(render_list);
     for (auto &render_window : render_window_list) {
       RenderWindowAsyncContext render_context;
       render_context.render_list = &render_list;

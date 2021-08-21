@@ -17,23 +17,35 @@ struct CameraBlock {
   Eigen::Matrix4f projection_matrix = Eigen::Matrix4f::Identity();
   static constexpr uint32_t SampleShadingFlag = 1;
   static constexpr uint32_t TransparentSampleShadingFlag = 2;
+  static constexpr uint32_t ShadowCameraFlag = 4;
   uint32_t flags = 0;
 };
 
 enum class LightType : uint32_t {
+
   Ambient = 0,
+
+  DirectionalShadow = (1 | 32 | 64),
   Directional = 1,
+
+  PointShadow = 2,
   Point = 2,
-  Spot = 3,
+
+  SpotShadow = (3 | 32 | 64),
+  Spot = (3 | 32),
+
   ViewSpace = (1 << 20),
 };
 
 struct LightBlock {
-  Eigen::Matrix4f pose = Eigen::Matrix4f::Identity();
+  Eigen::Matrix4f view_matrix = Eigen::Matrix4f::Identity();
+  Eigen::Matrix4f projection_matrix = Eigen::Matrix4f::Identity();
   Eigen::Vector3f color = Eigen::Vector3f::Zero();
   uint32_t type = 0;
   Eigen::Vector3f position = Eigen::Vector3f::Zero();
   float softness = 1.0f;
+  float shadow_bias = 0.0f;
+  int32_t shadow_index = -1;
 };
 
 struct LightArrayBlock {
@@ -94,6 +106,8 @@ class RenderList {
       _instances;
   std::vector<RenderCommand> _commands;
   std::vector<LightBlock, Eigen::aligned_allocator<LightBlock>> _lights;
+  size_t _shadow_map_count = 0;
+  size_t _shadow_cube_count = 0;
 
 public:
   void push(const MaterialBlock &material);
@@ -122,7 +136,7 @@ public:
     }
   }
 
-  inline void push(const LightBlock &light) { _lights.push_back(light); }
+  void push(const LightBlock &light);
 
   void clear();
 
