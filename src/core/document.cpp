@@ -63,6 +63,12 @@ void WorldDisplay::renderSync(const RenderSyncContext &context) {
     light.type = (uint32_t)LightType::Ambient;
     context.render_list->push(light);
   }
+  {
+    RenderParameters params;
+    params.shadow_map_resolution = rendering()->shadowMapResolution();
+    params.shadow_cube_resolution = rendering()->shadowCubeResolution();
+    context.render_list->put(params);
+  }
   /* _current_scene_annotations.clear();
    {
      LockScope ws;

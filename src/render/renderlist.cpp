@@ -42,7 +42,7 @@ void RenderList::push(const InstanceBlock &instance) {
 
 void RenderList::push(const LightBlock &light) {
   auto l = light;
-  switch (l.type) {
+  switch (l.type & 0xff) {
   case uint32_t(LightType::PointShadow):
     l.shadow_index = (_shadow_cube_count++);
     break;
@@ -61,4 +61,5 @@ void RenderList::clear() {
   _instances.clear();
   _commands.clear();
   _lights.clear();
+  _parameters = RenderParameters();
 }

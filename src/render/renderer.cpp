@@ -168,6 +168,12 @@ void Renderer::prepare(const CameraBlock &camera_block,
     }
 
     light.type = (light.type & 0xff);
+
+    if (light.type == uint32_t(LightType::PointShadow)) {
+      light.shadow_bias *= 1.0 / render_list._parameters.shadow_cube_resolution;
+    } else {
+      light.shadow_bias *= 1.0 / render_list._parameters.shadow_map_resolution;
+    }
   }
   light_buffer.update(light_array);
   light_buffer.bind();
@@ -240,8 +246,8 @@ void Renderer::_splitTransparentOpaque(const RenderList &render_list) {
 
 void Renderer::renderShadows(const RenderList &render_list) {
 
-  uint32_t shadow_map_size = 512;
-  uint32_t shadow_cube_size = 256;
+  uint32_t shadow_map_size = render_list._parameters.shadow_map_resolution;
+  uint32_t shadow_cube_size = render_list._parameters.shadow_cube_resolution;
 
   _splitTransparentOpaque(render_list);
 
@@ -253,7 +259,8 @@ void Renderer::renderShadows(const RenderList &render_list) {
 
   V_GL(glActiveTexture(GL_TEXTURE0 + uint32_t(Samplers::shadowmap)));
   V_GL(glBindTexture(GL_TEXTURE_2D_ARRAY, _shadow_map_array.id()));
-  if (_shadow_map_watcher.changed(render_list._shadow_map_count)) {
+  if (_shadow_map_watcher.changed(render_list._shadow_map_count,
+                                  shadow_map_size)) {
     LOG_DEBUG("shadow map count " << render_list._shadow_map_count);
     V_GL(glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S,
                          GL_CLAMP_TO_EDGE));
@@ -275,7 +282,8 @@ void Renderer::renderShadows(const RenderList &render_list) {
 
   V_GL(glActiveTexture(GL_TEXTURE0 + uint32_t(Samplers::shadowcube)));
   V_GL(glBindTexture(GL_TEXTURE_CUBE_MAP_ARRAY, _shadow_cube_array.id()));
-  if (_shadow_cube_watcher.changed(render_list._shadow_cube_count)) {
+  if (_shadow_cube_watcher.changed(render_list._shadow_cube_count,
+                                   shadow_cube_size)) {
     LOG_DEBUG("shadow cube count " << render_list._shadow_cube_count);
     V_GL(glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_WRAP_S,
                          GL_CLAMP_TO_EDGE));
@@ -298,7 +306,7 @@ void Renderer::renderShadows(const RenderList &render_list) {
   V_GL(glActiveTexture(GL_TEXTURE0));
 
   for (auto &light : render_list._lights) {
-    switch (light.type) {
+    switch (light.type & 0xff) {
 
     case uint32_t(LightType::SpotShadow):
     case uint32_t(LightType::DirectionalShadow): {
@@ -318,7 +326,12 @@ void Renderer::renderShadows(const RenderList &render_list) {
       V_GL(glClearColor(0, 0, 0, 0));
       V_GL(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
 
+      glEnable(GL_SCISSOR_TEST);
+      V_GL(glScissor(1, 1, shadow_map_size - 2, shadow_map_size - 2));
+
       render(render_list, _opaque);
+
+      glDisable(GL_SCISSOR_TEST);
 
       break;
     }
@@ -350,22 +363,13 @@ void Renderer::renderShadows(const RenderList &render_list) {
           v = lookatMatrix(light.position.cast<double>(),
                            at[face] + light.position.cast<double>(), -up[face])
                   .cast<float>();
-
-          /*
-  v(2, 0) *= -1.0f;
-  v(2, 1) *= -1.0f;
-  v(2, 2) *= -1.0f;
-  v(2, 3) *= -1.0f;
-  */
-
-          /*v(1, 0) *= -1.0f;
-          v(1, 1) *= -1.0f;
-          v(1, 2) *= -1.0f;
-          v(1, 3) *= -1.0f;*/
         }
 
+        double far = 20.0;
+        double near = 0.1;
+
         shadow_camera_block.projection_matrix =
-            projectionMatrix(M_PI / 2, 1, 0.1, 2.0).cast<float>();
+            projectionMatrix(M_PI / 2, 1, near, far).cast<float>();
 
         shadow_camera_block.flags = CameraBlock::ShadowCameraFlag;
         prepare(shadow_camera_block, render_list);
@@ -377,10 +381,8 @@ void Renderer::renderShadows(const RenderList &render_list) {
 
         V_GL(glViewport(0, 0, shadow_cube_size, shadow_cube_size));
 
-        // V_GL(glClearDepth(0));
         V_GL(glClearColor(0, 0, 0, 0));
         V_GL(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
-        // V_GL(glClearDepth(1));
 
         render(render_list, _opaque);
       }

@@ -1,7 +1,8 @@
 // TAMSVIZ
 // (c) 2020 Philipp Ruppel
 
-#version 150
+//#version 150
+#version 400
 
 layout(std140) uniform material_block {
     vec4 color;

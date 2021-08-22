@@ -28,7 +28,7 @@ enum class LightType : uint32_t {
   DirectionalShadow = (1 | 32 | 64),
   Directional = 1,
 
-  PointShadow = 2,
+  PointShadow = (2 | 128),
   Point = 2,
 
   SpotShadow = (3 | 32 | 64),
@@ -99,6 +99,11 @@ struct RenderCommand {
   bool indexed = false;
 };
 
+struct RenderParameters {
+  size_t shadow_map_resolution = 256;
+  size_t shadow_cube_resolution = 256;
+};
+
 class RenderList {
   std::vector<MaterialBlock, Eigen::aligned_allocator<MaterialBlock>>
       _materials;
@@ -106,6 +111,7 @@ class RenderList {
       _instances;
   std::vector<RenderCommand> _commands;
   std::vector<LightBlock, Eigen::aligned_allocator<LightBlock>> _lights;
+  RenderParameters _parameters;
   size_t _shadow_map_count = 0;
   size_t _shadow_cube_count = 0;
 
@@ -113,6 +119,8 @@ public:
   void push(const MaterialBlock &material);
   void push(const std::shared_ptr<Mesh> &mesh, const RenderOptions &options);
   void push(const InstanceBlock &instance);
+
+  void put(const RenderParameters &parameters) { _parameters = parameters; }
 
   inline void push(const MaterialBlock &material,
                    const std::shared_ptr<Mesh> &mesh,

@@ -96,23 +96,7 @@ public:
 };
 DECLARE_TYPE_C(RobotStateDisplay, RobotStateDisplayBase, Robot);
 
-/*
-class DisplayRobotStateDisplay : public RobotStateDisplayBase {
-
-public:
-  PROPERTY(TopicProperty<moveit_msgs::DisplayRobotState>, topic,
-           "/joint_states");
-  virtual void refresh() override {
-    refreshTopic(topic().topic());
-    RobotStateDisplayBase::refresh();
-  }
-};
-DECLARE_TYPE(DisplayRobotStateDisplay, RobotStateDisplayBase);
-*/
-
 class DisplayRobotStateDisplay : public GenericFrameDisplay<RobotDisplayBase> {
-  // std::shared_ptr<const moveit_msgs::DisplayRobotState>
-  //      _display_robot_state_message;
 
 public:
   PROPERTY(TopicProperty<moveit_msgs::DisplayRobotState>, topic,
@@ -121,19 +105,6 @@ public:
   virtual void renderAsync(const RenderAsyncContext &context) override;
 };
 DECLARE_TYPE_C(DisplayRobotStateDisplay, RobotDisplayBase, Robot);
-
-/*
-class RobotTrajectoryDisplay : public GenericFrameDisplay<RobotDisplayBase> {
-  Watcher _trajectory_watcher;
-  size_t _frame_index = 0;
-
-public:
-  PROPERTY(TopicProperty<moveit_msgs::DisplayTrajectory>, topic,
-           "/move_group/display_planned_path");
-  virtual void renderSync(const RenderSyncContext &context) override;
-};
-DECLARE_TYPE(RobotTrajectoryDisplay, RobotDisplayBase);
-*/
 
 class RobotTrajectoryDisplay : public GenericFrameDisplay<RobotDisplayBase> {
   Watcher _trajectory_watcher;
@@ -152,6 +123,8 @@ class RobotTrajectoryDisplay : public GenericFrameDisplay<RobotDisplayBase> {
   volatile bool _update_exit = false;
   Watcher _update_parameter_watcher;
   double _update_speed = 1;
+  bool _play_trajectory = false;
+  double _trajectory_time = 0;
 
 public:
   PROPERTY(TopicProperty<moveit_msgs::DisplayTrajectory>, topic,
@@ -159,7 +132,8 @@ public:
   PROPERTY(int, maxSteps, 10, min = 1);
   PROPERTY(bool, showAllStates, false);
   PROPERTY(double, speed, 1, min = 0);
-  // PROPERTY(double, stateDisplayTime, 0.1);
+  PROPERTY(bool, playTrajectory, true);
+  PROPERTY(double, trajectoryTime, 0, min = 0);
   virtual void renderSync(const RenderSyncContext &context) override;
   virtual void renderAsync(const RenderAsyncContext &context) override;
   RobotTrajectoryDisplay();

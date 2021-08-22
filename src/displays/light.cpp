@@ -23,7 +23,7 @@ protected:
   ShadowLightDisplayBase() {}
 
 public:
-  PROPERTY(double, shadowBias, 0.01, min = 0.0);
+  PROPERTY(double, shadowBias, 1.0, min = 0.0);
   PROPERTY(bool, shadowEnable, true);
 };
 DECLARE_TYPE(ShadowLightDisplayBase, LightDisplayBase);
@@ -69,7 +69,8 @@ struct PointLight : ShadowLightDisplayBase {
       light.view_matrix = pose.inverse().matrix().cast<float>();
       light.color = color().toLinearVector4f().head(3) * (float)brightness();
       light.type =
-          (uint32_t(LightType::Point) |
+          (uint32_t(shadowEnable() ? LightType::PointShadow
+                                   : LightType::Point) |
            (viewSpace() ? uint32_t(LightType::ViewSpace) : uint32_t(0)));
       light.shadow_bias = shadowBias();
       context.render_list->push(light);
@@ -79,9 +80,10 @@ struct PointLight : ShadowLightDisplayBase {
 DECLARE_TYPE_C(PointLight, ShadowLightDisplayBase, Light);
 
 struct SpotLight : ShadowLightDisplayBase {
-  // Texture _light_map{TextureType::Linear};
   PROPERTY(double, softness, 0.5, min = 0.0, max = 1.0);
   PROPERTY(double, angle, 90, min = 0.0, max = 180);
+  PROPERTY(double, shadowNear, 0.1, min = 0.0);
+  PROPERTY(double, shadowFar, 10.0, min = 0.0);
   virtual void renderSync(const RenderSyncContext &context) override {
     ShadowLightDisplayBase::renderSync(context);
     if (visible()) {
@@ -95,7 +97,7 @@ struct SpotLight : ShadowLightDisplayBase {
       light.projection_matrix =
           projectionMatrix(std::max(1e-6, std::min(180.0 - 1e-3, angle())) *
                                M_PI / 180.0,
-                           1.0, 0.01, 100.0)
+                           1.0, shadowNear(), shadowFar())
               .cast<float>();
       light.color = color().toLinearVector4f().head(3) * (float)brightness();
       light.type =
@@ -103,7 +105,6 @@ struct SpotLight : ShadowLightDisplayBase {
            (viewSpace() ? uint32_t(LightType::ViewSpace) : uint32_t(0)));
       light.softness = std::max(0.0001f, std::min(1.0f, (float)softness()));
       light.shadow_bias = shadowBias();
-      // light.light_map = _light_map.update(256, 256, GL_DEPTH_COMPONENT);
       context.render_list->push(light);
     }
   }

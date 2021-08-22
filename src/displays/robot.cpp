@@ -543,6 +543,8 @@ void RobotTrajectoryDisplay::renderSync(const RenderSyncContext &context) {
     _update_speed = speed();
     _update_condition.notify_all();
   }
+  _play_trajectory = playTrajectory();
+  _trajectory_time = trajectoryTime();
   RobotDisplayBase::renderSync(context);
 }
 
@@ -551,67 +553,12 @@ void RobotTrajectoryDisplay::renderAsync(const RenderAsyncContext &context) {
   if (_robot_model_loader) {
     robot_model = _robot_model_loader->load();
   }
-  /*
-  size_t current_frame = 0;
-  if (!_show_all) {
-    current_frame =
-        (size_t)std::fmod(ros::WallTime::now().toSec(), _frame_time);
-  }
-  */
+
   if (_trajectory_watcher.changed(_display_trajectory_message, _max_steps,
                                   robot_model)) {
     _trajectory.clear();
     if (robot_model && _display_trajectory_message) {
-      // LOG_DEBUG("new trajectory");
       if (robot_model->moveit_robot) {
-
-        /*
-        ros::Time current_frame_time;
-        {
-          {
-            size_t joint_frame_count = 0;
-            size_t md_frame_count = 0;
-            for (auto &robot_trajectory :
-                 _display_trajectory_message->trajectory) {
-              joint_frame_count +=
-                  robot_trajectory.joint_trajectory.points.size();
-              md_frame_count +=
-                  robot_trajectory.multi_dof_joint_trajectory.points.size();
-            }
-            size_t frame_count = std::max(
-                size_t(1), std::max(md_frame_count, joint_frame_count));
-            current_frame = current_frame % frame_count;
-          }
-        }
-        */
-
-        /*
-        ros::Duration display_time = ros::Duration(0);
-        if (!_show_all) {
-          ros::Duration trajectory_duration = ros::Duration(0.0);
-          {
-            for (auto &robot_trajectory :
-                 _display_trajectory_message->trajectory) {
-              ros::Duration duration = ros::Duration(0.0);
-              if (!robot_trajectory.joint_trajectory.points.empty()) {
-                duration = std::max(
-                    duration, robot_trajectory.joint_trajectory.points.back()
-                                  .time_from_start);
-              }
-              if (!robot_trajectory.multi_dof_joint_trajectory.points.empty()) {
-                duration = std::max(
-                    duration,
-                    robot_trajectory.multi_dof_joint_trajectory.points.back()
-                        .time_from_start);
-              }
-              trajectory_duration += duration;
-            }
-          }
-          display_time = ros::Duration(
-              std::fmod(ros::Time::now().toSec(),
-                        std::max(0.001, trajectory_duration.toSec())));
-        }
-        */
 
         std::map<ros::Duration, std::shared_ptr<RobotState>> states;
         {
@@ -723,7 +670,6 @@ void RobotTrajectoryDisplay::renderAsync(const RenderAsyncContext &context) {
                                               ->getLinkModel(link->link_index))
                                       .matrix()) *
                 link->pose);
-            // robot_state->mesh_renderers.at(i)->show();
           }
           _trajectory.emplace_back((pair.first - states.begin()->first).toSec(),
                                    robot_state);
@@ -753,6 +699,14 @@ void RobotTrajectoryDisplay::renderAsync(const RenderAsyncContext &context) {
       j = _frame_update;
     }
     j = (j % _trajectory.size());
+    if (!_show_all && !_play_trajectory) {
+      for (size_t i = 0; i < _trajectory.size(); i++) {
+        j = i;
+        if (_trajectory_time < _trajectory[i].first) {
+          break;
+        }
+      }
+    }
     for (size_t i = 0; i < _trajectory.size(); i++) {
       auto &pair = _trajectory[i];
       bool vis = (_show_all || i == j);

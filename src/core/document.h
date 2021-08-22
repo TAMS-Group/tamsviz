@@ -205,6 +205,8 @@ DECLARE_TYPE(Window, Object);
 struct RenderingParameters : Object {
   PROPERTY(int, multiSampling, 4, min = 0, max = 16);
   PROPERTY(int, sampleShading, 1, min = 0, max = 2);
+  PROPERTY(int, shadowMapResolution, 1024, min = 1);
+  PROPERTY(int, shadowCubeResolution, 512, min = 1);
 };
 DECLARE_TYPE(RenderingParameters, Object);
 
