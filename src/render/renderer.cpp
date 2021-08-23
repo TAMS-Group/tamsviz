@@ -420,32 +420,58 @@ void Renderer::render(RenderTarget &render_target,
   V_GL(glDisable(GL_BLEND));
   render(render_list, _opaque);
 
+  {
+    blend_shader->use();
+    std::lock_guard<std::mutex> lock(render_target._mutex);
+    V_GL(glUniform1i(
+        glGetUniformLocation(blend_shader->program(), "transparency"),
+        !_transparent.empty()));
+    V_GL(glUniform1i(
+        glGetUniformLocation(blend_shader->program(), "tone_mapping"),
+        render_list._parameters.tone_mapping));
+    V_GL(glUniform1f(
+        glGetUniformLocation(blend_shader->program(), "exposure"),
+        float(render_list._parameters.exposure / render_target._samples)));
+    V_GL(glUniform1i(glGetUniformLocation(blend_shader->program(), "samples"),
+                     render_target._samples));
+  }
+
   if (_transparent.empty()) {
 
     std::lock_guard<std::mutex> lock(render_target._mutex);
 
-    render_target._front_framebuffer.bind();
     render_target._front_framebuffer.attach(render_target._front_colorbuffer,
                                             GL_COLOR_ATTACHMENT0);
-
-    V_GL(glBindFramebuffer(GL_DRAW_FRAMEBUFFER,
-                           render_target._front_framebuffer.id()));
-    V_GL(glBindFramebuffer(GL_READ_FRAMEBUFFER,
-                           render_target._opaque_framebuffer.id()));
-    V_GL(glBlitFramebuffer(0, 0, render_target._width, render_target._height, 0,
-                           0, render_target._width, render_target._height,
-                           GL_COLOR_BUFFER_BIT, GL_NEAREST));
-
     render_target._front_framebuffer.bind();
-    V_GL(glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-                                   GL_RENDERBUFFER, 0));
+
+    V_GL(glDepthMask(GL_FALSE));
+
+    glDisable(GL_SAMPLE_SHADING);
+
+    screen_quad->bind();
+
+    blend_shader->use();
+
+    V_GL(glUniform1i(glGetUniformLocation(blend_shader->program(), "opaque"),
+                     1));
+    V_GL(glActiveTexture(GL_TEXTURE1));
+    V_GL(glBindTexture(GL_TEXTURE_2D_MULTISAMPLE,
+                       render_target._opaque_texture.id()));
+
+    V_GL(glDrawElements(GL_TRIANGLES, screen_quad->data().indices.size(),
+                        GL_UNSIGNED_INT, nullptr));
 
     V_GL(glBindFramebuffer(GL_FRAMEBUFFER, 0));
+
+    V_GL(glActiveTexture(GL_TEXTURE1));
+    V_GL(glBindTexture(GL_TEXTURE_2D, 0));
 
     V_GL(glFlush());
     V_GL(glFinish());
 
   } else {
+
+    default_shader->use();
 
     if (camera_block.flags & CameraBlock::TransparentSampleShadingFlag) {
       glEnable(GL_SAMPLE_SHADING);
@@ -510,9 +536,6 @@ void Renderer::render(RenderTarget &render_target,
     V_GL(glActiveTexture(GL_TEXTURE4));
     V_GL(glBindTexture(GL_TEXTURE_2D_MULTISAMPLE,
                        render_target._transparent_texture_tail_alpha.id()));
-
-    V_GL(glUniform1i(glGetUniformLocation(blend_shader->program(), "samples"),
-                     render_target._samples));
 
     V_GL(glDrawElements(GL_TRIANGLES, screen_quad->data().indices.size(),
                         GL_UNSIGNED_INT, nullptr));

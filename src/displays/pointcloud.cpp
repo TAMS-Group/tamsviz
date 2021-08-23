@@ -230,7 +230,11 @@ void PointCloudDisplay::renderSync(const RenderSyncContext &context) {
     std::shared_ptr<const Message> message;
     {
       PROFILER("fetch message");
-      message = topic().subscriber()->topic()->message();
+      if (auto sub = topic().subscriber()) {
+        if (auto topic = sub->topic()) {
+          message = topic->message();
+        }
+      }
     }
     if (_watcher.changed(message, pointColors())) {
       setPointCloud(message);
@@ -248,7 +252,11 @@ void PointCloud2Display::renderSync(const RenderSyncContext &context) {
     std::shared_ptr<const Message> message;
     {
       PROFILER("fetch message");
-      message = topic().subscriber()->topic()->message();
+      if (auto sub = topic().subscriber()) {
+        if (auto topic = sub->topic()) {
+          message = topic->message();
+        }
+      }
     }
     if (_watcher.changed(message, pointColors())) {
       setPointCloud(message);

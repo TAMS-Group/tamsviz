@@ -207,6 +207,8 @@ struct RenderingParameters : Object {
   PROPERTY(int, sampleShading, 1, min = 0, max = 2);
   PROPERTY(int, shadowMapResolution, 1024, min = 1);
   PROPERTY(int, shadowCubeResolution, 512, min = 1);
+  PROPERTY(double, exposure, 1, min = 0);
+  PROPERTY(bool, toneMapping, true);
 };
 DECLARE_TYPE(RenderingParameters, Object);
 
@@ -219,7 +221,10 @@ public:
   std::shared_ptr<Transformer> transformer;
   PROPERTY(std::string, fixedFrame, "world", list = &WorldDisplay::_listFrames);
   PROPERTY(Color4, backgroundColor, Color4(0.3, 0.3, 0.3, 1.0));
+  PROPERTY(double, backgroundBrightness, 1, min = 0);
   PROPERTY(double, ambientLighting, 1.0, min = 0.0, max = 1.0);
+  PROPERTY(Color3, groundColor, Color3(0.0, 0.0, 0.0));
+  PROPERTY(double, hemisphericLighting, 0.5, min = 0.0, max = 1.0);
   PROPERTY(std::shared_ptr<RenderingParameters>, rendering,
            std::make_shared<RenderingParameters>());
   virtual void renderSync(const RenderSyncContext &context) override;

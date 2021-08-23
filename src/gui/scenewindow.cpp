@@ -113,7 +113,8 @@ void SceneWindow::updateViewMatrix() {
 void SceneWindow::renderWindowSync(const RenderWindowSyncContext &context) {
   LockScope ws;
 
-  _bgcolor = ws->document()->display()->backgroundColor().toLinearVector4f();
+  _bgcolor = ws->document()->display()->backgroundColor().toLinearVector4f() *
+             float(ws->document()->display()->backgroundBrightness());
 
   updateViewMatrix();
   float far = (100.0 + (viewPosition() - viewTarget()).norm() * 2.0);

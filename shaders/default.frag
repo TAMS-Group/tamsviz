@@ -25,6 +25,8 @@ struct Light {
     mat4 projection_matrix;
     vec3 color;
     int type;
+    vec3 color2;
+    float hemispheric;
     vec3 position;
     float softness;
     float shadow_bias;
@@ -187,6 +189,7 @@ void main() {
         
         switch(type & 3) {
             
+        /*
         case 0: { // ambient
             vec3 radiance = light_color;
             float n_dot_l = 1.0;
@@ -196,6 +199,37 @@ void main() {
             specular = min(vec3(1.0), specular);
             specular *= specular_factor;
             lighting += max(vec3(0.0), (diffuse * albedo / pi + specular) * radiance * max(0.0, n_dot_l));
+            continue;
+        }
+        */
+        
+        /*
+        case 0: { // ambient
+            vec3 diffuse_radiance = light_color * (normal.z * 0.5 + 0.5);
+            vec3 specular_radiance = light_color * (reflect(view_direction, normal).z * -0.5 + 0.5);
+            float n_dot_l = 1.0;
+            float n_dot_h = 1.0;
+            float ndf = 1.0;
+            vec3 specular = (vec3(ndf * geometry) * fresnel) / max(0.001, 4.0 * max(0.0, n_dot_v));
+            specular = min(vec3(1.0), specular);
+            specular *= specular_factor;
+            lighting += max(vec3(0.0), (diffuse * albedo / pi * diffuse_radiance + specular * specular_radiance) * max(0.0, n_dot_l));
+            continue;
+        }
+        */
+        
+        case 0: { // ambient
+            vec3 light_color_2 = lights.light_array[light_index].color2.xyz;
+            float hemi = lights.light_array[light_index].hemispheric;
+            vec3 diffuse_radiance = mix(light_color, light_color_2, hemi * (normal.z * -0.5 + 0.5));
+            vec3 specular_radiance = mix(light_color, light_color_2, hemi * (reflect(view_direction, normal).z * 0.5 + 0.5));
+            float n_dot_l = 1.0;
+            float n_dot_h = 1.0;
+            float ndf = 1.0;
+            vec3 specular = (vec3(ndf * geometry) * fresnel) / max(0.001, 4.0 * max(0.0, n_dot_v));
+            specular = min(vec3(1.0), specular);
+            specular *= specular_factor;
+            lighting += max(vec3(0.0), (diffuse * albedo / pi * diffuse_radiance + specular * specular_radiance) * max(0.0, n_dot_l));
             continue;
         }
         

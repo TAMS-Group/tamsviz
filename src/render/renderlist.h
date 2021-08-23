@@ -42,6 +42,8 @@ struct LightBlock {
   Eigen::Matrix4f projection_matrix = Eigen::Matrix4f::Identity();
   Eigen::Vector3f color = Eigen::Vector3f::Zero();
   uint32_t type = 0;
+  Eigen::Vector3f color2 = Eigen::Vector3f::Zero();
+  float hemispheric = 0.0f;
   Eigen::Vector3f position = Eigen::Vector3f::Zero();
   float softness = 1.0f;
   float shadow_bias = 0.0f;
@@ -102,6 +104,8 @@ struct RenderCommand {
 struct RenderParameters {
   size_t shadow_map_resolution = 256;
   size_t shadow_cube_resolution = 256;
+  double exposure = 1.0;
+  bool tone_mapping = true;
 };
 
 class RenderList {

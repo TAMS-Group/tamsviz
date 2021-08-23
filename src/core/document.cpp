@@ -58,15 +58,20 @@ void WorldDisplay::renderSync(const RenderSyncContext &context) {
   DisplayGroupBase::renderSync(context);
   {
     LightBlock light;
-    light.color =
-        backgroundColor().toLinearVector4f().head(3) * (float)ambientLighting();
+    light.color = backgroundColor().toLinearVector4f().head(3) *
+                  (float)(ambientLighting() * backgroundBrightness());
     light.type = (uint32_t)LightType::Ambient;
+    light.hemispheric = float(hemisphericLighting());
+    light.color2 = groundColor().toLinearVector4f().head(3) *
+                   (float)(ambientLighting() * backgroundBrightness());
     context.render_list->push(light);
   }
   {
     RenderParameters params;
     params.shadow_map_resolution = rendering()->shadowMapResolution();
     params.shadow_cube_resolution = rendering()->shadowCubeResolution();
+    params.exposure = rendering()->exposure();
+    params.tone_mapping = rendering()->toneMapping();
     context.render_list->put(params);
   }
   /* _current_scene_annotations.clear();
