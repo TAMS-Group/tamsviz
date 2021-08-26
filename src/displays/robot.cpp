@@ -537,10 +537,12 @@ void RobotTrajectoryDisplay::renderSync(const RenderSyncContext &context) {
   _display_trajectory_message = topic().message();
   _max_steps = maxSteps();
   _show_all = showAllStates();
-  if (_update_parameter_watcher.changed(showAllStates(), speed())) {
+  if (_update_parameter_watcher.changed(showAllStates(), speed(),
+                                        playTrajectory())) {
     std::unique_lock<std::mutex> lock(_update_mutex);
     _update_show_all = showAllStates();
     _update_speed = speed();
+    _update_play_trajectory = playTrajectory();
     _update_condition.notify_all();
   }
   _play_trajectory = playTrajectory();
@@ -728,7 +730,8 @@ RobotTrajectoryDisplay::RobotTrajectoryDisplay() {
       if (_update_exit) {
         break;
       }
-      if (_update_times.size() < 2 || _update_show_all || _update_speed == 0) {
+      if (_update_times.size() < 2 || _update_show_all || _update_speed == 0 ||
+          !_update_play_trajectory) {
         _update_condition.wait(lock);
       } else {
         current_frame_index = (current_frame_index % _update_times.size());

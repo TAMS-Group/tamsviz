@@ -18,6 +18,9 @@ uniform bool transparency;
 uniform float exposure;
 uniform bool tone_mapping;
 
+uniform float black_level;
+uniform float white_level;
+
 vec3 map_color(vec3 color);
 
 void main() {
@@ -27,7 +30,6 @@ void main() {
             vec4 o = texelFetch(opaque, ivec2(gl_FragCoord.xy), i);
             vec4 t = texelFetch(transparent_head, ivec2(gl_FragCoord.xy), i);
             vec4 tta = texelFetch(transparent_tail_alpha, ivec2(gl_FragCoord.xy), i);
-            //vec3 c = o.xyz;
             if(t.w <= 0.0 && tta.x <= 0.0) {
                 out_color.xyz += o.xyz;
             } else {
@@ -37,18 +39,15 @@ void main() {
                 color = mix(color, t.xyz, t.w);
                 out_color.xyz += color;
             }
-            //if(tone_mapping) c = map_color(c * exposure);
-            //out_color.xyz += c;
         }
     } else {
         for(int i = 0; i < samples; i++) {
-            vec3 c = texelFetch(opaque, ivec2(gl_FragCoord.xy), i).xyz;
-            //if(tone_mapping) c = map_color(c * exposure);
-            out_color.xyz += c;
+            out_color.xyz += texelFetch(opaque, ivec2(gl_FragCoord.xy), i).xyz;
         }
     }
     out_color.xyz *= exposure;
     if(tone_mapping) out_color.xyz = map_color(out_color.xyz);
+    out_color.xyz = (out_color.xyz - black_level) * (1.0 / (white_level - black_level));
 }
 
 // tone mapping, based on 

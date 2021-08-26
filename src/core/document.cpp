@@ -72,6 +72,8 @@ void WorldDisplay::renderSync(const RenderSyncContext &context) {
     params.shadow_cube_resolution = rendering()->shadowCubeResolution();
     params.exposure = rendering()->exposure();
     params.tone_mapping = rendering()->toneMapping();
+    params.black_level = rendering()->blackLevel();
+    params.white_level = rendering()->whiteLevel();
     context.render_list->put(params);
   }
   /* _current_scene_annotations.clear();

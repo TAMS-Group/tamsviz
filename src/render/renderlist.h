@@ -106,6 +106,8 @@ struct RenderParameters {
   size_t shadow_cube_resolution = 256;
   double exposure = 1.0;
   bool tone_mapping = true;
+  float black_level = 0;
+  float white_level = 1;
 };
 
 class RenderList {

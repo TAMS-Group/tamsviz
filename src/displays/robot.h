@@ -123,6 +123,7 @@ class RobotTrajectoryDisplay : public GenericFrameDisplay<RobotDisplayBase> {
   volatile bool _update_exit = false;
   Watcher _update_parameter_watcher;
   double _update_speed = 1;
+  bool _update_play_trajectory = 0;
   bool _play_trajectory = false;
   double _trajectory_time = 0;
 

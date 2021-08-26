@@ -434,6 +434,12 @@ void Renderer::render(RenderTarget &render_target,
         float(render_list._parameters.exposure / render_target._samples)));
     V_GL(glUniform1i(glGetUniformLocation(blend_shader->program(), "samples"),
                      render_target._samples));
+    V_GL(glUniform1f(
+        glGetUniformLocation(blend_shader->program(), "black_level"),
+        float(render_list._parameters.black_level)));
+    V_GL(glUniform1f(
+        glGetUniformLocation(blend_shader->program(), "white_level"),
+        float(render_list._parameters.white_level)));
   }
 
   if (_transparent.empty()) {

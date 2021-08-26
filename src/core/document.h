@@ -209,6 +209,8 @@ struct RenderingParameters : Object {
   PROPERTY(int, shadowCubeResolution, 512, min = 1);
   PROPERTY(double, exposure, 1, min = 0);
   PROPERTY(bool, toneMapping, true);
+  PROPERTY(double, blackLevel, 0);
+  PROPERTY(double, whiteLevel, 1);
 };
 DECLARE_TYPE(RenderingParameters, Object);
 
