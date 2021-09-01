@@ -19,6 +19,8 @@
 #include <thread>
 
 #include <opencv2/imgcodecs.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/highgui/highgui.hpp>
 
 struct AnnotationView : QGraphicsItem {
   bool ok = false;
@@ -434,11 +436,13 @@ ImageWindow::ImageWindow() {
           */
 
           cv::Mat mat;
+          std::string img_encoding="";
 
           if (auto img = image->instantiate<sensor_msgs::Image>()) {
             cv_bridge::CvImagePtr cv_ptr;
             try {
               cv_ptr = cv_bridge::toCvCopy(*img);
+              img_encoding = img->encoding;
             } catch (cv_bridge::Exception &e) {
               LOG_ERROR("cv_bridge exception: " << e.what());
               {
@@ -470,7 +474,8 @@ ImageWindow::ImageWindow() {
                             QImage::Format_Grayscale8);
             break;
           case CV_16UC1:
-            mat.convertTo(mat, CV_8U, 1.0 / 256.0);
+            cv::normalize(mat,  mat, 0, 255, cv::NORM_MINMAX);
+            mat.convertTo(mat, CV_8U, 1.0);
             qimage = QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
                             QImage::Format_Grayscale8);
             break;
@@ -486,12 +491,14 @@ ImageWindow::ImageWindow() {
             break;
 
           case CV_8UC3:
-            cv::cvtColor(mat, mat, cv::COLOR_BGR2RGB);
+            if (img_encoding == "bgr8")
+              cv::cvtColor(mat, mat, cv::COLOR_BGR2RGB);
             qimage = QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
                             QImage::Format_RGB888);
             break;
           case CV_16UC3:
-            cv::cvtColor(mat, mat, cv::COLOR_BGR2RGB);
+            if (img_encoding == "bgr16")
+              cv::cvtColor(mat, mat, cv::COLOR_BGR2RGB);
             mat.convertTo(mat, CV_8UC3, 1.0 / 256.0);
             qimage = QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
                             QImage::Format_RGB888);
@@ -510,12 +517,14 @@ ImageWindow::ImageWindow() {
             break;
 
           case CV_8UC4:
-            cv::cvtColor(mat, mat, cv::COLOR_BGRA2RGBA);
+            if (img_encoding == "bgra8")
+              cv::cvtColor(mat, mat, cv::COLOR_BGRA2RGBA);
             qimage = QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
                             QImage::Format_RGBA8888);
             break;
           case CV_16UC4:
-            cv::cvtColor(mat, mat, cv::COLOR_BGRA2RGBA);
+            if (img_encoding == "bgra16")
+              cv::cvtColor(mat, mat, cv::COLOR_BGRA2RGBA);
             mat.convertTo(mat, CV_8UC4, 1.0 / 256.0);
             qimage = QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
                             QImage::Format_RGBA8888);
