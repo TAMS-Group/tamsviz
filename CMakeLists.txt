@@ -19,6 +19,7 @@ find_package(Qt5 REQUIRED Core Widgets OpenGL)
 set(QT_LIBRARIES Qt5::Widgets Qt5::OpenGL)
 
 find_package(catkin REQUIRED COMPONENTS
+    camera_info_manager
     cv_bridge
     eigen_conversions
     geometry_msgs
@@ -38,6 +39,7 @@ find_package(catkin REQUIRED COMPONENTS
 
 catkin_package(
     CATKIN_DEPENDS
+        camera_info_manager
         cv_bridge
         geometry_msgs
         interactive_markers
@@ -87,6 +89,7 @@ add_executable(${PROJECT_NAME}
     src/core/watcher.cpp
     src/core/workspace.cpp
     src/displays/axes.cpp
+    src/displays/drvcam.cpp
     src/displays/frame.cpp
     src/displays/geometry.cpp
     src/displays/grid.cpp

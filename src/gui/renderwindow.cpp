@@ -93,6 +93,7 @@ RenderWindowBase::RenderWindowBase() {
           LOG_SUCCESS("screenshot saved: " << file_name.toStdString());
         } else {
           LOG_ERROR("failed to save screenshot: " << file_name.toStdString());
+          QMessageBox::warning(nullptr, "Error", "Failed to save screenshot.");
         }
       }
     });

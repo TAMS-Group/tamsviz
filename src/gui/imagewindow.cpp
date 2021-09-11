@@ -340,20 +340,6 @@ ImageWindow::ImageWindow() {
     }
   }
 
-  {
-    auto *button = new FlatButton();
-    button->setIcon(MATERIAL_ICON("zoom_out_map"));
-    button->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
-    connect(button, &QPushButton::clicked, this, [this]() {
-      LockScope ws;
-      zoom() = 1.0;
-      center().x() = 0.5;
-      center().y() = 0.5;
-      ws->modified();
-    });
-    addToolWidgetRight(button);
-  }
-
   class MessageBuffer {
     std::mutex _mutex;
     std::shared_ptr<const Message> _image;
@@ -573,6 +559,70 @@ ImageWindow::ImageWindow() {
     }
   };
   std::shared_ptr<MessageBuffer> buffer = std::make_shared<MessageBuffer>();
+
+  {
+    auto *button = new FlatButton();
+    button->setIcon(MATERIAL_ICON("photo_camera", 0.0));
+    button->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
+    connect(button, &QPushButton::clicked, this, [this, buffer]() {
+      QPixmap screenshot;
+      ros::Time time;
+      buffer->fetchPixmap(&screenshot, &time);
+      if (!screenshot) {
+        QMessageBox::warning(nullptr, "Error",
+                             "No image received. Select image topic.");
+        return;
+      }
+      std::string namesuggest;
+      {
+        LockScope ws;
+        namesuggest = topic();
+      }
+      while (namesuggest.size() && !std::isalnum(namesuggest.front())) {
+        namesuggest = namesuggest.substr(1);
+      }
+      for (auto &c : namesuggest) {
+        if (!std::isalnum(c)) {
+          c = '_';
+        }
+      }
+      namesuggest += "_";
+      namesuggest += std::to_string(ros::WallTime::now().toNSec());
+      namesuggest += ".png";
+      QString file_name = QFileDialog::getSaveFileName(
+          this, tr("Save Screenshot"), namesuggest.c_str(),
+          tr("Images (*.png *.jpg)"));
+      if (!file_name.isEmpty()) {
+        if (QFileInfo(file_name).suffix().isEmpty()) {
+          if (!file_name.endsWith(".")) {
+            file_name += ".";
+          }
+          file_name += "png";
+        }
+        if (screenshot.save(file_name)) {
+          LOG_SUCCESS("screenshot saved: " << file_name.toStdString());
+        } else {
+          LOG_ERROR("failed to save screenshot: " << file_name.toStdString());
+          QMessageBox::warning(nullptr, "Error", "Failed to save image.");
+        }
+      }
+    });
+    addToolWidgetRight(button);
+  }
+
+  {
+    auto *button = new FlatButton();
+    button->setIcon(MATERIAL_ICON("zoom_out_map"));
+    button->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
+    connect(button, &QPushButton::clicked, this, [this]() {
+      LockScope ws;
+      zoom() = 1.0;
+      center().x() = 0.5;
+      center().y() = 0.5;
+      ws->modified();
+    });
+    addToolWidgetRight(button);
+  }
 
   class GraphicsView : public QGraphicsView {
     class GraphicsScene : public QGraphicsScene {
