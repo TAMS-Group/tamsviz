@@ -18,9 +18,9 @@
 #include <mutex>
 #include <thread>
 
+#include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
-#include <opencv2/highgui/highgui.hpp>
 
 struct AnnotationView : QGraphicsItem {
   bool ok = false;
@@ -344,12 +344,14 @@ ImageWindow::ImageWindow() {
 
   class MessageBuffer {
     std::mutex _mutex;
+    bool _pending = false;
     std::shared_ptr<const Message> _image;
     std::condition_variable _put_condition;
     std::thread _worker;
     QPixmap _pixmap;
     bool _stop = false;
     ros::Time _image_time, _pixmap_time;
+    ImageWindowOptions _options;
 
   public:
     Event<void()> ready;
@@ -363,9 +365,9 @@ ImageWindow::ImageWindow() {
               if (_stop) {
                 return;
               }
-              if (_image) {
+              if (_pending) {
+                _pending = false;
                 image = _image;
-                _image = nullptr;
                 break;
               }
               _put_condition.wait(lock);
@@ -379,51 +381,9 @@ ImageWindow::ImageWindow() {
             continue;
           }
 
-          /*
-          cv_bridge::CvImagePtr cv_ptr;
-          QImage::Format image_format;
-          try {
-            if (sensor_msgs::image_encodings::isColor(image->encoding)) {
-              LOG_DEBUG("color");
-              image_format = QImage::Format_RGBA8888;
-              cv_ptr = cv_bridge::toCvCopy(*image,
-                                           sensor_msgs::image_encodings::RGBA8);
-            } else {
-              LOG_DEBUG("grayscale");
-              image_format = QImage::Format_Grayscale8;
-              cv_ptr = cv_bridge::toCvCopy(*image,
-                                           sensor_msgs::image_encodings::MONO8);
-            }
-          } catch (cv_bridge::Exception &e) {
-            LOG_ERROR("cv_bridge exception: " << e.what());
-            {
-              std::unique_lock<std::mutex> lock(_mutex);
-              _pixmap = QPixmap();
-            }
-            ready();
-            continue;
-          }
-          if (cv_ptr->image.data == nullptr) {
-            {
-              std::unique_lock<std::mutex> lock(_mutex);
-              _pixmap = QPixmap();
-            }
-            ready();
-            continue;
-          }
-          cv::Mat mat = cv_ptr->image;
-          auto pixmap = QPixmap::fromImage(QImage(
-              (uchar *)mat.data, mat.cols, mat.rows, mat.step, image_format));
-          {
-            std::unique_lock<std::mutex> lock(_mutex);
-            _pixmap = pixmap;
-            _pixmap_time = _image_time;
-          }
-          */
-
+          // use cv bridge to convert image message to cv mat
           cv::Mat mat;
-          std::string img_encoding="";
-
+          std::string img_encoding = "";
           if (auto img = image->instantiate<sensor_msgs::Image>()) {
             cv_bridge::CvImagePtr cv_ptr;
             try {
@@ -442,92 +402,127 @@ ImageWindow::ImageWindow() {
           } else if (auto img =
                          image->instantiate<sensor_msgs::CompressedImage>()) {
             mat = cv::imdecode(img->data, cv::IMREAD_UNCHANGED);
+            if (mat.channels() == 3 || mat.channels() == 4) {
+              cv::cvtColor(mat, mat, cv::COLOR_BGRA2RGBA);
+            }
           } else {
             LOG_WARN("unsupported image message type" << image->type()->name());
             continue;
           }
-
           if (mat.empty()) {
             LOG_WARN("failed to decode image");
             continue;
           }
+          LOG_DEBUG_THROTTLE(1, img_encoding);
 
+          // remove nans and infinity
+          switch (mat.type()) {
+          case CV_32FC1:
+          case CV_32FC2:
+          case CV_32FC3:
+          case CV_32FC4:
+            for (size_t y = 0; y < mat.rows; y++) {
+              auto *pixel = mat.ptr<float>(y);
+              size_t n = mat.cols * mat.channels();
+              for (size_t x = 0; x < n; x++) {
+                if (!std::isfinite(*pixel)) {
+                  *pixel = 0;
+                }
+                pixel++;
+              }
+            }
+            break;
+          case CV_64FC1:
+          case CV_64FC2:
+          case CV_64FC3:
+          case CV_64FC4:
+            for (size_t y = 0; y < mat.rows; y++) {
+              auto *pixel = mat.ptr<double>(y);
+              size_t n = mat.cols * mat.channels();
+              for (size_t x = 0; x < n; x++) {
+                if (!std::isfinite(*pixel)) {
+                  *pixel = 0;
+                }
+                pixel++;
+              }
+            }
+            break;
+          }
+
+          if (_options.normalizeDepth) {
+            switch (mat.type()) {
+            case CV_16UC1:
+              cv::normalize(mat, mat, 0x0000, 0xffff, cv::NORM_MINMAX);
+              break;
+            case CV_32FC1:
+            case CV_64FC1:
+              cv::normalize(mat, mat, 0.0, 1.0, cv::NORM_MINMAX);
+              break;
+            }
+          }
+
+          // convert to 8 bit
+          switch (mat.type()) {
+          case CV_16UC1:
+            mat.convertTo(mat, CV_8U, 1.0 / 256);
+            break;
+          case CV_32FC1:
+            mat.convertTo(mat, CV_8U, 255.0);
+            break;
+          case CV_64FC1:
+            mat.convertTo(mat, CV_8U, 255.0);
+            break;
+          case CV_16UC3:
+            mat.convertTo(mat, CV_8UC3, 1.0 / 256.0);
+            break;
+          case CV_32FC3:
+            mat.convertTo(mat, CV_8UC3, 255.0);
+            break;
+          case CV_64FC3:
+            mat.convertTo(mat, CV_8UC3, 255.0);
+            break;
+          case CV_16UC4:
+            mat.convertTo(mat, CV_8UC4, 1.0 / 256.0);
+            break;
+          case CV_32FC4:
+            mat.convertTo(mat, CV_8UC4, 255.0);
+            break;
+          case CV_64FC4:
+            mat.convertTo(mat, CV_8UC4, 255.0);
+            break;
+          }
+
+          // color map
+          if (_options.colorMapApply &&
+              (mat.type() == CV_8UC1 || mat.type() == CV_8UC3)) {
+            try {
+              cv::applyColorMap(mat, mat, _options.colorMapType);
+            } catch (const cv::Exception &ex) {
+              LOG_ERROR_THROTTLE(1.0, "Failed to apply color map: " + ex.msg);
+            }
+          }
+
+          // convert to qt image
           QImage qimage;
           switch (mat.type()) {
-
           case CV_8UC1:
             qimage = QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
                             QImage::Format_Grayscale8);
             break;
-          case CV_16UC1:
-            cv::normalize(mat,  mat, 0, 255, cv::NORM_MINMAX);
-            mat.convertTo(mat, CV_8U, 1.0);
-            qimage = QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
-                            QImage::Format_Grayscale8);
-            break;
-          case CV_32FC1:
-            mat.convertTo(mat, CV_8U, 255.0);
-            qimage = QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
-                            QImage::Format_Grayscale8);
-            break;
-          case CV_64FC1:
-            mat.convertTo(mat, CV_8U, 255.0);
-            qimage = QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
-                            QImage::Format_Grayscale8);
-            break;
-
           case CV_8UC3:
-            if (img_encoding == "bgr8")
+            if (img_encoding == "bgr8" || img_encoding == "bgr16") {
               cv::cvtColor(mat, mat, cv::COLOR_BGR2RGB);
+            }
             qimage = QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
                             QImage::Format_RGB888);
             break;
-          case CV_16UC3:
-            if (img_encoding == "bgr16")
-              cv::cvtColor(mat, mat, cv::COLOR_BGR2RGB);
-            mat.convertTo(mat, CV_8UC3, 1.0 / 256.0);
-            qimage = QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
-                            QImage::Format_RGB888);
-            break;
-          case CV_32FC3:
-            cv::cvtColor(mat, mat, cv::COLOR_BGR2RGB);
-            mat.convertTo(mat, CV_8UC3, 255.0);
-            qimage = QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
-                            QImage::Format_RGB888);
-            break;
-          case CV_64FC3:
-            cv::cvtColor(mat, mat, cv::COLOR_BGR2RGB);
-            mat.convertTo(mat, CV_8UC3, 255.0);
-            qimage = QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
-                            QImage::Format_RGB888);
-            break;
-
           case CV_8UC4:
-            if (img_encoding == "bgra8")
+            if (img_encoding == "bgra8" || img_encoding == "bgra16") {
               cv::cvtColor(mat, mat, cv::COLOR_BGRA2RGBA);
+            }
             qimage = QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
                             QImage::Format_RGBA8888);
             break;
-          case CV_16UC4:
-            if (img_encoding == "bgra16")
-              cv::cvtColor(mat, mat, cv::COLOR_BGRA2RGBA);
-            mat.convertTo(mat, CV_8UC4, 1.0 / 256.0);
-            qimage = QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
-                            QImage::Format_RGBA8888);
-            break;
-          case CV_32FC4:
-            cv::cvtColor(mat, mat, cv::COLOR_BGRA2RGBA);
-            mat.convertTo(mat, CV_8UC4, 255.0);
-            qimage = QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
-                            QImage::Format_RGBA8888);
-            break;
-          case CV_64FC4:
-            cv::cvtColor(mat, mat, cv::COLOR_BGRA2RGBA);
-            mat.convertTo(mat, CV_8UC4, 255.0);
-            qimage = QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
-                            QImage::Format_RGBA8888);
-            break;
-
           default:
             LOG_WARN("image format not yet supported " << mat.type());
             continue;
@@ -552,13 +547,19 @@ ImageWindow::ImageWindow() {
     }
     void putImage(const std::shared_ptr<const Message> &msg) {
       std::unique_lock<std::mutex> lock(_mutex);
+      _pending = true;
       _image = nullptr;
       _image_time = ros::Time();
       if (msg) {
         _image = msg;
         _image_time = msg->time();
-        _put_condition.notify_one();
       }
+      _put_condition.notify_one();
+    }
+    void refresh(const ImageWindowOptions &options) {
+      std::unique_lock<std::mutex> lock(_mutex);
+      _options = options;
+      _pending = true;
       _put_condition.notify_one();
     }
     void fetchPixmap(QPixmap *pixmap, ros::Time *time) {
@@ -568,6 +569,10 @@ ImageWindow::ImageWindow() {
     }
   };
   std::shared_ptr<MessageBuffer> buffer = std::make_shared<MessageBuffer>();
+
+  _refresh_callback = [buffer](const ImageWindowOptions &options) {
+    buffer->refresh(options);
+  };
 
   {
     auto *button = new FlatButton();

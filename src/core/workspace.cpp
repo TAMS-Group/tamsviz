@@ -103,7 +103,10 @@ Workspace::Workspace() {
     });
   }
 
-  modified.connect([this]() { document()->display()->refreshRecursive(); });
+  modified.connect([this]() {
+    document()->display()->refreshRecursive();
+    document()->window()->refreshRecursive();
+  });
 }
 Workspace::~Workspace() { object_ptr_test.clear(); }
 std::vector<std::string> Workspace::listTopics(const std::string &type_name) {

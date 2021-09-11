@@ -20,12 +20,20 @@ STRUCT_PROPERTY(x, min = 0, max = 1);
 STRUCT_PROPERTY(y, min = 0, max = 1);
 STRUCT_END();
 
+AUTO_STRUCT_BEGIN(ImageWindowOptions);
+AUTO_STRUCT_FIELD(bool, normalizeDepth, true);
+AUTO_STRUCT_FIELD(bool, colorMapApply, false);
+AUTO_STRUCT_FIELD(size_t, colorMapType, 9, min = 0);
+AUTO_STRUCT_END();
+
 class AnnotationView;
 
 class ImageWindow : public ContentWindowBase {
+  std::function<void(const ImageWindowOptions &)> _refresh_callback;
   std::shared_ptr<Subscriber<Message>> subscriber;
   static constexpr double minZoom() { return 0.01; }
   static constexpr double maxZoom() { return 1000000; }
+  Watcher _options_watcher;
 
 public:
   std::shared_ptr<ImageAnnotationBase> new_annotation;
@@ -37,5 +45,14 @@ public:
   PROPERTY(std::string, topic, "");
   PROPERTY(ClampedVector2d, center, Eigen::Vector2d(0.5, 0.5));
   PROPERTY(double, zoom, 1.0, min = minZoom(), max = maxZoom());
+  PROPERTY(ImageWindowOptions, options);
+  virtual void refresh() override {
+    ContentWindowBase::refresh();
+    if (_options_watcher.changed(options())) {
+      if (_refresh_callback) {
+        _refresh_callback(options());
+      }
+    }
+  }
 };
 DECLARE_TYPE(ImageWindow, ContentWindowBase);

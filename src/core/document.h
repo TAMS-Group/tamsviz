@@ -199,6 +199,8 @@ protected:
 
 public:
   PROPERTY(std::string, name, "Window");
+  virtual void refreshRecursive();
+  virtual void refresh();
 };
 DECLARE_TYPE(Window, Object);
 

@@ -146,6 +146,18 @@ void Pose::fromIsometry3d(const Eigen::Isometry3d &pose) {
   orientation().roll() = angles.z() * (180.0 / M_PI);
 }
 
+void Window::refreshRecursive() {
+  recurse([](const std::shared_ptr<Object> &object) {
+    if (object) {
+      if (auto window = std::dynamic_pointer_cast<Window>(object)) {
+        window->refresh();
+      }
+    }
+  });
+}
+
+void Window::refresh() {}
+
 void Display::refreshRecursive() { refresh(); }
 
 void Display::refresh() {}
