@@ -1,4 +1,4 @@
-# Visualization and annotation tool for ROS
+# TAMSVIZ - Visualization and Annotation Tool for ROS
 
 ### Features
 
@@ -14,6 +14,7 @@
 - Online visualization
 - Plots, filtering plot data, message queries
 - Physically-based shading
+- Dynamic lighting and shadows
 - Transparency without order inversion
 - Options to fix mesh normals
 - Normal mapping
