@@ -1,41 +1,8 @@
 // TAMSVIZ
 // (c) 2020 Philipp Ruppel
 
-//#version 150
-#version 400
-
-layout(std140) uniform material_block {
-    vec4 color;
-    float roughness;
-    float metallic;
-    int color_texture;
-    int normal_texture;
-    uint id;
-    int flags;
-} material;
-
-layout(std140) uniform camera_block {
-    mat4 view_matrix;
-    mat4 projection_matrix;
-    uint flags;
-} camera;
-
-struct Light {
-    mat4 view_matrix;
-    mat4 projection_matrix;
-    vec3 color;
-    int type;
-    vec3 color2;
-    float hemispheric;
-    vec3 position;
-    float softness;
-    float shadow_bias;
-    int shadow_index;
-};
-layout(std140) uniform light_block {
-  Light light_array[16];
-  int light_count;
-} lights;
+// #include <package://tamsviz/shaders/common.glsl>
+#include "common.glsl"
 
 uniform sampler2D color_sampler;
 uniform sampler2D normal_sampler;
@@ -56,31 +23,9 @@ out vec4 out_color;
 out vec4 out_blend;
 out uint out_id;
 
-float srgb2linear(float srgb) {
-  if (srgb < 0.04045) {
-    return srgb * (25.0 / 232.0);
-  } else {
-    return pow((200.0 * srgb + 11.0) * (1.0f / 211.0), 12.0 / 5.0);
-  }
-}
-
 void main() {
     
-    if((camera.flags & uint(4)) != uint(0)) {
-        out_color = vec4(0.0);
-        out_blend = vec4(0.0);
-        out_id = uint(0);
-        return;
-    }
-    
     const float pi = 3.14159265359;
-    
-    float roughness = material.roughness;
-    float metallic = material.metallic;
-
-    float roughness_2 = roughness * roughness;
-    vec3 lighting = vec3(0.0, 0.0, 0.0);
-    vec3 view_direction = normalize(x_view_position - x_position.xyz);
     
     if(x_extra.z > 0.5 && x_extra.z < 1.5) {
         if(length(x_texcoord) > 1.0) {
@@ -106,10 +51,21 @@ void main() {
         }
     }
     
-    if(((material.flags & 2) != 0) || (x_extra.z > 0.1)) {
+    if(
+        ((material.flags & 2) != 0) || 
+        ((camera.flags & uint(4)) != uint(0)) || // rendering shadow map
+        (x_extra.z > 0.1)
+        ) {
         out_color = vec4(albedo, alpha);
         return;
     }
+    
+    float roughness = material.roughness;
+    float metallic = material.metallic;
+
+    float roughness_2 = roughness * roughness;
+    vec3 lighting = vec3(0.0, 0.0, 0.0);
+    vec3 view_direction = normalize(x_view_position - x_position.xyz);
     
     vec3 normal;
     if(material.normal_texture > 0) {
@@ -171,53 +127,11 @@ void main() {
                 float smz = p4.z / p4.w * 0.5 + 0.5;
                 
                 shadow = texture(shadow_map_sampler, vec4(smxy, smi, smz));
-                
-                /*
-                if(true) {
-                    shadow = 0.0;
-                    for(int x = -1; x <= 1; x++) {
-                        for(int y = -1; y <= 1; y++) {
-                            vec2 offset = vec2(float(x), float(y)) * (1.0 / 1024.0);
-                            shadow += texture(shadow_map_sampler, vec4(smxy + offset, smi, smz));
-                        }
-                    }
-                    shadow *= (1.0 / 9.0);
-                }
-                */
             }
         }
         
         switch(type & 3) {
             
-        /*
-        case 0: { // ambient
-            vec3 radiance = light_color;
-            float n_dot_l = 1.0;
-            float n_dot_h = 1.0;
-            float ndf = 1.0;
-            vec3 specular = (vec3(ndf * geometry) * fresnel) / max(0.001, 4.0 * max(0.0, n_dot_v));
-            specular = min(vec3(1.0), specular);
-            specular *= specular_factor;
-            lighting += max(vec3(0.0), (diffuse * albedo / pi + specular) * radiance * max(0.0, n_dot_l));
-            continue;
-        }
-        */
-        
-        /*
-        case 0: { // ambient
-            vec3 diffuse_radiance = light_color * (normal.z * 0.5 + 0.5);
-            vec3 specular_radiance = light_color * (reflect(view_direction, normal).z * -0.5 + 0.5);
-            float n_dot_l = 1.0;
-            float n_dot_h = 1.0;
-            float ndf = 1.0;
-            vec3 specular = (vec3(ndf * geometry) * fresnel) / max(0.001, 4.0 * max(0.0, n_dot_v));
-            specular = min(vec3(1.0), specular);
-            specular *= specular_factor;
-            lighting += max(vec3(0.0), (diffuse * albedo / pi * diffuse_radiance + specular * specular_radiance) * max(0.0, n_dot_l));
-            continue;
-        }
-        */
-        
         case 0: { // ambient
             vec3 light_color_2 = lights.light_array[light_index].color2.xyz;
             float hemi = lights.light_array[light_index].hemispheric;
@@ -246,11 +160,9 @@ void main() {
             light_falloff = 1.0 / dot(p, p);
             
             if((type & 128) != 0) {
-                
-                //p -= normal * (lights.light_array[light_index].shadow_bias * length(p) * 2.0);
+
                 p -= normal * (lights.light_array[light_index].shadow_bias * max(abs(p.x), max(abs(p.y), abs(p.z))) * 2.0);
-                //p -= normal * (lights.light_array[light_index].shadow_bias);
-                
+
                 float ref = max(abs(p.x), max(abs(p.y), abs(p.z)));
                 
                 float smi = float(lights.light_array[light_index].shadow_index);
@@ -297,7 +209,7 @@ void main() {
             
             vec3 radiance = light_color * vec3(n_dot_l * light_falloff);
 
-            float ndf_d = max(0.0, n_dot_h) * max(0.0, n_dot_h) * (roughness_2 - 1.0) + 1;
+            float ndf_d = max(0.0, n_dot_h) * max(0.0, n_dot_h) * (roughness_2 - 1.0) + 1.0;
             float ndf = roughness_2 / (pi * ndf_d * ndf_d);
 
             vec3 specular = (vec3(ndf * geometry) * fresnel) / max(0.001, 4.0 * max(0.0, n_dot_l) * max(0.0, n_dot_v));

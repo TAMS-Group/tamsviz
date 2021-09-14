@@ -7,7 +7,11 @@
 #include "../core/log.h"
 #include "opengl.h"
 
+#include <regex>
+#include <sstream>
 #include <vector>
+
+static const char *g_tamsviz_shader_preamble = "#version 400\n";
 
 static bool logEmpty(const std::string &s) {
   for (auto c : s) {
@@ -23,12 +27,81 @@ ShaderManager &Shader::manager() {
   return instance;
 }
 
-void Shader::addShader(GLenum type, const std::string &url) {
+static std::string loadShader(const std::string &url) {
+
+  static const std::regex local_include_regex(
+      "\\s*\\#include\\s+\\\"([^\\>]*)\\\"(.*)?");
+
+  static const std::regex package_include_regex(
+      "\\s*\\#include\\s+\\<([^\\>]*)\\>(.*)?");
+
+  std::smatch regex_match;
+
   std::string source;
   loadResource(url, source);
+  std::istringstream istream{source};
+
+  std::ostringstream ostream;
+
+  ostream << "// " << url << "\n";
+
+  std::string line;
+  size_t index = 1;
+
+  while (getline(istream, line)) {
+
+    if (std::regex_match(line, regex_match, local_include_regex)) {
+
+      std::string include_url = url;
+
+      {
+        auto p = include_url.find_last_of("/");
+        if (p != std::string::npos) {
+          include_url.resize(p + 1);
+        }
+      }
+
+      include_url = include_url + regex_match[1].str();
+
+      LOG_INFO("local shader include " << include_url);
+      ostream << "// " << line << "\n";
+      ostream << loadShader(include_url) << "\n";
+      ostream << "// " << url << "\n";
+      ostream << regex_match[2].str() << "\n";
+
+    } else if (std::regex_match(line, regex_match, package_include_regex)) {
+
+      std::string include_url = regex_match[1].str();
+
+      LOG_INFO("package shader include " << include_url);
+      ostream << "// " << line << "\n";
+      ostream << loadShader(include_url) << "\n";
+      ostream << "// " << url << "\n";
+      ostream << regex_match[2].str() << "\n";
+
+    } else {
+
+      ostream << "#line " << index << "\n";
+      ostream << line << "\n";
+    }
+
+    index++;
+  }
+
+  return ostream.str();
+};
+
+void Shader::addShader(GLenum type, const std::string &url) {
+
+  LOG_INFO("loading shader " << url);
+
+  std::string source = g_tamsviz_shader_preamble + loadShader(url);
   if (source.empty()) {
     throw std::runtime_error("shader file " + url + " is empty");
   }
+
+  // LOG_DEBUG("SHADER\n" << source);
+
   GLuint shader = 0;
   V_GL(shader = glCreateShader(type));
   Destructor dtor([&]() {
@@ -37,9 +110,11 @@ void Shader::addShader(GLenum type, const std::string &url) {
       shader = 0;
     }
   });
+
   auto *src = source.c_str();
   V_GL(glShaderSource(shader, 1, &src, NULL));
   V_GL(glCompileShader(shader));
+
   {
     std::vector<char> error_log(1024 * 32, 0);
     V_GL(glGetShaderInfoLog(shader, error_log.size(), NULL, error_log.data()));
@@ -55,6 +130,7 @@ void Shader::addShader(GLenum type, const std::string &url) {
       }
     }
   }
+
   V_GL(glAttachShader(_program, shader));
 }
 

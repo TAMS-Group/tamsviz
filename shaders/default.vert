@@ -1,24 +1,8 @@
 // TAMSVIZ
 // (c) 2020 Philipp Ruppel
 
-//#version 150
-#version 400
-
-layout(std140) uniform material_block {
-    vec4 color;
-    float roughness;
-    float metallic;
-    int color_texture;
-    int normal_texture;
-    uint id;
-    int flags;
-} material;
-
-layout(std140) uniform camera_block {
-    mat4 view_matrix;
-    mat4 projection_matrix;
-    uint flags;
-} camera;
+// #include <package://tamsviz/shaders/common.glsl>
+#include "common.glsl"
 
 in vec4 position;
 in vec3 normal;
@@ -40,14 +24,6 @@ out vec3 x_bitangent;
 out vec4 x_color;
 out vec4 x_extra;
 
-float srgb2linear(float srgb) {
-  if (srgb < 0.04045) {
-    return srgb * (25.0 / 232.0);
-  } else {
-    return pow((200.0 * srgb + 11.0) * (1.0f / 211.0), 12.0 / 5.0);
-  }
-}
-
 void main() {
     mat4 world_matrix = transpose(mat4(pose_x, pose_y, pose_z, vec4(0.0, 0.0, 0.0, 1.0)));
     mat3 normal_matrix = mat3(world_matrix);
@@ -59,10 +35,12 @@ void main() {
     x_bitangent = normal_matrix * bitangent;
     vec4 world_position = world_matrix * position;
     vec4 view_position = camera.view_matrix * world_position;
+    /*
     if((camera.flags & uint(4)) != uint(0)) {
         gl_Position = (camera.projection_matrix * view_position);
         return;
     }
+    */
     if(extra.z == 1.0) { // point
         view_position.xy += texcoord * extra.x;
     }

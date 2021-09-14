@@ -46,6 +46,7 @@ class TextDisplay : public FrameDisplayBase {
 public:
   PROPERTY(std::string, text, "Text");
   PROPERTY(Color3, color, Color3(1, 1, 1));
+  PROPERTY(double, brightness, 1.0, min = 0.0);
   PROPERTY(double, opacity, 1.0, min = 0.0, max = 1.0);
   PROPERTY(double, size, 0.1, min = 0);
   PROPERTY(bool, viewFacing, true);

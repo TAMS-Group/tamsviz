@@ -462,7 +462,9 @@ TextDisplay::TextDisplay() {
 }
 
 void TextDisplay::renderSync(const RenderSyncContext &context) {
-  _material->color() = color();
+  _material->color().r() = color().r() * brightness();
+  _material->color().g() = color().g() * brightness();
+  _material->color().b() = color().b() * brightness();
   _material->opacity() = opacity();
   _renderer->text(text());
   _renderer->offset(offset());
