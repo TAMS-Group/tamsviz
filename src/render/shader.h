@@ -13,6 +13,7 @@ enum class Samplers : GLuint {
   normal = 2,
   shadowmap = 3,
   shadowcube = 4,
+  environment = 5,
 };
 
 enum class VertexAttributes : GLuint {

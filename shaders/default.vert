@@ -1,5 +1,5 @@
 // TAMSVIZ
-// (c) 2020 Philipp Ruppel
+// (c) 2020-2021 Philipp Ruppel
 
 // #include <package://tamsviz/shaders/common.glsl>
 #include "common.glsl"
@@ -34,6 +34,10 @@ void main() {
     x_tangent = normal_matrix * tangent;
     x_bitangent = normal_matrix * bitangent;
     vec4 world_position = world_matrix * position;
+    x_view_position = -vec3(camera.view_matrix[3]) * mat3(camera.view_matrix);
+    if((material.flags & 8) != 0) {
+        world_position.xyz = world_position.xyz + x_view_position;
+    }
     vec4 view_position = camera.view_matrix * world_position;
     /*
     if((camera.flags & uint(4)) != uint(0)) {
@@ -52,7 +56,6 @@ void main() {
     }
     gl_Position = (camera.projection_matrix * view_position);
     x_position = world_position;
-    x_view_position = -vec3(camera.view_matrix[3]) * mat3(camera.view_matrix);
     x_texcoord = texcoord;
     x_extra = extra;
     if((material.flags & 4) != 0) { // sbgr colors

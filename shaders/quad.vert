@@ -1,5 +1,5 @@
 // TAMSVIZ
-// (c) 2020 Philipp Ruppel
+// (c) 2020-2021 Philipp Ruppel
 
 in vec4 position;
 in vec2 texcoord;

@@ -481,58 +481,6 @@ void DisplayRobotStateDisplay::renderAsync(const RenderAsyncContext &context) {
   RobotDisplayBase::renderAsync(context);
 }
 
-/*
-void RobotTrajectoryDisplay::renderSync(const RenderSyncContext &context) {
-
-  auto display_trajectory_message = topic().message();
-  if (_trajectory_watcher.changed(display_trajectory_message)) {
-    _frame_index = 0;
-  }
-
-  size_t frame_index = 0;
-  if (_robot_state && display_trajectory_message) {
-    for (auto &robot_trajectory : display_trajectory_message->trajectory) {
-      auto &joint_trajectory = robot_trajectory.joint_trajectory;
-      for (auto &point : joint_trajectory.points) {
-        if (_frame_index == frame_index) {
-          for (size_t ijoint = 0; ijoint < joint_trajectory.joint_names.size();
-               ijoint++) {
-            if (ijoint < point.positions.size()) {
-              _robot_state->moveit_state.setVariablePosition(
-                  joint_trajectory.joint_names[ijoint],
-                  point.positions[ijoint]);
-            }
-          }
-        }
-        frame_index++;
-      }
-    }
-  }
-  _frame_index++;
-  if (_frame_index >= frame_index) {
-    _frame_index = 0;
-  }
-
-  if (_robot_state) {
-    for (size_t i = 0; i < _robot_state->robot_model->links.size(); i++) {
-      auto &link = _robot_state->robot_model->links[i];
-      _robot_state->mesh_renderers.at(i)->pose(
-          pose_temp *
-          Eigen::Isometry3d(
-              _robot_state->moveit_state
-                  .getGlobalLinkTransform(
-                      _robot_state->robot_model->moveit_robot->getLinkModel(
-                          link->link_index))
-                  .matrix()) *
-          link->pose);
-      _robot_state->mesh_renderers.at(i)->show();
-    }
-  }
-
-  RobotDisplayBase::renderSync(context);
-}
-*/
-
 void RobotTrajectoryDisplay::renderSync(const RenderSyncContext &context) {
   _display_trajectory_message = topic().message();
   _max_steps = maxSteps();

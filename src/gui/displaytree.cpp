@@ -46,7 +46,7 @@ DisplayTreeWidget::DisplayTreeWidget() : QDockWidget("Display Tree") {
         return;
       }
       std::shared_ptr<DisplayGroupBase> old_parent_display;
-      ws()->document()->display()->recurse(
+      ws()->document()->display()->recurseDisplays(
           [&](const std::shared_ptr<Display> &parent,
               const std::shared_ptr<Display> &child) {
             if (child == dragged_object) {
@@ -192,7 +192,7 @@ void DisplayTreeWidget::sync() {
   LockScope ws;
   updating = true;
   std::unordered_set<std::shared_ptr<Object>> all_objects;
-  ws->document()->display()->recurse(
+  ws->document()->display()->recurseDisplays(
       [&](const std::shared_ptr<Object> &o) { all_objects.insert(o); });
   std::unordered_map<std::shared_ptr<Object>, std::shared_ptr<QTreeWidgetItem>>
       object_to_item;
@@ -207,7 +207,7 @@ void DisplayTreeWidget::sync() {
     }
     items.clear();
   }
-  ws->document()->display()->recurse(
+  ws->document()->display()->recurseDisplays(
       [&object_to_item](const std::shared_ptr<Display> &display) {
         if (object_to_item.find(display) == object_to_item.end()) {
           auto item = std::make_shared<QTreeWidgetItem>();
@@ -215,7 +215,7 @@ void DisplayTreeWidget::sync() {
           object_to_item[display] = item;
         }
       });
-  ws->document()->display()->recurse(
+  ws->document()->display()->recurseDisplays(
       [&object_to_item, this](const std::shared_ptr<Display> &parent,
                               const std::shared_ptr<Display> &display) {
         LockScope ws;

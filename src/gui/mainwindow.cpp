@@ -469,8 +469,8 @@ MainWindow::MainWindow() {
           }
           auto clipboard_data = std::make_shared<ClipboardData>();
           std::unordered_set<std::shared_ptr<Object>> clipboard_set;
-          ws()->recurse([&](const std::shared_ptr<Object> &parent,
-                            const std::shared_ptr<Object> &child) {
+          ws()->recurseObjects([&](const std::shared_ptr<Object> &parent,
+                                   const std::shared_ptr<Object> &child) {
             if (clipboard_set.find(parent) != clipboard_set.end()) {
               clipboard_set.insert(child);
             } else {

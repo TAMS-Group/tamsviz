@@ -8,6 +8,7 @@
 class Object : public std::enable_shared_from_this<Object> {
   std::vector<Property> _properties, _object_properties;
   uint64_t _id = 0;
+  static void _dummyVoid() {}
 
 public:
   Object();
@@ -24,8 +25,9 @@ public:
   void assignNewId();
   void setId(uint64_t id);
   template <class F>
-  auto recurse(const F &f)
-      -> decltype(f(std::shared_ptr<Object>(), std::shared_ptr<Object>())) {
+  auto recurseObjects(const F &f)
+      -> decltype(f(std::shared_ptr<Object>(), std::shared_ptr<Object>()),
+                  _dummyVoid()) {
     forEachObject((void *)&f,
                   [](void *context, const Object *parent, const Object *child) {
                     auto *f = (F *)context;
@@ -39,7 +41,8 @@ public:
                   nullptr, this);
   }
   template <class F>
-  auto recurse(const F &f) -> decltype(f(std::shared_ptr<Object>())) {
+  auto recurseObjects(const F &f)
+      -> decltype(f(std::shared_ptr<Object>()), _dummyVoid()) {
     forEachObject((void *)&f,
                   [](void *context, const Object *parent, const Object *child) {
                     auto *f = (F *)context;

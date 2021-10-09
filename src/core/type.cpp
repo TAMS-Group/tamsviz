@@ -10,10 +10,6 @@
 #include <unordered_map>
 #include <unordered_set>
 
-uint64_t handleObjectId(const Object *object) {
-  return object ? object->id() : 0;
-}
-
 struct TypeRegistry {
   std::mutex mutex;
   std::unordered_map<std::string, std::shared_ptr<Type>> names;

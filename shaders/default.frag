@@ -1,14 +1,17 @@
 // TAMSVIZ
-// (c) 2020 Philipp Ruppel
+// (c) 2020-2021 Philipp Ruppel
 
 // #include <package://tamsviz/shaders/common.glsl>
 #include "common.glsl"
+#include "hdr.glsl"
 
 uniform sampler2D color_sampler;
 uniform sampler2D normal_sampler;
 
 uniform sampler2DArrayShadow shadow_map_sampler;
 uniform samplerCubeArrayShadow shadow_cube_sampler;
+
+uniform samplerCube environment_sampler;
 
 in vec3 x_normal;
 in vec4 x_position;
@@ -38,6 +41,8 @@ void main() {
     
     out_id = material.id;
     
+    bool unlit = (((material.flags & 2) != 0) || (x_extra.z > 0.1));
+    
     out_blend = vec4(alpha, 0.0, 0.0, 1.0);
     if(material.color_texture != 0) {
         vec4 t = texture2D(color_sampler, x_texcoord);
@@ -51,14 +56,20 @@ void main() {
         }
     }
     
-    if(
-        ((material.flags & 2) != 0) || 
-        ((camera.flags & uint(4)) != uint(0)) || // rendering shadow map
-        (x_extra.z > 0.1)
-        ) {
-        out_color = vec4(albedo, alpha);
+    if((camera.flags & uint(4)) != uint(0)) { // rendering shadow map
+        out_color = vec4(0.0);
         return;
     }
+    
+    if(unlit) {
+        vec3 c = albedo;
+        c = map_color_inverse(c);
+        c *= material.brightness;
+        out_color = vec4(c, alpha);
+        return;
+    }
+    
+    albedo *= material.brightness;
     
     float roughness = material.roughness;
     float metallic = material.metallic;
@@ -81,14 +92,15 @@ void main() {
         normal = -normal;
     }
     
-    float specular_factor = 1.0 / (0.2 + alpha);
+    //float specular_factor = 1.0 / (0.2 + alpha);
+    float specular_factor = 1.0;
     
     float n_dot_v = dot(normal, view_direction);
     
     vec3 fresnel_temp = mix(vec3(0.04), albedo, metallic);
     vec3 fresnel = fresnel_temp + (vec3(1.0) - fresnel_temp) * pow(1.0 - n_dot_v, 5.0);
     
-    float geometry_temp = ((roughness + 1.0) * (roughness + 1.0)) / 8.0;
+    float geometry_temp = ((roughness_2 + 1.0) * (roughness_2 + 1.0)) / 8.0;
     float geometry = max(0.0, n_dot_v) / (max(0.0, n_dot_v) * (1.0 - geometry_temp) + geometry_temp);
     
     vec3 diffuse = (vec3(1.0) - fresnel) * (1.0 - metallic);
@@ -130,7 +142,7 @@ void main() {
             }
         }
         
-        switch(type & 3) {
+        switch(type & 7) {
             
         case 0: { // ambient
             vec3 light_color_2 = lights.light_array[light_index].color2.xyz;
@@ -146,6 +158,39 @@ void main() {
             lighting += max(vec3(0.0), (diffuse * albedo / pi * diffuse_radiance + specular * specular_radiance) * max(0.0, n_dot_l));
             continue;
         }
+        
+        
+        case 4: {
+            
+            vec3 dir = reflect(view_direction, normal);
+            //lighting += texture(environment_sampler, dir).xyz;
+            //lighting += vec3(1.0);
+
+            vec3 diffuse_radiance = max(vec3(0.0), textureLod(environment_sampler, dir, 32.0).xyz * light_color);
+
+            //float level = pow(roughness, 1.0 / 1.7) * (10.0 - 1.0);
+            float level = sqrt(roughness) * 9.0;
+            vec3 specular_radiance = max(vec3(0.0), textureLod(environment_sampler, dir, level).xyz * light_color);
+            
+            // vec3 dx = dFdx(dir);
+            // vec3 dy = dFdy(dir);
+            // dx += normalize(dx) * (roughness * 1.0);
+            // dy += normalize(dy) * (roughness * 1.0);
+            // vec3 specular_radiance = max(vec3(0.0), textureGrad(environment_sampler, dir, dx, dy).xyz * light_color);
+
+            float n_dot_l = 1.0;
+            float n_dot_h = 1.0;
+            float ndf = 1.0;
+            vec3 specular = (vec3(ndf * geometry) * fresnel) / max(0.001, 4.0 * max(0.0, n_dot_v));
+            specular *= specular_factor;
+            lighting += max(vec3(0.0), (diffuse * albedo / pi * diffuse_radiance + specular * specular_radiance) * max(0.0, n_dot_l));
+            
+            
+            //lighting += specular_radiance;
+            
+            continue;
+        }
+        
         
         case 1: { // directional
             light_falloff = 1.0;

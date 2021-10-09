@@ -24,7 +24,7 @@ static void replaceWindow(const std::shared_ptr<Object> &old_window,
                           const std::shared_ptr<Window> &new_window) {
   LockScope ws;
   std::shared_ptr<Object> parent;
-  ws->recurse(
+  ws->recurseObjects(
       [&](const std::shared_ptr<Object> &p, const std::shared_ptr<Object> &c) {
         if (c == old_window) {
           parent = p;
@@ -260,7 +260,7 @@ ContentWindowBase::ContentWindowBase() {
         auto me = std::dynamic_pointer_cast<Window>(this->shared_from_this());
         std::shared_ptr<Object> window_old;
         std::shared_ptr<Window> window_new;
-        ws->recurse([&](const std::shared_ptr<Object> &window) {
+        ws->recurseObjects([&](const std::shared_ptr<Object> &window) {
           if (auto split = std::dynamic_pointer_cast<SplitWindowBase>(window)) {
             if (split->a() == me) {
               window_old = split;

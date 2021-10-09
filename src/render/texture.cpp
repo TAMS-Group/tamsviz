@@ -4,37 +4,12 @@
 #include "texture.h"
 
 #include "../core/log.h"
+#include "imageloader.h"
 
 #include <opencv2/opencv.hpp>
 
 #include <chrono>
 #include <thread>
-
-struct TextureData {
-  cv::Mat image;
-  TextureData(const std::string &url) {
-    if (url.empty()) {
-      return;
-    }
-    std::vector<uint8_t> data;
-    try {
-      loadResource(url, data);
-    } catch (std::exception &ex) {
-      LOG_ERROR("failed to read texture file " << url);
-      return;
-    }
-    if (data.empty()) {
-      LOG_ERROR("texture file is empty " << url);
-      return;
-    }
-    auto img = cv::imdecode(data, cv::IMREAD_COLOR);
-    if (img.data == nullptr) {
-      LOG_ERROR("failed to decode texture " << url);
-      return;
-    }
-    image = img;
-  }
-};
 
 Texture::Texture(const std::string &url, TextureType type)
     : _url(url), _type(type), _loader(url) {}

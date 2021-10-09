@@ -230,6 +230,7 @@ void Shader::create() {
     bindSampler(Samplers::normal, "normal_sampler");
     bindSampler(Samplers::shadowmap, "shadow_map_sampler");
     bindSampler(Samplers::shadowcube, "shadow_cube_sampler");
+    bindSampler(Samplers::environment, "environment_sampler");
     V_GL(glUseProgram(0));
   }
 }

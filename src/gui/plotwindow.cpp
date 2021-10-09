@@ -36,7 +36,7 @@ PlotWindow::PlotWindow() {
     addToolWidget(button);
     connect(menu, &QMenu::aboutToShow, this, [this, menu]() {
       menu->clear();
-      LockScope()->document()->display()->recurse(
+      LockScope()->document()->display()->recurseDisplays(
           [&](const std::shared_ptr<Display> &display) {
             if (auto plot = std::dynamic_pointer_cast<PlotDisplay>(display)) {
               connect(menu->addAction(plot->name().c_str()),

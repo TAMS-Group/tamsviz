@@ -82,8 +82,8 @@ void RenderThread::run() {
     {
       NoMessageScope m_scope;
       LockScope ws;
-      ws->recurse([&render_window_list,
-                   &display_list](const std::shared_ptr<Object> &object) {
+      ws->recurseObjects([&render_window_list, &display_list](
+                             const std::shared_ptr<Object> &object) {
         if (object) {
           if (auto render_window =
                   std::dynamic_pointer_cast<RenderWindowBase>(object)) {

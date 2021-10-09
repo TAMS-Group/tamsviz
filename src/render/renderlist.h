@@ -34,6 +34,8 @@ enum class LightType : uint32_t {
   SpotShadow = (3 | 32 | 64),
   Spot = (3 | 32),
 
+  Environment = 4,
+
   ViewSpace = (1 << 20),
 };
 
@@ -48,6 +50,8 @@ struct LightBlock {
   float softness = 1.0f;
   float shadow_bias = 0.0f;
   int32_t shadow_index = -1;
+  float reserved0 = 0;
+  float reserved1 = 0;
 };
 
 struct LightArrayBlock {
@@ -57,12 +61,15 @@ struct LightArrayBlock {
 
 struct MaterialBlock {
   Eigen::Vector4f color = Eigen::Vector4f(1, 1, 1, 1);
+
   float roughness = 0.5f;
   float metallic = 0.0f;
   uint32_t color_texture = 0;
   uint32_t normal_texture = 0;
+
   uint32_t id = 0;
   uint32_t flags = 0;
+  float brightness = 1.0f;
   uint8_t transparent = false;
 };
 
@@ -108,6 +115,7 @@ struct RenderParameters {
   bool tone_mapping = true;
   float black_level = 0;
   float white_level = 1;
+  uint32_t environment_cube_map = 0;
 };
 
 class RenderList {
@@ -126,7 +134,8 @@ public:
   void push(const std::shared_ptr<Mesh> &mesh, const RenderOptions &options);
   void push(const InstanceBlock &instance);
 
-  void put(const RenderParameters &parameters) { _parameters = parameters; }
+  // void put(const RenderParameters &parameters) { _parameters = parameters; }
+  RenderParameters &parameters() { return _parameters; }
 
   inline void push(const MaterialBlock &material,
                    const std::shared_ptr<Mesh> &mesh,

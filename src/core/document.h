@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "component.h"
 #include "event.h"
 #include "object.h"
 #include "serialization.h"
@@ -129,6 +130,8 @@ class Interaction;
 
 struct Display : Object {
 
+  static void _dummyVoid() {}
+
 protected:
   Display();
   virtual ~Display() {}
@@ -138,9 +141,9 @@ public:
   PROPERTY(std::string, name,
            "Display"); // more intuitive e.g. for plot objects
   template <class F>
-  auto recurse(const F &f)
-      -> decltype(f(std::shared_ptr<Display>(), std::shared_ptr<Display>())) {
-
+  auto recurseDisplays(const F &f)
+      -> decltype(f(std::shared_ptr<Display>(), std::shared_ptr<Display>()),
+                  _dummyVoid()) {
     forEachObject(
         (void *)&f,
         [](void *context, const Object *parent, const Object *child) {
@@ -156,7 +159,8 @@ public:
         nullptr, this);
   }
   template <class F>
-  auto recurse(const F &f) -> decltype(f(std::shared_ptr<Display>())) {
+  auto recurseDisplays(const F &f)
+      -> decltype(f(std::shared_ptr<Display>()), _dummyVoid()) {
     forEachObject((void *)&f,
                   [](void *context, const Object *parent, const Object *child) {
                     auto *f = (F *)context;
@@ -204,35 +208,21 @@ public:
 };
 DECLARE_TYPE(Window, Object);
 
-struct RenderingParameters : Object {
-  PROPERTY(int, multiSampling, 4, min = 0, max = 16);
-  PROPERTY(int, sampleShading, 1, min = 0, max = 2);
-  PROPERTY(int, shadowMapResolution, 1024, min = 1);
-  PROPERTY(int, shadowCubeResolution, 512, min = 1);
-  PROPERTY(double, exposure, 1, min = 0);
-  PROPERTY(bool, toneMapping, true);
-  PROPERTY(double, blackLevel, 0);
-  PROPERTY(double, whiteLevel, 1);
-};
-DECLARE_TYPE(RenderingParameters, Object);
-
 class Transformer;
 struct WorldDisplay : DisplayGroupBase {
 private:
   static std::vector<std::string> _listFrames(const Property &);
+  std::vector<std::shared_ptr<Component>> _components_refresh,
+      _components_render;
 
 public:
   std::shared_ptr<Transformer> transformer;
   PROPERTY(std::string, fixedFrame, "world", list = &WorldDisplay::_listFrames);
-  PROPERTY(Color4, backgroundColor, Color4(0.3, 0.3, 0.3, 1.0));
-  PROPERTY(double, backgroundBrightness, 1, min = 0);
-  PROPERTY(double, ambientLighting, 1.0, min = 0.0, max = 1.0);
-  PROPERTY(Color3, groundColor, Color3(0.0, 0.0, 0.0));
-  PROPERTY(double, hemisphericLighting, 0.5, min = 0.0, max = 1.0);
-  PROPERTY(std::shared_ptr<RenderingParameters>, rendering,
-           std::make_shared<RenderingParameters>());
+  PROPERTY(std::shared_ptr<Component>, rendering, nullptr);
+  PROPERTY(std::shared_ptr<Component>, environment, nullptr);
   virtual void renderSync(const RenderSyncContext &context) override;
   virtual void renderAsync(const RenderAsyncContext &context) override;
+  virtual void refresh() override;
   WorldDisplay();
 };
 DECLARE_TYPE(WorldDisplay, DisplayGroupBase);

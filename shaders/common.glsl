@@ -1,5 +1,5 @@
 // TAMSVIZ
-// (c) 2020 Philipp Ruppel
+// (c) 2020-2021 Philipp Ruppel
 
 layout(std140) uniform material_block {
     vec4 color;
@@ -9,6 +9,7 @@ layout(std140) uniform material_block {
     int normal_texture;
     uint id;
     int flags;
+    float brightness;
 } material;
 
 layout(std140) uniform camera_block {
@@ -28,6 +29,8 @@ struct Light {
     float softness;
     float shadow_bias;
     int shadow_index;
+    float reserved0;
+    float reserved1;
 };
 
 layout(std140) uniform light_block {

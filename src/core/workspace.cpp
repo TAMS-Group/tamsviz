@@ -35,7 +35,7 @@ bool Selection::contains(const std::shared_ptr<Object> &o) const {
 std::vector<std::shared_ptr<Object>>
 Selection::resolve(const std::shared_ptr<Object> &root) const {
   std::vector<std::shared_ptr<Object>> ret;
-  root->recurse([&](const std::shared_ptr<Object> &o) {
+  root->recurseObjects([&](const std::shared_ptr<Object> &o) {
     for (auto id : _objects) {
       if (o->id() == id) {
         ret.push_back(o);
@@ -95,7 +95,7 @@ Workspace::Workspace() {
 
   if (0) {
     modified.connect([this]() {
-      recurse([this](const std::shared_ptr<Object> &o) {
+      recurseObjects([this](const std::shared_ptr<Object> &o) {
         if (o && o.get() != this) {
           object_ptr_test.insert(o);
         }

@@ -3,6 +3,8 @@
 
 #include "document.h"
 
+#include "../components/environment.h"
+#include "../components/rendering.h"
 #include "../render/renderer.h"
 #include "../scene/node.h"
 #include "bagplayer.h"
@@ -50,68 +52,43 @@ Eigen::Vector4f Color4::toLinearVector4f() const {
 
 WorldDisplay::WorldDisplay() {
   transformer = std::make_shared<Transformer>();
+  rendering() = std::make_shared<RenderingComponent>();
+  environment() = std::make_shared<EnvironmentComponent>();
   name() = "Document";
 }
 
 void WorldDisplay::renderSync(const RenderSyncContext &context) {
+
   transformer->update(fixedFrame());
+
   DisplayGroupBase::renderSync(context);
-  {
-    LightBlock light;
-    light.color = backgroundColor().toLinearVector4f().head(3) *
-                  (float)(ambientLighting() * backgroundBrightness());
-    light.type = (uint32_t)LightType::Ambient;
-    light.hemispheric = float(hemisphericLighting());
-    light.color2 = groundColor().toLinearVector4f().head(3) *
-                   (float)(ambientLighting() * backgroundBrightness());
-    context.render_list->push(light);
+
+  _components_render = _components_refresh;
+  for (auto &component : _components_render) {
+    component->renderSync(context);
   }
-  {
-    RenderParameters params;
-    params.shadow_map_resolution = rendering()->shadowMapResolution();
-    params.shadow_cube_resolution = rendering()->shadowCubeResolution();
-    params.exposure = rendering()->exposure();
-    params.tone_mapping = rendering()->toneMapping();
-    params.black_level = rendering()->blackLevel();
-    params.white_level = rendering()->whiteLevel();
-    context.render_list->put(params);
-  }
-  /* _current_scene_annotations.clear();
-   {
-     LockScope ws;
-     if (ws->player && ws->document()->timeline()) {
-       auto current_time = ws->player->time();
-       for (auto &track : ws->document()->timeline()->tracks()) {
-         if (auto annotation_track =
-                 std::dynamic_pointer_cast<AnnotationTrack>(track)) {
-           if (auto branch = annotation_track->branch()) {
-             for (auto &span : branch->spans()) {
-               if (span->start() <= current_time &&
-                   span->start() + span->duration() >= current_time) {
-                 for (auto &annotation : span->annotations()) {
-                   if (auto scene_annotation =
-                           std::dynamic_pointer_cast<SceneAnnotationBase>(
-                               annotation)) {
-                     _current_scene_annotations.push_back(scene_annotation);
-                   }
-                 }
-               }
-             }
-           }
-         }
-       }
-     }
-   }
-   for (auto &scene_annotation : _current_scene_annotations) {
-     scene_annotation->renderSync(context);
- }*/
 }
 
 void WorldDisplay::renderAsync(const RenderAsyncContext &context) {
   DisplayGroupBase::renderAsync(context);
-  /*for (auto &scene_annotation : _current_scene_annotations) {
-    scene_annotation->renderAsync(context);
-}*/
+
+  for (auto &component : _components_render) {
+    component->renderAsync(context);
+  }
+}
+
+void WorldDisplay::refresh() {
+  DisplayGroupBase::refresh();
+
+  _components_refresh.clear();
+  recurseObjects([&](const std::shared_ptr<Object> &object) {
+    if (object) {
+      if (auto component = std::dynamic_pointer_cast<Component>(object)) {
+        _components_refresh.push_back(component);
+        component->refresh();
+      }
+    }
+  });
 }
 
 void DisplayGroupBase::renderSyncRecursive(const RenderSyncContext &context) {
@@ -147,7 +124,7 @@ void Pose::fromIsometry3d(const Eigen::Isometry3d &pose) {
 }
 
 void Window::refreshRecursive() {
-  recurse([](const std::shared_ptr<Object> &object) {
+  recurseObjects([](const std::shared_ptr<Object> &object) {
     if (object) {
       if (auto window = std::dynamic_pointer_cast<Window>(object)) {
         window->refresh();

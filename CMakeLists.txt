@@ -64,9 +64,13 @@ find_package(Boost REQUIRED COMPONENTS program_options)
 add_executable(${PROJECT_NAME}
     src/annotations/image.cpp
     src/annotations/scene.cpp
+    src/components/environment.cpp
+    src/components/rendering.cpp
     src/core/bagplayer.cpp
+    src/core/component.cpp
     src/core/document.cpp
     src/core/event.cpp
+    src/core/handle.cpp
     src/core/history.cpp
     src/core/interaction.cpp
     src/core/loader.cpp
@@ -117,6 +121,7 @@ add_executable(${PROJECT_NAME}
     src/gui/splitwindow.cpp
     src/gui/timeline.cpp
     src/render/framebuffer.cpp
+    src/render/imageloader.cpp
     src/render/mesh.cpp
     src/render/opengl.cpp
     src/render/renderbuffer.cpp

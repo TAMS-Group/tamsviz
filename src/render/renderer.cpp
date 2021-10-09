@@ -177,6 +177,10 @@ void Renderer::prepare(const CameraBlock &camera_block,
   }
   light_buffer.update(light_array);
   light_buffer.bind();
+
+  V_GL(glActiveTexture(GL_TEXTURE0 + (int)Samplers::environment));
+  V_GL(glBindTexture(GL_TEXTURE_CUBE_MAP,
+                     render_list._parameters.environment_cube_map));
 }
 
 Renderer::PickResult Renderer::pick(RenderTarget &render_target,
@@ -338,38 +342,20 @@ void Renderer::renderShadows(const RenderList &render_list) {
 
     case uint32_t(LightType::PointShadow): {
 
-      static std::array<Eigen::Vector3d, 6> at = {
-          Eigen::Vector3d(+1.0f, 0.0f, 0.0f),
-          Eigen::Vector3d(-1.0f, 0.0f, 0.0f),
-          Eigen::Vector3d(0.0f, +1.0f, 0.0f),
-          Eigen::Vector3d(0.0f, -1.0f, 0.0f),
-          Eigen::Vector3d(0.0f, 0.0f, +1.0f),
-          Eigen::Vector3d(0.0f, 0.0f, -1.0f)};
-
-      static std::array<Eigen::Vector3d, 6> up = {
-          Eigen::Vector3d(0.0f, 1.0f, 0.0f),
-          Eigen::Vector3d(0.0f, 1.0f, 0.0f),
-          Eigen::Vector3d(0.0f, 0.0f, -1.0f),
-          Eigen::Vector3d(0.0f, 0.0f, 1.0f),
-          Eigen::Vector3d(0.0f, 1.0f, 0.0f),
-          Eigen::Vector3d(0.0f, 1.0f, 0.0f)};
-
       for (size_t face = 0; face < 6; face++) {
 
         CameraBlock shadow_camera_block;
 
         {
           auto &v = shadow_camera_block.view_matrix;
-          v = lookatMatrix(light.position.cast<double>(),
-                           at[face] + light.position.cast<double>(), -up[face])
+          v = cubeMapViewMatrix(light.position.cast<double>(), face)
                   .cast<float>();
         }
 
         double far = 20.0;
         double near = 0.1;
-
         shadow_camera_block.projection_matrix =
-            projectionMatrix(M_PI / 2, 1, near, far).cast<float>();
+            cubeMapProjectionMatrix(near, far).cast<float>();
 
         shadow_camera_block.flags = CameraBlock::ShadowCameraFlag;
         prepare(shadow_camera_block, render_list);
@@ -429,9 +415,11 @@ void Renderer::render(RenderTarget &render_target,
     V_GL(glUniform1i(
         glGetUniformLocation(blend_shader->program(), "tone_mapping"),
         render_list._parameters.tone_mapping));
-    V_GL(glUniform1f(
-        glGetUniformLocation(blend_shader->program(), "exposure"),
-        float(render_list._parameters.exposure / render_target._samples)));
+    // V_GL(glUniform1f(
+    //     glGetUniformLocation(blend_shader->program(), "exposure"),
+    //     float(render_list._parameters.exposure / render_target._samples)));
+    V_GL(glUniform1f(glGetUniformLocation(blend_shader->program(), "exposure"),
+                     float(render_list._parameters.exposure)));
     V_GL(glUniform1i(glGetUniformLocation(blend_shader->program(), "samples"),
                      render_target._samples));
     V_GL(glUniform1f(

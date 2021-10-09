@@ -9,6 +9,8 @@
 #include <typeindex>
 #include <vector>
 
+#include "handle.h"
+
 inline void toString(const std::string &v, std::string &s) { s = v; }
 inline void toString(const bool &v, std::string &s) {
   if (v) {
@@ -112,59 +114,6 @@ void removeObject(const std::shared_ptr<Object> &parent, void *object);
 struct StopObjectRecursionTag {};
 
 typedef std::function<bool(const std::shared_ptr<Object> &o)> SnapshotFilter;
-
-uint64_t handleObjectId(const Object *object);
-template <class T> class Handle {
-  uint64_t _id = 0;
-
-public:
-  Handle(const std::shared_ptr<T> &p = nullptr) { reset(p); }
-  void reset(uint64_t id) { _id = id; }
-  void reset(const std::shared_ptr<T> &p = nullptr) {
-    _id = handleObjectId(p ? (Object *)p.get() : nullptr);
-  }
-  void operator=(const std::shared_ptr<T> &p) { reset(p); }
-  template <class R>
-  std::shared_ptr<T> resolve(const std::shared_ptr<R> &root) {
-    if (_id == 0) {
-      return nullptr;
-    }
-    std::shared_ptr<T> r;
-    root->recurse([&r, this](const std::shared_ptr<Object> &o) {
-      if (handleObjectId(o.get()) == _id) {
-        if (auto x = std::dynamic_pointer_cast<T>(o)) {
-          r = x;
-        }
-      }
-    });
-    return r;
-  }
-  const uint64_t id() const { return _id; }
-};
-template <class T, class S>
-bool operator==(const Handle<T> &h, const std::shared_ptr<S> &p) {
-  if (p == nullptr) {
-    return h.id() == 0;
-  } else {
-    return h.id() == p->id();
-  }
-}
-template <class T, class S>
-bool operator==(const std::shared_ptr<S> &p, const Handle<T> &h) {
-  if (p == nullptr) {
-    return h.id() == 0;
-  } else {
-    return h.id() == p->id();
-  }
-}
-template <class T, class S>
-bool operator!=(const Handle<T> &h, const std::shared_ptr<S> &p) {
-  return !(h == p);
-}
-template <class T, class S>
-bool operator!=(const std::shared_ptr<S> &p, const Handle<T> &h) {
-  return !(h == p);
-}
 
 template <class T>
 auto forEachObject(void *context,

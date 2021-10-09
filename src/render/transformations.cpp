@@ -36,3 +36,22 @@ Eigen::Matrix4d lookatMatrix(const Eigen::Vector3d &eye,
   matrix(2, 3) = -z.dot(eye);
   return matrix;
 }
+
+Eigen::Matrix4d cubeMapProjectionMatrix(double near, double far) {
+  return projectionMatrix(M_PI / 2, 1, near, far);
+}
+
+Eigen::Matrix4d cubeMapViewMatrix(const Eigen::Vector3d &eye, size_t face) {
+
+  static std::array<Eigen::Vector3d, 6> at = {
+      Eigen::Vector3d(+1.0f, 0.0f, 0.0f), Eigen::Vector3d(-1.0f, 0.0f, 0.0f),
+      Eigen::Vector3d(0.0f, +1.0f, 0.0f), Eigen::Vector3d(0.0f, -1.0f, 0.0f),
+      Eigen::Vector3d(0.0f, 0.0f, +1.0f), Eigen::Vector3d(0.0f, 0.0f, -1.0f)};
+
+  static std::array<Eigen::Vector3d, 6> up = {
+      Eigen::Vector3d(0.0f, 1.0f, 0.0f),  Eigen::Vector3d(0.0f, 1.0f, 0.0f),
+      Eigen::Vector3d(0.0f, 0.0f, -1.0f), Eigen::Vector3d(0.0f, 0.0f, 1.0f),
+      Eigen::Vector3d(0.0f, 1.0f, 0.0f),  Eigen::Vector3d(0.0f, 1.0f, 0.0f)};
+
+  return lookatMatrix(eye, at[face] + eye, -up[face]);
+}

@@ -23,7 +23,7 @@ class Texture;
 
 typedef ResourceManager<Texture, std::string, TextureType> TextureManager;
 
-class TextureData;
+class ImageLoader;
 
 class TextureBase : public ResourceBase {
 protected:
@@ -40,7 +40,7 @@ class Texture : public TextureBase {
   bool _loaded = false;
   TextureType _type = TextureType::Color;
   std::string _url;
-  Loader<TextureData> _loader;
+  Loader<ImageLoader> _loader;
   Watcher _watcher;
   bool _transparent = false;
   bool _mipmap = true;
