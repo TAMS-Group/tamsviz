@@ -1,5 +1,7 @@
 # TAMSVIZ - Visualization and Annotation Tool for ROS
 
+![](screenshots/1.png)
+
 ### Features
 
 - Visualize robots and robot trajectories
@@ -24,24 +26,6 @@
 - Anti-aliasing
 - ROS integration
 - Mouse picking
-
-### Screenshots
-
-![](screenshots/1.png)
-
-![](screenshots/hand-tracking.png)
-
-![](screenshots/5.png)
-
-![](screenshots/hand-transparent.png)
-
-![](screenshots/plots.png)
-
-![](screenshots/markers-text.png)
-
-![](screenshots/image-annotation.png)
-
-![](screenshots/4.png)
 
 ### Documentation
 
