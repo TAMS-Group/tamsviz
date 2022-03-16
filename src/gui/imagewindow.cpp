@@ -353,6 +353,145 @@ ImageWindow::ImageWindow() {
     ros::Time _image_time, _pixmap_time;
     ImageWindowOptions _options;
 
+    static QImage mat2image(const cv::Mat &mat,
+                            const std::string &img_encoding) {
+      switch (mat.type()) {
+      case CV_8UC1:
+        return QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
+                      QImage::Format_Grayscale8);
+      case CV_8UC2:
+        LOG_WARN_THROTTLE(1, "image format not yet supported " << mat.type()
+                                                               << " CV_8UC2");
+        return QImage();
+      case CV_8UC3:
+        if (img_encoding == "bgr8" || img_encoding == "bgr16") {
+          cv::cvtColor(mat, mat, cv::COLOR_BGR2RGB);
+        }
+        return QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
+                      QImage::Format_RGB888);
+      case CV_8UC4:
+        if (img_encoding == "bgra8" || img_encoding == "bgra16") {
+          cv::cvtColor(mat, mat, cv::COLOR_BGRA2RGBA);
+        }
+        return QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
+                      QImage::Format_RGBA8888);
+        break;
+      default:
+        LOG_WARN_THROTTLE(1, "image format not yet supported " << mat.type());
+        return QImage();
+      }
+    }
+
+    static void removeNotFinite(cv::Mat &mat) {
+      switch (mat.type()) {
+      case CV_32FC1:
+      case CV_32FC2:
+      case CV_32FC3:
+      case CV_32FC4:
+        for (size_t y = 0; y < mat.rows; y++) {
+          auto *pixel = mat.ptr<float>(y);
+          size_t n = mat.cols * mat.channels();
+          for (size_t x = 0; x < n; x++) {
+            if (!std::isfinite(*pixel)) {
+              *pixel = 0;
+            }
+            pixel++;
+          }
+        }
+        break;
+      case CV_64FC1:
+      case CV_64FC2:
+      case CV_64FC3:
+      case CV_64FC4:
+        for (size_t y = 0; y < mat.rows; y++) {
+          auto *pixel = mat.ptr<double>(y);
+          size_t n = mat.cols * mat.channels();
+          for (size_t x = 0; x < n; x++) {
+            if (!std::isfinite(*pixel)) {
+              *pixel = 0;
+            }
+            pixel++;
+          }
+        }
+        break;
+      }
+    }
+
+    static void to8Bit(cv::Mat &mat) {
+      switch (mat.type()) {
+      case CV_16UC1:
+        mat.convertTo(mat, CV_8U, 1.0 / 256);
+        break;
+      case CV_32FC1:
+        mat.convertTo(mat, CV_8U, 255.0);
+        break;
+      case CV_64FC1:
+        mat.convertTo(mat, CV_8U, 255.0);
+        break;
+      case CV_16UC3:
+        mat.convertTo(mat, CV_8UC3, 1.0 / 256.0);
+        break;
+      case CV_32FC3:
+        mat.convertTo(mat, CV_8UC3, 255.0);
+        break;
+      case CV_64FC3:
+        mat.convertTo(mat, CV_8UC3, 255.0);
+        break;
+      case CV_16UC4:
+        mat.convertTo(mat, CV_8UC4, 1.0 / 256.0);
+        break;
+      case CV_32FC4:
+        mat.convertTo(mat, CV_8UC4, 255.0);
+        break;
+      case CV_64FC4:
+        mat.convertTo(mat, CV_8UC4, 255.0);
+        break;
+      }
+    }
+
+    static bool msg2mat(const std::shared_ptr<const Message> &image,
+                        cv::Mat &mat, std::string &encoding) {
+      if (auto img = image->instantiate<sensor_msgs::Image>()) {
+        if (sensor_msgs::image_encodings::isBayer(img->encoding) ||
+            img->encoding == sensor_msgs::image_encodings::YUV422) {
+          try {
+            cv_bridge::CvImageConstPtr cv_ptr =
+                cv_bridge::toCvCopy(*img, sensor_msgs::image_encodings::RGB8);
+            mat = cv_ptr->image;
+            encoding = cv_ptr->encoding;
+            return true;
+          } catch (cv_bridge::Exception &e) {
+            LOG_ERROR("cv_bridge exception: " << e.what());
+          }
+        }
+        try {
+          cv_bridge::CvImageConstPtr cv_ptr = cv_bridge::toCvCopy(*img);
+          mat = cv_ptr->image;
+          encoding = cv_ptr->encoding;
+          return true;
+        } catch (cv_bridge::Exception &e) {
+          LOG_ERROR("cv_bridge exception: " << e.what());
+        }
+      } else if (auto img =
+                     image->instantiate<sensor_msgs::CompressedImage>()) {
+        try {
+          cv_bridge::CvImageConstPtr cv_ptr =
+              cv_bridge::toCvCopy(*img, sensor_msgs::image_encodings::RGB8);
+          mat = cv_ptr->image;
+          encoding = cv_ptr->encoding;
+          return true;
+        } catch (cv_bridge::Exception &e) {
+          LOG_ERROR("cv_bridge exception: " << e.what());
+        }
+      } else {
+        LOG_WARN("unsupported image message type" << image->type()->name());
+      }
+      if (mat.empty()) {
+        LOG_WARN("failed to decode image");
+      }
+      return false;
+    }
+
   public:
     Event<void()> ready;
     MessageBuffer() {
@@ -381,73 +520,17 @@ ImageWindow::ImageWindow() {
             continue;
           }
 
-          // use cv bridge to convert image message to cv mat
-          cv::Mat mat;
-          std::string img_encoding = "";
-          if (auto img = image->instantiate<sensor_msgs::Image>()) {
-            cv_bridge::CvImagePtr cv_ptr;
-            try {
-              cv_ptr = cv_bridge::toCvCopy(*img);
-              img_encoding = img->encoding;
-            } catch (cv_bridge::Exception &e) {
-              LOG_ERROR("cv_bridge exception: " << e.what());
-              {
-                std::unique_lock<std::mutex> lock(_mutex);
-                _pixmap = QPixmap();
-              }
-              ready();
-              continue;
-            }
-            mat = cv_ptr->image;
-          } else if (auto img =
-                         image->instantiate<sensor_msgs::CompressedImage>()) {
-            mat = cv::imdecode(img->data, cv::IMREAD_UNCHANGED);
-            if (mat.channels() == 3 || mat.channels() == 4) {
-              cv::cvtColor(mat, mat, cv::COLOR_BGRA2RGBA);
-            }
-          } else {
-            LOG_WARN("unsupported image message type" << image->type()->name());
-            continue;
-          }
-          if (mat.empty()) {
-            LOG_WARN("failed to decode image");
-            continue;
-          }
-          LOG_DEBUG_THROTTLE(1, img_encoding);
+          PROFILER();
 
-          // remove nans and infinity
-          switch (mat.type()) {
-          case CV_32FC1:
-          case CV_32FC2:
-          case CV_32FC3:
-          case CV_32FC4:
-            for (size_t y = 0; y < mat.rows; y++) {
-              auto *pixel = mat.ptr<float>(y);
-              size_t n = mat.cols * mat.channels();
-              for (size_t x = 0; x < n; x++) {
-                if (!std::isfinite(*pixel)) {
-                  *pixel = 0;
-                }
-                pixel++;
-              }
-            }
-            break;
-          case CV_64FC1:
-          case CV_64FC2:
-          case CV_64FC3:
-          case CV_64FC4:
-            for (size_t y = 0; y < mat.rows; y++) {
-              auto *pixel = mat.ptr<double>(y);
-              size_t n = mat.cols * mat.channels();
-              for (size_t x = 0; x < n; x++) {
-                if (!std::isfinite(*pixel)) {
-                  *pixel = 0;
-                }
-                pixel++;
-              }
-            }
-            break;
+          cv::Mat mat;
+          std::string encoding;
+          bool ok = msg2mat(image, mat, encoding);
+          if (!ok) {
+            LOG_WARN_THROTTLE(1, "failed to convert image");
+            continue;
           }
+
+          removeNotFinite(mat);
 
           if (_options.normalizeDepth) {
             switch (mat.type()) {
@@ -461,38 +544,8 @@ ImageWindow::ImageWindow() {
             }
           }
 
-          // convert to 8 bit
-          switch (mat.type()) {
-          case CV_16UC1:
-            mat.convertTo(mat, CV_8U, 1.0 / 256);
-            break;
-          case CV_32FC1:
-            mat.convertTo(mat, CV_8U, 255.0);
-            break;
-          case CV_64FC1:
-            mat.convertTo(mat, CV_8U, 255.0);
-            break;
-          case CV_16UC3:
-            mat.convertTo(mat, CV_8UC3, 1.0 / 256.0);
-            break;
-          case CV_32FC3:
-            mat.convertTo(mat, CV_8UC3, 255.0);
-            break;
-          case CV_64FC3:
-            mat.convertTo(mat, CV_8UC3, 255.0);
-            break;
-          case CV_16UC4:
-            mat.convertTo(mat, CV_8UC4, 1.0 / 256.0);
-            break;
-          case CV_32FC4:
-            mat.convertTo(mat, CV_8UC4, 255.0);
-            break;
-          case CV_64FC4:
-            mat.convertTo(mat, CV_8UC4, 255.0);
-            break;
-          }
+          to8Bit(mat);
 
-          // color map
           if (_options.colorMapApply &&
               (mat.type() == CV_8UC1 || mat.type() == CV_8UC3)) {
             try {
@@ -502,32 +555,7 @@ ImageWindow::ImageWindow() {
             }
           }
 
-          // convert to qt image
-          QImage qimage;
-          switch (mat.type()) {
-          case CV_8UC1:
-            qimage = QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
-                            QImage::Format_Grayscale8);
-            break;
-          case CV_8UC3:
-            if (img_encoding == "bgr8" || img_encoding == "bgr16") {
-              cv::cvtColor(mat, mat, cv::COLOR_BGR2RGB);
-            }
-            qimage = QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
-                            QImage::Format_RGB888);
-            break;
-          case CV_8UC4:
-            if (img_encoding == "bgra8" || img_encoding == "bgra16") {
-              cv::cvtColor(mat, mat, cv::COLOR_BGRA2RGBA);
-            }
-            qimage = QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
-                            QImage::Format_RGBA8888);
-            break;
-          default:
-            LOG_WARN("image format not yet supported " << mat.type());
-            continue;
-          }
-          auto pixmap = QPixmap::fromImage(qimage);
+          auto pixmap = QPixmap::fromImage(mat2image(mat, encoding));
           {
             std::unique_lock<std::mutex> lock(_mutex);
             _pixmap = pixmap;

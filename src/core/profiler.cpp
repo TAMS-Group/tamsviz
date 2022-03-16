@@ -81,8 +81,10 @@ ProfilerThread::ProfilerThread(const std::shared_ptr<Profiler> &profiler) {
       stream << "profiler\n";
       for (auto &row : data) {
         if (row.first.count > 0) {
-          stream << row.first.time << " " << row.first.count << " "
-                 << row.second->name() << "\n";
+          stream << "calls:" << row.first.count
+                 << " avg:" << row.first.time / row.first.count
+                 << "us/call total:" << row.first.time
+                 << "us fn:" << row.second->name() << "\n";
         }
       }
       stream << "\n";

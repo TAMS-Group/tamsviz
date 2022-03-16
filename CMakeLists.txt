@@ -35,6 +35,7 @@ find_package(catkin REQUIRED COMPONENTS
     eigen_conversions
     laser_geometry
     tf
+    image_transport
 )
 
 catkin_package(
