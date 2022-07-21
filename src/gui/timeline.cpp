@@ -1883,6 +1883,17 @@ TimelineWidget::TimelineWidget() : QDockWidget("Timeline") {
                 [this](bool checked) { MainWindow::instance()->closeBag(); });
         action->setEnabled(ws->player != nullptr);
       }
+      {
+        auto *action = menu->addAction("Republish");
+        action->setCheckable(true);
+        action->setChecked(ws->document()->display()->republish());
+        connect(action, &QAction::toggled, []() {
+          ActionScope ws{"Republishing"};
+          ws->document()->display()->republish() =
+              !ws->document()->display()->republish();
+          ws->modified();
+        });
+      }
       std::set<std::string> branches;
       for (auto &track : ws->document()->timeline()->tracks()) {
         LOG_DEBUG("track " << track->label());

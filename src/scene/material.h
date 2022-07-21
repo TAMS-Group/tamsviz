@@ -14,6 +14,7 @@ struct Material : Object {
   PROPERTY(double, opacity, 1.0, min = 0, max = 1);
   PROPERTY(double, roughness, 0.4, min = 0, max = 1);
   PROPERTY(double, metallic, 0.0, min = 0, max = 1);
+  PROPERTY(bool, unlit, false);
   PROPERTY(std::string, texture, "");
   PROPERTY(std::string, normals, "");
   Material();

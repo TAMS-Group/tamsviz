@@ -86,7 +86,7 @@ public:
       } else {
         static ros::NodeHandle ros_node;
         _publisher.reset(
-            new ros::Publisher(ros_node.advertise<Message>(topic, 1000)));
+            new ros::Publisher(ros_node.advertise<Message>(topic, 10, false)));
       }
       _topic = topic;
     }

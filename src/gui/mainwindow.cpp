@@ -224,7 +224,6 @@ bool MainWindow::closeDocument() {
 }
 
 void MainWindow::openBag(const QString &path) {
-  LockScope ws;
   QProgressDialog progress(tr("Loading bag..."), QString(), 0, 0);
   progress.setModal(true);
   progress.setWindowFlags(Qt::Window | Qt::WindowTitleHint |
@@ -254,8 +253,11 @@ void MainWindow::openBag(const QString &path) {
   thread.join();
   progress.close();
   if (player) {
-    ws->player = player;
-    ws->modified();
+    {
+      LockScope ws;
+      ws->player = player;
+      ws->modified();
+    }
     addRecentFile(path);
     player->rewind();
   } else {
@@ -411,8 +413,9 @@ MainWindow::MainWindow() {
       };
   {
     auto *menu = menuBar()->addMenu(tr("&File"));
-    createMenuItem(menu, "&New", [this]() { closeDocument(); })
-        ->setShortcut(QKeySequence(Qt::CTRL + Qt::Key_N));
+    createMenuItem(menu, "&New", [this]() {
+      closeDocument();
+    })->setShortcut(QKeySequence(Qt::CTRL + Qt::Key_N));
     createMenuAndToolbarItem(menu, "&Open", QIcon::fromTheme("document-open"),
                              [this]() { openBrowse(); })
         ->setShortcut(QKeySequence(Qt::CTRL + Qt::Key_O));
@@ -420,40 +423,46 @@ MainWindow::MainWindow() {
     createMenuAndToolbarItem(menu, "&Save", QIcon::fromTheme("document-save"),
                              [this]() { saveDocument(); })
         ->setShortcut(QKeySequence(Qt::CTRL + Qt::Key_S));
-    createMenuItem(menu, "Save &As...", [this]() { saveDocumentAs(); })
-        ->setShortcut(QKeySequence(Qt::CTRL + Qt::SHIFT + Qt::Key_S));
-    createMenuItem(menu, "&Close Document", [this]() { closeDocument(); })
-        ->setShortcut(QKeySequence(Qt::CTRL + Qt::Key_W));
-    createMenuItem(menu, "Close &Bag", [this]() { closeBag(); })
-        ->setShortcut(QKeySequence(Qt::CTRL + Qt::Key_B));
-    createMenuItem(menu, "E&xit", [this]() { close(); })
-        ->setShortcut(QKeySequence(Qt::CTRL + Qt::Key_Q));
+    createMenuItem(menu, "Save &As...", [this]() {
+      saveDocumentAs();
+    })->setShortcut(QKeySequence(Qt::CTRL + Qt::SHIFT + Qt::Key_S));
+    createMenuItem(menu, "&Close Document", [this]() {
+      closeDocument();
+    })->setShortcut(QKeySequence(Qt::CTRL + Qt::Key_W));
+    createMenuItem(menu, "Close &Bag", [this]() {
+      closeBag();
+    })->setShortcut(QKeySequence(Qt::CTRL + Qt::Key_B));
+    createMenuItem(menu, "E&xit", [this]() {
+      close();
+    })->setShortcut(QKeySequence(Qt::CTRL + Qt::Key_Q));
   }
   {
     auto *menu = menuBar()->addMenu(tr("&Edit"));
-    createMenuAndToolbarItem(menu, "&Undo", // FA_S_ICON("undo", 0.15),
-                             QIcon::fromTheme("edit-undo"),
-                             [this]() {
-                               LockScope ws;
-                               ws->history->undo(ws());
-                               ws->modified();
-                             },
-                             []() {
-                               LockScope ws;
-                               return ws->history->canUndo();
-                             })
+    createMenuAndToolbarItem(
+        menu, "&Undo", // FA_S_ICON("undo", 0.15),
+        QIcon::fromTheme("edit-undo"),
+        [this]() {
+          LockScope ws;
+          ws->history->undo(ws());
+          ws->modified();
+        },
+        []() {
+          LockScope ws;
+          return ws->history->canUndo();
+        })
         ->setShortcut(QKeySequence(Qt::CTRL + Qt::Key_Z));
-    createMenuAndToolbarItem(menu, "&Redo", // FA_S_ICON("redo", 0.15),
-                             QIcon::fromTheme("edit-redo"),
-                             [this]() {
-                               LockScope ws;
-                               ws->history->redo(ws());
-                               ws->modified();
-                             },
-                             []() {
-                               LockScope ws;
-                               return ws->history->canRedo();
-                             })
+    createMenuAndToolbarItem(
+        menu, "&Redo", // FA_S_ICON("redo", 0.15),
+        QIcon::fromTheme("edit-redo"),
+        [this]() {
+          LockScope ws;
+          ws->history->redo(ws());
+          ws->modified();
+        },
+        []() {
+          LockScope ws;
+          return ws->history->canRedo();
+        })
         ->setShortcuts({QKeySequence(Qt::CTRL + Qt::Key_Y),
                         QKeySequence(Qt::CTRL + Qt::SHIFT + Qt::Key_Z)});
     createMenuAndToolbarItem(
@@ -561,35 +570,36 @@ MainWindow::MainWindow() {
               update_paste);
       update_paste();
     }
-    createMenuAndToolbarItem(menu, "&Delete", // FA_R_ICON("trash-alt"),
-                             QIcon::fromTheme("edit-delete"),
-                             [this]() {
-                               LOG_INFO("delete");
-                               ActionScope ws("Delete");
-                               for (auto selected :
-                                    ws->selection().resolve(ws())) {
-                                 removeObject(ws(), (void *)selected.get());
-                                 ws->modified();
-                               }
-                             },
-                             []() {
-                               LockScope ws;
-                               return !ws()->selection().empty();
-                             })
+    createMenuAndToolbarItem(
+        menu, "&Delete", // FA_R_ICON("trash-alt"),
+        QIcon::fromTheme("edit-delete"),
+        [this]() {
+          LOG_INFO("delete");
+          ActionScope ws("Delete");
+          for (auto selected : ws->selection().resolve(ws())) {
+            removeObject(ws(), (void *)selected.get());
+            ws->modified();
+          }
+        },
+        []() {
+          LockScope ws;
+          return !ws()->selection().empty();
+        })
         ->setShortcut(QKeySequence(Qt::Key_Delete));
-    createMenuItem(menu, "Deselect",
-                   [this]() {
-                     LockScope ws;
-                     ws->selection().clear();
-                     ws->modified();
-                     if (auto *w = qApp->focusWidget()) {
-                       w->clearFocus();
-                     }
-                   },
-                   []() {
-                     LockScope ws;
-                     return !ws()->selection().empty();
-                   })
+    createMenuItem(
+        menu, "Deselect",
+        [this]() {
+          LockScope ws;
+          ws->selection().clear();
+          ws->modified();
+          if (auto *w = qApp->focusWidget()) {
+            w->clearFocus();
+          }
+        },
+        []() {
+          LockScope ws;
+          return !ws()->selection().empty();
+        })
         ->setShortcut(QKeySequence(Qt::Key_Escape));
     /*createMenuItem(menu, "Reload",
                    [this]() { ResourceEvents::instance().reload(); })

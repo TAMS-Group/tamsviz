@@ -4,8 +4,11 @@
 #include "bagplayer.h"
 
 #include "log.h"
+#include "message.h"
 #include "topic.h"
+#include "workspace.h"
 
+#include <ros/ros.h>
 #include <rosbag/view.h>
 
 #include <chrono>
@@ -16,11 +19,16 @@ protected:
   RosBagViewBase(const std::string &filename) { _bag.open(filename); }
 };
 
+struct RosBagTopicInfo {
+  std::string name, type, md5, definition;
+};
+
 class RosBagView : protected RosBagViewBase, protected rosbag::View {
 
   std::vector<std::pair<std::string, std::string>> _viz_topic_list;
   std::unordered_map<std::string, std::string> _topic_bag_to_viz;
   std::unordered_map<std::string, std::string> _topic_viz_to_bag;
+  std::vector<RosBagTopicInfo> _topic_infos;
 
   std::shared_ptr<const Message> loadMessage(const rosbag::ConnectionInfo *conn,
                                              const rosbag::IndexEntry &index,
@@ -44,7 +52,17 @@ public:
       _topic_bag_to_viz[conn->topic] = viz_name;
       _topic_viz_to_bag[viz_name] = conn->topic;
       _viz_topic_list.emplace_back(conn->datatype, viz_name);
+      RosBagTopicInfo info;
+      info.name = viz_name;
+      info.type = conn->datatype;
+      info.md5 = conn->md5sum;
+      info.definition = conn->msg_def;
+      _topic_infos.push_back(info);
     }
+  }
+
+  const std::vector<RosBagTopicInfo> &topicInfos() const {
+    return _topic_infos;
   }
 
   ros::Time startTime() { return getBeginTime(); }
@@ -172,23 +190,11 @@ void BagPlayer::publish(const std::string &topic,
                 << " time:" << (message->time() - _bag_start_time).toSec());
     }
     _topics[topic]->publish(message);
+    if (_data->republish) {
+      _republishers[topic].publish(*message);
+    }
   }
 }
-
-/*
-std::vector<std::shared_ptr<const Message>>
-BagPlayer::readMessageSamples(const std::string &topic, double start,
-                              double stop) {
-  std::unique_lock<std::mutex> lock(_view_mutex);
-  std::vector<std::shared_ptr<const Message>> ret;
-  readMessageSamples(topic, start, stop,
-                     [&](const std::shared_ptr<const Message> &msg) {
-                       ret.push_back(msg);
-                       return true;
-                     });
-  return ret;
-}
-*/
 
 void BagPlayer::readMessageSamples(
     const std::string &topic, double start, double stop,
@@ -226,6 +232,7 @@ void BagPlayer::readMessageSamples(
 
 BagPlayer::BagPlayer(const std::string &path) : _path(path) {
   LOG_DEBUG("opening bag " << path);
+  ros::NodeHandle node;
   _file_name = path;
   if (auto *n = std::strrchr(path.c_str(), '/')) {
     _file_name = n + 1;
@@ -235,18 +242,35 @@ BagPlayer::BagPlayer(const std::string &path) : _path(path) {
   _view = std::make_shared<RosBagView>(path);
   LOG_DEBUG("listing topics");
   for (auto &topic : _view->topics()) {
+    LOG_DEBUG("topic " << topic.first << " " << topic.second);
     _topic_type_name_list.push_back(topic);
     _topic_names.push_back(topic.second);
     _topics[topic.second] = Topic::instance(topic.second);
   }
+  for (auto &topic : _view->topicInfos()) {
+    LOG_DEBUG("topic " << topic.name << " " << topic.type);
+    ros::AdvertiseOptions opts(topic.name, 10, topic.md5, topic.type,
+                               topic.definition);
+    _republishers[topic.name] = node.advertise(opts);
+  }
   LOG_DEBUG("done listing topics");
   _message_playback_scope =
       std::make_shared<MessagePlaybackScope>(_topic_names);
+  LOG_DEBUG("playback scope created");
   _duration = (_view->endTime() - _view->startTime()).toSec();
   _bag_start_time = _view->startTime();
   LOG_DEBUG("rosbag opened path:" << path << " duration:" << _duration);
   _thread = std::thread([this]() {
     LOG_DEBUG("bag thread started");
+    {
+      auto data = _data;
+      LockScope ws;
+      ws->modified.connect(data, [data]() {
+        data->republish = LockScope()->document()->display()->republish();
+      });
+      data->republish = ws->document()->display()->republish();
+    }
+    LOG_DEBUG("entering bag loop");
     while (true) {
       std::function<void()> action;
       {
@@ -435,6 +459,7 @@ BagPlayer::~BagPlayer() {
     _exit = true;
     _action_condition.notify_one();
   }
+  LOG_DEBUG("rosbag join " << _path);
   _thread.join();
   LOG_DEBUG("rosbag closed " << _path);
 }

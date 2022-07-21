@@ -49,5 +49,6 @@ public:
   virtual void composite(int target) override;
   PROPERTY(Eigen::Vector3d, viewPosition, Eigen::Vector3d(3, 3, 3));
   PROPERTY(Eigen::Vector3d, viewTarget, Eigen::Vector3d(0, 0, 0));
+  PROPERTY(double, fieldOfView, 180 / M_PI);
 };
 DECLARE_TYPE(SceneWindow, RenderWindowBase);

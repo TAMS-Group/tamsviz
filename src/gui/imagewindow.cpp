@@ -628,6 +628,21 @@ ImageWindow::ImageWindow() {
           c = '_';
         }
       }
+      {
+        LockScope ws;
+        if (ws->player) {
+          std::string bagname = ws->player->fileName();
+          for (auto &c : bagname) {
+            if (!std::isalnum(c)) {
+              c = '_';
+            }
+          }
+          namesuggest = QFileInfo(ws->player->path().c_str())
+                            .absoluteDir()
+                            .filePath((bagname + "-" + namesuggest).c_str())
+                            .toStdString();
+        }
+      }
       namesuggest += "_";
       namesuggest += std::to_string(ros::WallTime::now().toNSec());
       namesuggest += ".png";

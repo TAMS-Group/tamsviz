@@ -120,22 +120,26 @@ void Topic::_unsubscribe(const std::shared_ptr<Topic> &topic) {
 MessagePlaybackScope::MessagePlaybackScope(
     const std::vector<std::string> &topics)
     : _topics(topics), _registry(TopicRegistry::instance()) {
-  std::lock_guard<std::mutex> lock(_registry->topic_map_mutex);
-  for (auto &topic_name : _topics) {
-    bool unsubscribe = false;
-    {
-      std::lock_guard<std::mutex> lock(_registry->topic_bag_counter_mutex);
-      _registry->topic_bag_counters[topic_name]++;
-      if (_registry->topic_bag_counters[topic_name] == 1) {
-        unsubscribe = true;
+  LOG_DEBUG("playback scope ctor begin");
+  {
+    std::lock_guard<std::mutex> lock(_registry->topic_map_mutex);
+    for (auto &topic_name : _topics) {
+      bool unsubscribe = false;
+      {
+        std::lock_guard<std::mutex> lock(_registry->topic_bag_counter_mutex);
+        _registry->topic_bag_counters[topic_name]++;
+        if (_registry->topic_bag_counters[topic_name] == 1) {
+          unsubscribe = true;
+        }
       }
-    }
-    if (unsubscribe) {
-      if (auto topic_instance = _registry->topic_map[topic_name].lock()) {
-        Topic::_unsubscribe(topic_instance);
+      if (unsubscribe) {
+        if (auto topic_instance = _registry->topic_map[topic_name].lock()) {
+          Topic::_unsubscribe(topic_instance);
+        }
       }
     }
   }
+  LOG_DEBUG("playback scope ctor ready");
 }
 
 MessagePlaybackScope::~MessagePlaybackScope() {

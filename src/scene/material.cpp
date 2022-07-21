@@ -82,6 +82,8 @@ void MaterialRenderer::updateSync(const Material &material) {
   _block.color.w() = (float)material.opacity();
   _block.roughness = (float)material.roughness();
   _block.metallic = (float)material.metallic();
+  if (material.unlit())
+    _block.metallic = -1;
   _color_texture_url = material.texture();
   _normal_texture_url = material.normals();
   if (!material._alive) {
@@ -99,6 +101,8 @@ void MaterialRenderer::updateSync(const MaterialOverride &material_override) {
   if (material_override.parameters()) {
     _block.roughness = (float)material_override.material()->roughness();
     _block.metallic = (float)material_override.material()->metallic();
+    if (material_override.material()->unlit())
+      _block.metallic = -1;
   }
   _block.color.w() = (float)material_override.material()->opacity();
   if (material_override.texture()) {

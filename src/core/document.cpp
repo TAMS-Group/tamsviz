@@ -25,6 +25,13 @@ float srgbGamma2Linear(float srgb) {
   }
 }
 
+/*
+float srgbGamma2Linear(float srgb) {
+  return srgb <= 0.04045f ? srgb / 12.92f
+                          : std::pow((srgb + 0.055f) / 1.055f, 2.4f);
+}
+*/
+
 std::vector<std::string> WorldDisplay::_listFrames(const Property &) {
   auto ret = LockScope()->document()->display()->transformer->list();
   std::sort(ret.begin(), ret.end());

@@ -38,6 +38,7 @@ layout(std140) uniform light_block {
   int light_count;
 } lights;
 
+
 float srgb2linear(float srgb) {
   if (srgb < 0.04045) {
     return srgb * (25.0 / 232.0);
@@ -45,3 +46,11 @@ float srgb2linear(float srgb) {
     return pow((200.0 * srgb + 11.0) * (1.0f / 211.0), 12.0 / 5.0);
   }
 }
+
+/*
+float srgb2linear(float srgb) {
+  return srgb <= 0.04045
+       ? srgb / 12.92
+       : pow((srgb + 0.055) / 1.055, 2.4);
+}
+*/

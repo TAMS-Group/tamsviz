@@ -65,4 +65,10 @@ void main() {
     } else {
         x_color = color;
     }
+
+    /*if(true) { // todo: remove again
+      x_color.r = srgb2linear(color.r);
+      x_color.g = srgb2linear(color.g);
+      x_color.b = srgb2linear(color.b);
+    }*/
 }

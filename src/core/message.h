@@ -66,9 +66,21 @@ namespace ros {
 namespace message_traits {
 template <> struct MD5Sum<Message> {
   static const char *value() { return "*"; }
+  static const char *value(const Message &message) {
+    return message.type()->hash().c_str();
+  }
 };
 template <> struct DataType<Message> {
   static const char *value() { return "*"; }
+  static const char *value(const Message &message) {
+    return message.type()->name().c_str();
+  }
+};
+template <> struct Definition<Message> {
+  static const char *value() { return "*"; }
+  static const char *value(const Message &message) {
+    return message.type()->definition().c_str();
+  }
 };
 } // namespace message_traits
 namespace serialization {
@@ -77,6 +89,11 @@ template <> struct Serializer<Message> {
   inline static void read(Stream &stream, Message &m) {
     m.read(stream);
   }
+  template <typename Stream>
+  inline static void write(Stream &stream, const Message &m) {
+    std::memcpy(stream.advance(m.size()), m.data(), m.size());
+  }
+  inline static uint32_t serializedLength(const Message &m) { return m.size(); }
 };
 template <> struct PreDeserialize<Message> {
   static void notify(const PreDeserializeParams<Message> &params) {

@@ -127,7 +127,8 @@ void SceneWindow::renderWindowSync(const RenderWindowSyncContext &context) {
   updateViewMatrix();
   float far = (100.0 + (viewPosition() - viewTarget()).norm() * 2.0);
   float near = far * 0.0001f;
-  _projection_matrix = projectionMatrix(1.0, _height * 1.0 / _width, near, far);
+  _projection_matrix = projectionMatrix(fieldOfView() * M_PI / 180,
+                                        _height * 1.0 / _width, near, far);
   _camera_block.projection_matrix = _projection_matrix.cast<float>();
 
   _camera_block.flags = 0;
@@ -306,8 +307,9 @@ void SceneWindow::handleEvent(QEvent *event) {
 
         LockScope ws;
         QPoint d = mouse->pos() - _mouse_position;
+        double s = 1.0f / std::tan((double)(fieldOfView() * M_PI / 180) * 0.5);
         double meters_per_pixel = (viewTarget() - viewPosition()).norm() /
-                                  std::sqrt(1.0 * width() * height());
+                                  std::sqrt(1.0 * width() * height()) / s * 2;
         double dx = d.x() * meters_per_pixel;
         double dy = d.y() * meters_per_pixel;
         Eigen::Vector3d mx = (viewTarget() - viewPosition())

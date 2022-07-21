@@ -378,6 +378,7 @@ void VisualizationMarker::renderSync(const RenderSyncContext &context) {
       _renderer->pose(_pose);
       if (auto r = std::dynamic_pointer_cast<MeshRenderer>(_renderer)) {
         r->options() = _render_options;
+        // r->materialRenderer()->block().flags |= 4;
       }
       if (auto r = std::dynamic_pointer_cast<TextRenderer>(_renderer)) {
         r->text(_text);

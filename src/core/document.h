@@ -220,6 +220,7 @@ public:
   PROPERTY(std::string, fixedFrame, "world", list = &WorldDisplay::_listFrames);
   PROPERTY(std::shared_ptr<Component>, rendering, nullptr);
   PROPERTY(std::shared_ptr<Component>, environment, nullptr);
+  PROPERTY(bool, republish, true);
   virtual void renderSync(const RenderSyncContext &context) override;
   virtual void renderAsync(const RenderAsyncContext &context) override;
   virtual void refresh() override;

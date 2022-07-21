@@ -11,13 +11,17 @@
 #include <vector>
 
 #include "event.h"
+#include "topic.h"
 
+#include <ros/ros.h>
 #include <rosbag/bag.h>
 
 class RosBagView;
 class MessagePlaybackScope;
 class Topic;
 class Message;
+
+template <class Message> class Publisher;
 
 class BagPlayer {
   std::shared_ptr<RosBagView> _view;
@@ -35,6 +39,11 @@ class BagPlayer {
   std::unordered_map<std::string, std::shared_ptr<Topic>> _topics;
   std::vector<std::string> _topic_names;
   std::vector<std::pair<std::string, std::string>> _topic_type_name_list;
+  std::unordered_map<std::string, ros::Publisher> _republishers;
+  struct Data {
+    volatile bool republish = true;
+  };
+  std::shared_ptr<Data> _data = std::make_shared<Data>();
   volatile bool _is_playing = false;
   bool _exit = false;
   void startAction(const std::function<void()> &action);
@@ -45,9 +54,6 @@ class BagPlayer {
     std::unique_lock<std::mutex> lock(_action_mutex);
     return interrupted_nolock();
   }
-  // std::shared_ptr<const Message>
-  // instantiate_nolock(const rosbag::MessageInstance &msg);
-  // void publish(const rosbag::MessageInstance &msg);
   void publish(const std::string &topic,
                const std::shared_ptr<const Message> &message);
 

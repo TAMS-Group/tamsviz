@@ -3,6 +3,7 @@
 
 #include "renderwindow.h"
 
+#include "../core/bagplayer.h"
 #include "../core/workspace.h"
 #include "../render/framebuffer.h"
 #include "../render/renderer.h"
@@ -80,8 +81,36 @@ RenderWindowBase::RenderWindowBase() {
         }
         render_widget->doneCurrent();
       }
+      std::string namesuggest = "";
+      /*
+      {
+        LockScope ws;
+        if (ws->player) {
+          name = ws->player->path();
+        }
+      }
+      name += ".3d.png";
+      */
+      namesuggest +=
+          "3d-" + std::to_string(ros::WallTime::now().toNSec()) + ".png";
+      {
+        LockScope ws;
+        if (ws->player) {
+          std::string bagname = ws->player->fileName();
+          for (auto &c : bagname) {
+            if (!std::isalnum(c)) {
+              c = '_';
+            }
+          }
+          namesuggest = QFileInfo(ws->player->path().c_str())
+                            .absoluteDir()
+                            .filePath((bagname + "-" + namesuggest).c_str())
+                            .toStdString();
+        }
+      }
       QString file_name = QFileDialog::getSaveFileName(
-          this, tr("Save Screenshot"), "", tr("Images (*.png *.jpg)"));
+          this, tr("Save Screenshot"), namesuggest.c_str(),
+          tr("Images (*.png *.jpg)"));
       if (!file_name.isEmpty()) {
         if (QFileInfo(file_name).suffix().isEmpty()) {
           if (!file_name.endsWith(".")) {

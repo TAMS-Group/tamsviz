@@ -32,7 +32,6 @@ find_package(catkin REQUIRED COMPONENTS
     rosbag
     roscpp
     std_msgs
-    eigen_conversions
     laser_geometry
     tf
     image_transport
