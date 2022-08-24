@@ -4,8 +4,9 @@ cmake_minimum_required(VERSION 3.1)
 
 project(tamsviz)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O3")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Os")
 
 set(CMAKE_CXX_STANDARD 11)
 
