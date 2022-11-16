@@ -13,7 +13,7 @@ public:
   Destructor(const Destructor &) = delete;
   Destructor &operator=(const Destructor &) = delete;
   Destructor(const std::function<void()> &fn) : fn(fn) {}
-  Destructor &operator=(const std::function<void()> &f) { fn = f; }
+  Destructor &operator=(const std::function<void()> &f) { fn = f; return *this;}
   ~Destructor() {
     if (fn) {
       fn();

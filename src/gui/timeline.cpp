@@ -279,7 +279,7 @@ class AnnotationSpanItem : public EditableText {
   double _track_color = 0;
 
   bool snap(double &x) {
-    snap(x, [this](const std::shared_ptr<AnnotationSpan> &span) {
+    return snap(x, [this](const std::shared_ptr<AnnotationSpan> &span) {
       return span != _annotation;
     });
   }
