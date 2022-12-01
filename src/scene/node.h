@@ -51,7 +51,7 @@ public:
   void show() { _visible = true; }
   void hide() { _visible = false; }
   bool visible() const { return _visible; }
-  bool visible(bool v) { _visible = v; }
+  bool visible(bool v) { _visible = v; return _visible;}
   template <class T, class... Args>
   std::shared_ptr<T> create(const Args &... args) {
     auto instance = std::make_shared<T>(args...);

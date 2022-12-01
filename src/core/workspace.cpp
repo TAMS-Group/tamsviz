@@ -86,6 +86,7 @@ bool operator==(const Selection &a, const Selection &b) {
       return false;
     }
   }
+  return true;
 }
 bool operator!=(const Selection &a, const Selection &b) { return !(a == b); }
 

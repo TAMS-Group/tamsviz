@@ -26,7 +26,7 @@ class ResourceBase : public std::enable_shared_from_this<ResourceBase> {
 
 protected:
   void cleanup(const std::function<void()> &callback);
-  bool invalidated() { _invalidated.poll(); }
+  bool invalidated() { return _invalidated.poll(); }
 
 public:
   static void setCleanupFunction(

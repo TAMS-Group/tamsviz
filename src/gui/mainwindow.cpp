@@ -35,7 +35,7 @@ struct ClipboardData : Object {
 };
 DECLARE_TYPE(ClipboardData, Object)
 
-bool MainWindow::event(QEvent *event) { QMainWindow::event(event); }
+bool MainWindow::event(QEvent *event) { return QMainWindow::event(event); }
 
 void MainWindow::addRecentFile(const QString &path) {
   {
