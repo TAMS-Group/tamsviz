@@ -11,6 +11,8 @@
 #include <atomic>
 #include <typeindex>
 
+extern bool g_show_split_window_bars;
+
 class WindowBase : public Window, public QFrame {
 
 protected:
@@ -23,6 +25,7 @@ protected:
 DECLARE_TYPE(WindowBase, Window);
 
 class ContentWindowBase : public WindowBase {
+  QWidget *bar_widget = nullptr;
   QHBoxLayout *bar = nullptr;
   QVBoxLayout *layout = nullptr;
   QWidget *spacer = nullptr;
