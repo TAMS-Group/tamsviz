@@ -117,13 +117,20 @@ STRUCT_PROPERTY(y, min = 1e-6);
 STRUCT_END();
 
 class RenderList;
+class Renderer;
 
 struct RenderSyncContext {
   Eigen::Affine3d pose = Eigen::Affine3d::Identity();
   RenderList *render_list = nullptr;
 };
+
 struct RenderAsyncContext {
   RenderList *render_list = nullptr;
+};
+
+struct RenderViewsAsyncContext {
+  RenderList *render_list = nullptr;
+  Renderer *renderer = nullptr;
 };
 
 class Interaction;
@@ -178,6 +185,7 @@ public:
   }
   virtual void renderSync(const RenderSyncContext &context) {}
   virtual void renderAsync(const RenderAsyncContext &context) {}
+  virtual void renderViewsAsync(const RenderViewsAsyncContext &context) {}
   virtual bool pick(uint32_t id) const { return false; }
   virtual bool interact(const Interaction &interaction);
   virtual void refreshRecursive();

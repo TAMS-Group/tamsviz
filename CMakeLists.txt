@@ -96,6 +96,7 @@ add_library(${LIBRARY_NAME}
     src/core/watcher.cpp
     src/core/workspace.cpp
     src/displays/axes.cpp
+    src/displays/camera.cpp
     src/displays/drvcam.cpp
     src/displays/frame.cpp
     src/displays/geometry.cpp
