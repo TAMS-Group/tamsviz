@@ -1,13 +1,18 @@
 // TAMSVIZ
 // (c) 2020-2023 Philipp Ruppel
 
+#include <pybind11/functional.h>
+#include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 
 #include "../core/workspace.h"
+#include "../displays/camera.h"
 #include "../gui/mainwindow.h"
 #include "../gui/renderthread.h"
 #include "../gui/renderwindow.h"
 
+#include <boost/thread/barrier.hpp>
 #include <console_bridge/console.h>
 #include <ros/package.h>
 #include <ros/ros.h>
@@ -68,6 +73,37 @@ PYBIND11_MODULE(pytamsviz, m) {
 
   // ---
 
+  m.def("ok", []() { return ros::ok(); });
+
+  m.def("message", [](const std::string &topic, const std::string &hash,
+                      const std::string &name, const std::string &definition,
+                      const std::string &data) {
+    if (auto topic_instance = Topic::instance(topic, false)) {
+      auto type = MessageType::instance(hash, name, definition);
+      auto message = std::make_shared<Message>();
+      message->type(type);
+      ros::serialization::IStream stream((uint8_t *)data.data(), data.size());
+      message->read(stream);
+      message->time(ros::Time::now());
+      topic_instance->publish(message);
+    }
+  });
+
+  m.def("render", []() {
+    boost::barrier b(2);
+    RenderThread::instance()->invalidate([&b]() { b.wait(); });
+    b.wait();
+  });
+
+  // m.def("thread",
+  //       [](const std::function<void()> &f) { std::thread(f).detach(); });
+
+  // m.def("interval", [](double interval, const std::function<void()> &f) {
+  //   node->createTimer(ros::Duration(interval),
+  //                     boost::function<void(const ros::TimerEvent &)>(
+  //                         [f](const ros::TimerEvent &) { f(); }));
+  // });
+
   m.def("start_offscreen", []() {
     init();
     RenderThread::start();
@@ -82,6 +118,33 @@ PYBIND11_MODULE(pytamsviz, m) {
     RenderThread::start();
     spinner = std::make_shared<ros::AsyncSpinner>(0);
     spinner->start();
+  });
+
+  m.def("image", [](const std::string &name) {
+    std::shared_ptr<sensor_msgs::Image> image_message;
+    {
+      LockScope ws;
+      ws->document()->display()->recurseDisplays(
+          [&](const std::shared_ptr<Display> &display) {
+            if (auto cam = std::dynamic_pointer_cast<CameraDisplay>(display)) {
+              if (cam->prefix() == name) {
+                image_message = cam->image();
+              }
+            }
+          });
+    }
+    py::array_t<uint8_t> ret;
+    if (image_message) {
+      ret.resize(std::vector<size_t>(
+          {image_message->height, image_message->width, 4}));
+      {
+        auto r = ret.mutable_data();
+        for (size_t i = 0; i < image_message->data.size(); i++) {
+          r[i] = image_message->data[i];
+        }
+      }
+    }
+    return ret;
   });
 
   m.def("start_embedded", [](uint64_t ptr) {

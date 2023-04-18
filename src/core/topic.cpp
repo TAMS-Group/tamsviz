@@ -166,11 +166,11 @@ Topic::Topic(const std::string &name)
   _connections = 0;
 }
 Topic::~Topic() {}
-std::shared_ptr<Topic> Topic::instance(const std::string &name) {
+std::shared_ptr<Topic> Topic::instance(const std::string &name, bool create) {
   auto registry = TopicRegistry::instance();
   std::lock_guard<std::mutex> lock(registry->topic_map_mutex);
   auto topic = registry->topic_map[name].lock();
-  if (!topic) {
+  if (!topic && create) {
     topic = std::shared_ptr<Topic>(new Topic(name));
     {
       bool sub = false;

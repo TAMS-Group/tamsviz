@@ -108,36 +108,23 @@ void CameraDisplay::renderViewsAsync(const RenderViewsAsyncContext &context) {
 
   context.renderer->render(_render_target, _camera_block, *context.render_list);
 
-  /*QImage screenshot;
-  {
-    QOpenGLFramebufferObject fbo(_width, _height);
-    _render_target.present(fbo.handle());
-    screenshot = fbo.toImage();
-  }*/
-
   _render_target._front_framebuffer.bind();
 
-  // cv::Mat mat(_height, _width, CV_8UC4, buffer.data());
+  auto image = std::make_shared<sensor_msgs::Image>();
+  {
+    image->header.frame_id = _params.frame;
 
-  // cv::imshow("camera", mat);
-  // cv::waitKey(1);
+    image->width = _width;
+    image->height = _height;
+    image->encoding = "rgba8";
+    image->step = _width * 4;
 
-  if (_camera_context) {
-
-    sensor_msgs::Image image;
-    image.header.frame_id = _params.frame;
-
-    image.width = _width;
-    image.height = _height;
-    image.encoding = "rgba8";
-    image.step = _width * 4;
-
-    image.data.resize(_width * _height * 4);
+    image->data.resize(_width * _height * 4);
     V_GL(glReadPixels(0, 0, _width, _height, GL_RGBA, GL_UNSIGNED_BYTE,
-                      image.data.data()));
+                      image->data.data()));
     V_GL(glBindFramebuffer(GL_FRAMEBUFFER, 0));
 
-    uint32_t *pixels = (uint32_t *)image.data.data();
+    uint32_t *pixels = (uint32_t *)image->data.data();
     for (size_t y = 0; y < _height / 2; y++) {
       size_t i0 = y * _width;
       size_t i1 = (_height - 1 - y) * _width;
@@ -147,16 +134,24 @@ void CameraDisplay::renderViewsAsync(const RenderViewsAsyncContext &context) {
         i1++;
       }
     }
+  }
 
-    sensor_msgs::CameraInfo info;
-    info.header.frame_id = _params.frame;
-    info.width = _width;
-    info.height = _height;
+  {
+    std::lock_guard<std::mutex> lock(_image_mutex);
+    _image_message = image;
+  }
 
-    LOG_INFO("publish image " << image.width << " " << image.height << " "
-                              << info.width << " " << info.height);
+  if (_camera_context) {
 
-    _camera_context->campub.publish(image, info);
+    auto info = std::make_shared<sensor_msgs::CameraInfo>();
+    info->header.frame_id = _params.frame;
+    info->width = _width;
+    info->height = _height;
+
+    LOG_INFO("publish image " << image->width << " " << image->height << " "
+                              << info->width << " " << info->height);
+
+    _camera_context->campub.publish(*image, *info);
   }
 
   LOG_INFO("camera view rendererd");

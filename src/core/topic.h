@@ -49,7 +49,8 @@ public:
     std::unique_lock<std::mutex> lock(_message_mutex);
     return _message_instance;
   }
-  static std::shared_ptr<Topic> instance(const std::string &name);
+  static std::shared_ptr<Topic> instance(const std::string &name,
+                                         bool create = true);
   Event<void(const std::shared_ptr<const Message> &)> received;
   Event<void()> connected;
   bool isFromBag() const;

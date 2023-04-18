@@ -9,6 +9,8 @@
 #include "../render/rendertarget.h"
 #include "frame.h"
 
+#include <sensor_msgs/Image.h>
+
 struct CameraDisplayParams {
   std::string prefix;
   std::string frame;
@@ -35,6 +37,8 @@ class CameraDisplay : public FrameDisplayBase {
   // Eigen::Matrix4d _view_matrix;
   // Eigen::Matrix4d _projection_matrix;
   Eigen::Vector4f _bgcolor;
+  std::mutex _image_mutex;
+  std::shared_ptr<sensor_msgs::Image> _image_message;
 
 private:
   std::shared_ptr<CameraDisplayContext> _camera_context;
@@ -42,6 +46,16 @@ private:
 public:
   virtual void renderSync(const RenderSyncContext &context);
   virtual void renderViewsAsync(const RenderViewsAsyncContext &context);
+
+public:
+  std::shared_ptr<sensor_msgs::Image> image() {
+    std::shared_ptr<sensor_msgs::Image> ret;
+    {
+      std::lock_guard<std::mutex> lock(_image_mutex);
+      ret = _image_message;
+    }
+    return ret;
+  }
 
 public:
   PROPERTY(std::string, prefix, "tamsviz_camera");

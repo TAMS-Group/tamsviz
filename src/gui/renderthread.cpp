@@ -24,6 +24,19 @@ void RenderThread::invalidate() {
   _condition.notify_all();
 }
 
+void RenderThread::invalidate(const std::function<void()> &callback) {
+  {
+    std::unique_lock<std::mutex> lock(_mutex);
+    if (!_stop_flag) {
+      _redraw_flag = true;
+      _callbacks.push_back(callback);
+      _condition.notify_all();
+      return;
+    }
+  }
+  callback();
+}
+
 void RenderThread::_run() {
   LOG_DEBUG("render thread started");
 
@@ -55,6 +68,7 @@ void RenderThread::_run() {
   RenderList render_list;
   while (true) {
     // std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    std::vector<std::function<void()>> callbacks;
     {
       std::unique_lock<std::mutex> lock(_mutex);
       while (true) {
@@ -63,6 +77,8 @@ void RenderThread::_run() {
         }
         if (_redraw_flag) {
           _redraw_flag = false;
+          callbacks = _callbacks;
+          _callbacks.clear();
           break;
         }
         _condition.wait(lock);
@@ -203,6 +219,22 @@ void RenderThread::_run() {
         render_window_list.clear();
       }
     }
+    for (auto &callback : callbacks) {
+      callback();
+    }
+    callbacks.clear();
+  }
+  {
+    std::vector<std::function<void()>> callbacks;
+    {
+      std::unique_lock<std::mutex> lock(_mutex);
+      callbacks = _callbacks;
+      _callbacks.clear();
+    }
+    for (auto &c : callbacks) {
+      c();
+    }
+    callbacks.clear();
   }
   offscreen_context.doneCurrent();
   ResourceBase::setCleanupFunction(nullptr);

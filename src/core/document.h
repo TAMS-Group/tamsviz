@@ -78,7 +78,8 @@ struct Orientation {
 STRUCT_BEGIN(Orientation);
 STRUCT_PROPERTY(yaw, step_scale = 90);
 STRUCT_PROPERTY(pitch, step_scale = 90);
-openDocument STRUCT_END();
+STRUCT_PROPERTY(roll, step_scale = 90);
+STRUCT_END();
 
 struct Pose {
   DECLARE_STRUCT_PROPERTY(Eigen::Vector3d, position, Eigen::Vector3d::Zero());
