@@ -27,6 +27,7 @@
 int main(int argc, char **argv) {
 
   {
+
     QCoreApplication::setAttribute(Qt::AA_ShareOpenGLContexts);
     {
       QSurfaceFormat format;
@@ -44,6 +45,8 @@ int main(int argc, char **argv) {
     QApplication app(argc, argv);
     app.setOrganizationName("TAMS");
     app.setApplicationName(QString(ROS_PACKAGE_NAME).toUpper());
+
+    std::setlocale(LC_NUMERIC, "en_US.UTF-8");
 
     QCommandLineParser parser;
     parser.setApplicationDescription(

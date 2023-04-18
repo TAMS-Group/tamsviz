@@ -42,6 +42,8 @@ PYBIND11_MODULE(pytamsviz, m) {
   app->setOrganizationName("TAMS");
   app->setApplicationName(QString(ROS_PACKAGE_NAME).toUpper());
 
+  std::setlocale(LC_NUMERIC, "en_US.UTF-8");
+
   node = std::make_shared<ros::NodeHandle>("~");
   signal(SIGINT, [](int sig) {
     LOG_DEBUG("shutting down");
