@@ -1,5 +1,5 @@
 // TAMSVIZ
-// (c) 2020-2021 Philipp Ruppel
+// (c) 2020-2023 Philipp Ruppel
 
 #pragma once
 
@@ -110,10 +110,10 @@ class InteractiveMarkerDisplay : public InteractiveMarkerDisplayBase {
   static std::vector<std::string> listTopicNamespaces();
 
 public:
-  PROPERTY(std::string, topicNamespace, "",
-           list = [](const Property &property) {
-             return InteractiveMarkerDisplay::listTopicNamespaces();
-           });
+  PROPERTY(
+      std::string, topicNamespace, "", list = [](const Property &property) {
+        return InteractiveMarkerDisplay::listTopicNamespaces();
+      });
   PROPERTY(bool, showDescriptions, true);
   PROPERTY(double, descriptionSize, 0.2, min = 0);
   PROPERTY(Eigen::Vector2d, descriptionOffset, Eigen::Vector2d(0, 0.85));

@@ -1,5 +1,5 @@
 // TAMSVIZ
-// (c) 2020-2021 Philipp Ruppel
+// (c) 2020-2023 Philipp Ruppel
 
 #include "drvcam.h"
 
@@ -15,7 +15,6 @@ CameraDriverDisplay::CameraDriverDisplay() {
   auto com = _worker_com;
 
   std::thread([com]() {
-
     LOG_INFO("camera thread started");
 
     Watcher watcher;
@@ -147,8 +146,7 @@ CameraDriverDisplay::CameraDriverDisplay() {
       connection->campub.publish(*connection->bridge.toImageMsg(),
                                  connection->infman.getCameraInfo());
     }
-  })
-      .detach();
+  }).detach();
 }
 
 CameraDriverDisplay::~CameraDriverDisplay() {

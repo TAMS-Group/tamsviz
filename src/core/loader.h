@@ -1,5 +1,5 @@
 // TAMSVIZ
-// (c) 2020-2021 Philipp Ruppel
+// (c) 2020-2023 Philipp Ruppel
 
 #pragma once
 
@@ -52,7 +52,7 @@ template <class T> struct Loader {
   }
 
 public:
-  template <class... Args> Loader(const Args &... args) {
+  template <class... Args> Loader(const Args &...args) {
     _constructor = [args...]() { return std::make_shared<T>(args...); };
   }
   Loader() {}

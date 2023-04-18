@@ -1,5 +1,5 @@
 // TAMSVIZ
-// (c) 2020-2021 Philipp Ruppel
+// (c) 2020-2023 Philipp Ruppel
 
 #pragma once
 
@@ -9,7 +9,7 @@ class Watcher {
   Variant _snapshot;
 
 public:
-  template <class... Args> bool changed(const Args &... args) {
+  template <class... Args> bool changed(const Args &...args) {
     if (std::type_index(typeid(std::make_tuple(args...))) == _snapshot.type()) {
       auto tuple = std::make_tuple(args...);
       if (tuple != _snapshot.value<decltype(tuple)>()) {

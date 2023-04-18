@@ -1,5 +1,5 @@
 // TAMSVIZ
-// (c) 2020-2021 Philipp Ruppel
+// (c) 2020-2023 Philipp Ruppel
 
 #include "transformer.h"
 
@@ -377,8 +377,7 @@ Transformer::Transformer(bool subscribe) {
           _data->_subscribers.push_back(listener);
         }
       }
-    })
-        .detach();
+    }).detach();
   }
 }
 

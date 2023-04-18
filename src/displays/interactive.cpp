@@ -1,5 +1,5 @@
 // TAMSVIZ
-// (c) 2020-2021 Philipp Ruppel
+// (c) 2020-2023 Philipp Ruppel
 
 #include "interactive.h"
 
@@ -376,8 +376,7 @@ void InteractivePoseDisplayBase::refresh() {
         }
       }
       LOG_DEBUG("exit publisher thread");
-    })
-        .detach();
+    }).detach();
   }
 }
 

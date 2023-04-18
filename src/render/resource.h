@@ -1,5 +1,5 @@
 // TAMSVIZ
-// (c) 2020-2021 Philipp Ruppel
+// (c) 2020-2023 Philipp Ruppel
 
 #pragma once
 
@@ -41,7 +41,7 @@ template <class T, class... ARGS> class ResourceManager {
   std::map<std::tuple<ARGS...>, std::weak_ptr<T>> _map;
 
 public:
-  std::shared_ptr<T> load(const ARGS &... args) {
+  std::shared_ptr<T> load(const ARGS &...args) {
     std::lock_guard<std::mutex> lock(_mutex);
     auto &item = _map[std::make_tuple(args...)];
     std::shared_ptr<T> ret = item.lock();
@@ -51,7 +51,7 @@ public:
     item = ret;
     return ret;
   }
-  std::shared_ptr<T> fetchExisting(const ARGS &... args) {
+  std::shared_ptr<T> fetchExisting(const ARGS &...args) {
     std::lock_guard<std::mutex> lock(_mutex);
     auto &item = _map[std::make_tuple(args...)];
     return item.lock();

@@ -1,5 +1,5 @@
 // TAMSVIZ
-// (c) 2020-2021 Philipp Ruppel
+// (c) 2020-2023 Philipp Ruppel
 
 #pragma once
 
@@ -13,7 +13,7 @@
 
 struct ClampedVector2d : Eigen::Vector2d {
   template <class... T>
-  ClampedVector2d(const T &... args) : Eigen::Vector2d(args...) {}
+  ClampedVector2d(const T &...args) : Eigen::Vector2d(args...) {}
 };
 STRUCT_BEGIN(ClampedVector2d);
 STRUCT_PROPERTY(x, min = 0, max = 1);

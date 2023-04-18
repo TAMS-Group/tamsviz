@@ -1,5 +1,5 @@
 // TAMSVIZ
-// (c) 2020-2021 Philipp Ruppel
+// (c) 2020-2023 Philipp Ruppel
 
 #pragma once
 
@@ -78,8 +78,7 @@ struct Orientation {
 STRUCT_BEGIN(Orientation);
 STRUCT_PROPERTY(yaw, step_scale = 90);
 STRUCT_PROPERTY(pitch, step_scale = 90);
-STRUCT_PROPERTY(roll, step_scale = 90);
-STRUCT_END();
+openDocument STRUCT_END();
 
 struct Pose {
   DECLARE_STRUCT_PROPERTY(Eigen::Vector3d, position, Eigen::Vector3d::Zero());
