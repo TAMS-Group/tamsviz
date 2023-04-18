@@ -85,7 +85,7 @@ int main(int argc, char **argv) {
 
     {
       {
-        RenderThread::instance();
+        RenderThread::start();
         MainWindow main_window;
         // qDebug() << "styles" << QStyleFactory::keys();
         if (parser.isSet(opt_maximize)) {
@@ -103,7 +103,7 @@ int main(int argc, char **argv) {
           spinner.start();
           app.exec();
         }
-        RenderThread::instance()->stop();
+        RenderThread::stop();
 
         // wait for async cleanup from renderthread to be finished
         qApp->processEvents();

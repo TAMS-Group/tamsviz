@@ -42,36 +42,50 @@ PYBIND11_MODULE(pytamsviz, m) {
   app->setOrganizationName("TAMS");
   app->setApplicationName(QString(ROS_PACKAGE_NAME).toUpper());
 
-  std::setlocale(LC_NUMERIC, "en_US.UTF-8");
-
-  node = std::make_shared<ros::NodeHandle>("~");
-  signal(SIGINT, [](int sig) {
-    LOG_DEBUG("shutting down");
-    if (app) {
-      app->exit();
+  static auto init = []() {
+    if (!app) {
+      throw std::runtime_error("tamsviz already shut down");
     }
-    ros::shutdown();
-  });
 
-  console_bridge::noOutputHandler();
+    std::setlocale(LC_NUMERIC, "en_US.UTF-8");
+
+    node = std::make_shared<ros::NodeHandle>("~");
+    signal(SIGINT, [](int sig) {
+      LOG_DEBUG("shutting down");
+      if (app) {
+        app->exit();
+      }
+      ros::shutdown();
+    });
+
+    console_bridge::noOutputHandler();
+
+    {
+      LockScope ws;
+      ws.ws() = std::make_shared<Workspace>();
+    }
+  };
 
   // ---
 
   m.def("start_offscreen", []() {
-    RenderThread::instance();
+    init();
+    RenderThread::start();
     spinner = std::make_shared<ros::AsyncSpinner>(0);
     spinner->start();
   });
 
   m.def("start_editor", []() {
+    init();
     main_window = std::make_shared<MainWindow>(false);
     main_window->show();
-    RenderThread::instance();
+    RenderThread::start();
     spinner = std::make_shared<ros::AsyncSpinner>(0);
     spinner->start();
   });
 
   m.def("start_embedded", [](uint64_t ptr) {
+    init();
     g_show_split_window_bars = false;
     main_window = std::make_shared<MainWindow>(true);
     main_window->menuBar()->hide();
@@ -88,7 +102,7 @@ PYBIND11_MODULE(pytamsviz, m) {
       layout->addWidget(&*main_window);
     }
     main_window->show();
-    RenderThread::instance();
+    RenderThread::start();
     spinner = std::make_shared<ros::AsyncSpinner>(0);
     spinner->start();
   });
@@ -130,7 +144,7 @@ PYBIND11_MODULE(pytamsviz, m) {
     spinner.reset();
 
     // LOG_INFO("shutdown phase 2");
-    RenderThread::instance()->stop();
+    RenderThread::stop();
 
     // LOG_INFO("shutdown phase 3");
     // wait for async cleanup from renderthread to be finished
@@ -165,7 +179,7 @@ PYBIND11_MODULE(pytamsviz, m) {
     main_window.reset();
     node.reset();
     app.reset();
-    // LOG_INFO("shutdown finished");
+    //  LOG_INFO("shutdown finished");
   };
 
   m.def("run", []() {

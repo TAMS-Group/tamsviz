@@ -15,10 +15,7 @@
 #include "../render/shader.h"
 #include "renderwindow.h"
 
-RenderThread::RenderThread() {
-  _running = true;
-  _thread = std::thread([this]() { run(); });
-}
+RenderThread::RenderThread() {}
 
 void RenderThread::invalidate() {
   // LOG_DEBUG("render thread invalidate");
@@ -27,7 +24,7 @@ void RenderThread::invalidate() {
   _condition.notify_all();
 }
 
-void RenderThread::run() {
+void RenderThread::_run() {
   LOG_DEBUG("render thread started");
 
   QOffscreenSurface offscreen_surface;
@@ -211,7 +208,7 @@ void RenderThread::run() {
   ResourceBase::setCleanupFunction(nullptr);
 }
 
-void RenderThread::stop() {
+void RenderThread::_stop() {
   if (_running) {
     _running = false;
     LOG_DEBUG("stopping render thread");
@@ -225,25 +222,42 @@ void RenderThread::stop() {
   }
 }
 
-RenderThread::~RenderThread() { stop(); }
+RenderThread::~RenderThread() { _stop(); }
 
-RenderThread *RenderThread::instance() {
-  static std::shared_ptr<RenderThread> instance = []() {
-    auto instance = std::make_shared<RenderThread>();
-    RenderThread *ptr = instance.get();
-    {
-      LockScope ws;
-      ws->modified.connect(instance, [ptr]() { ptr->invalidate(); });
-      GlobalEvents::instance()->redraw.connect(instance,
-                                               [ptr]() { ptr->invalidate(); });
-    }
-    LoaderThread::instance()->started.connect(instance,
-                                              [ptr]() { ptr->invalidate(); });
-    LoaderThread::instance()->finished.connect(instance,
-                                               [ptr]() { ptr->invalidate(); });
-    TopicManager::instance()->received.connect(instance,
-                                               [ptr]() { ptr->invalidate(); });
-    return instance;
-  }();
-  return instance.get();
+static std::shared_ptr<RenderThread> &renderThreadInstance() {
+  static std::shared_ptr<RenderThread> instance;
+  return instance;
+};
+
+void RenderThread::stop() {
+  if (auto instance = renderThreadInstance()) {
+    instance->_stop();
+  }
 }
+
+void RenderThread::start() {
+
+  auto &instance = renderThreadInstance();
+
+  instance = std::make_shared<RenderThread>();
+
+  auto *ptr = instance.get();
+
+  instance->_running = true;
+  instance->_thread = std::thread([ptr]() { ptr->_run(); });
+
+  {
+    LockScope ws;
+    ws->modified.connect(instance, [ptr]() { ptr->invalidate(); });
+    GlobalEvents::instance()->redraw.connect(instance,
+                                             [ptr]() { ptr->invalidate(); });
+  }
+  LoaderThread::instance()->started.connect(instance,
+                                            [ptr]() { ptr->invalidate(); });
+  LoaderThread::instance()->finished.connect(instance,
+                                             [ptr]() { ptr->invalidate(); });
+  TopicManager::instance()->received.connect(instance,
+                                             [ptr]() { ptr->invalidate(); });
+}
+
+RenderThread *RenderThread::instance() { return renderThreadInstance().get(); }
