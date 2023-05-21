@@ -336,6 +336,7 @@ void VisualizationMarker::update(const visualization_msgs::Marker &marker) {
     _mesh_watcher.changed();
     _text = marker.text;
     _mesh = nullptr;
+    _color = toColor4(marker.color);
     break;
   }
   default:
