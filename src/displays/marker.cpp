@@ -345,6 +345,9 @@ void VisualizationMarker::update(const visualization_msgs::Marker &marker) {
     break;
   }
   _scale = marker.scale.x;
+  if (marker.type == visualization_msgs::Marker::TEXT_VIEW_FACING) {
+    _scale = marker.scale.z;
+  }
   Eigen::Affine3d pose;
   tf::poseMsgToEigen(marker.pose, pose);
   _pose = pose * _pose;
