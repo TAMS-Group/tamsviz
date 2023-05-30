@@ -210,7 +210,7 @@ public:
                                              << " glyphs");
       instance = std::make_shared<Font>(font, font_size, merged_glyph_indices);
     } else {
-      LOG_DEBUG("re-using font texture");
+      // LOG_DEBUG("re-using font texture");
     }
     return instance;
   }
