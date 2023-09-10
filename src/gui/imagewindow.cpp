@@ -650,10 +650,12 @@ ImageWindow::ImageWindow() {
                             .absoluteDir()
                             .filePath((bagname + "-" + namesuggest).c_str())
                             .toStdString();
+          namesuggest +=
+              "_" + std::to_string(int64_t(ws->player->time() * 1000));
         }
       }
-      namesuggest += "_";
-      namesuggest += std::to_string(ros::WallTime::now().toNSec());
+      namesuggest =
+          namesuggest + "_" + std::to_string(ros::WallTime::now().toNSec());
       namesuggest += ".png";
       QString file_name = QFileDialog::getSaveFileName(
           this, tr("Save Screenshot"), namesuggest.c_str(),
