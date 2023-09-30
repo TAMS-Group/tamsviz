@@ -24,7 +24,8 @@
 
 #include <signal.h>
 
-int main(int argc, char **argv) {
+int main(int argc, char **argv)
+{
 
   {
 
@@ -65,21 +66,22 @@ int main(int argc, char **argv) {
     parser.process(app);
 
     ros::NodeHandle node("~");
-    signal(SIGINT, [](int sig) {
+    signal(SIGINT, [](int sig)
+           {
       LOG_DEBUG("shutting down");
       if (auto *app = qApp) {
         app->exit();
       }
-      ros::shutdown();
-    });
+      ros::shutdown(); });
 
-    console_bridge::noOutputHandler();
+    // console_bridge::noOutputHandler();
 
     LOG_DEBUG("package name " << ROS_PACKAGE_NAME);
     LOG_DEBUG("package path " << ros::package::getPath(ROS_PACKAGE_NAME));
 
     std::unique_ptr<ProfilerThread> profiler_thread;
-    if (parser.isSet(opt_profiler)) {
+    if (parser.isSet(opt_profiler))
+    {
       profiler_thread.reset(new ProfilerThread());
     }
 
@@ -88,12 +90,15 @@ int main(int argc, char **argv) {
         RenderThread::start();
         MainWindow main_window;
         // qDebug() << "styles" << QStyleFactory::keys();
-        if (parser.isSet(opt_maximize)) {
+        if (parser.isSet(opt_maximize))
+        {
           main_window.showMaximized();
         }
-        for (size_t i = 0; i < parser.positionalArguments().size(); i++) {
+        for (size_t i = 0; i < parser.positionalArguments().size(); i++)
+        {
           QString file = parser.positionalArguments()[i];
-          if (!file.isEmpty()) {
+          if (!file.isEmpty())
+          {
             qDebug() << "opening file" << file;
             main_window.openAny(file);
           }
@@ -113,8 +118,10 @@ int main(int argc, char **argv) {
 
           // windows will be deleted by the document
           auto widgets = main_window.findChildren<QWidget *>();
-          for (auto *w : widgets) {
-            if (dynamic_cast<Window *>(w)) {
+          for (auto *w : widgets)
+          {
+            if (dynamic_cast<Window *>(w))
+            {
               w->setParent(nullptr);
             }
           }

@@ -152,9 +152,9 @@ add_dependencies(${PROJECT_NAME} ${LIBRARY_NAME})
 target_link_libraries(${PROJECT_NAME} ${LIBRARY_NAME} ${catkin_LIBRARIES} ${OpenCV_LIBS} ${Boost_LIBRARIES} ${QT_LIBRARIES} ${ASSIMP_LIBRARIES} -lGL -lEGL -lGLEW yaml-cpp)
 
 
-pybind_add_module(pytamsviz MODULE
-    src/python/python.cpp
-)
-add_dependencies(pytamsviz ${LIBRARY_NAME} ${catkin_LIBRARIES} ${OpenCV_LIBS} ${Boost_LIBRARIES} ${QT_LIBRARIES} ${ASSIMP_LIBRARIES} -lGL -lEGL -lGLEW yaml-cpp)
-target_link_libraries(pytamsviz PRIVATE ${LIBRARY_NAME} ${catkin_LIBRARIES} ${QT_LIBRARIES} )
-set_target_properties(pytamsviz PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CATKIN_DEVEL_PREFIX}/${CATKIN_GLOBAL_PYTHON_DESTINATION})
+# pybind_add_module(pytamsviz MODULE
+#     src/python/python.cpp
+# )
+# add_dependencies(pytamsviz ${LIBRARY_NAME} ${catkin_LIBRARIES} ${OpenCV_LIBS} ${Boost_LIBRARIES} ${QT_LIBRARIES} ${ASSIMP_LIBRARIES} -lGL -lEGL -lGLEW yaml-cpp)
+# target_link_libraries(pytamsviz PRIVATE ${LIBRARY_NAME} ${catkin_LIBRARIES} ${QT_LIBRARIES} )
+# set_target_properties(pytamsviz PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CATKIN_DEVEL_PREFIX}/${CATKIN_GLOBAL_PYTHON_DESTINATION})

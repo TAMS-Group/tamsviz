@@ -24,22 +24,27 @@
 #include <eigen_conversions/eigen_msg.h>
 
 static std::shared_ptr<Mesh>
-createShapeMesh(const urdf::VisualSharedPtr &visual) {
+createShapeMesh(const urdf::VisualSharedPtr &visual)
+{
   auto geometry = visual->geometry;
-  switch (geometry->type) {
-  case urdf::Geometry::SPHERE: {
+  switch (geometry->type)
+  {
+  case urdf::Geometry::SPHERE:
+  {
     auto *sphere = (const urdf::Sphere *)geometry.get();
     return std::make_shared<Mesh>(Eigen::Scaling(float(sphere->radius)) *
                                   makeSphere(32, 16));
   }
-  case urdf::Geometry::BOX: {
+  case urdf::Geometry::BOX:
+  {
     auto *box = (const urdf::Box *)geometry.get();
     return std::make_shared<Mesh>(
         Eigen::Scaling(Eigen::Vector3f(box->dim.x * 0.5, box->dim.y * 0.5,
                                        box->dim.z * 0.5)) *
         makeBox());
   }
-  case urdf::Geometry::CYLINDER: {
+  case urdf::Geometry::CYLINDER:
+  {
     auto *cylinder = (const urdf::Cylinder *)geometry.get();
     return std::make_shared<Mesh>(
         Eigen::Scaling(Eigen::Vector3f(cylinder->radius, cylinder->radius,
@@ -50,8 +55,10 @@ createShapeMesh(const urdf::VisualSharedPtr &visual) {
   return nullptr;
 }
 
-struct RobotLink {
-  std::shared_ptr<Material> material = []() {
+struct RobotLink
+{
+  std::shared_ptr<Material> material = []()
+  {
     ObjectScope ws;
     return std::make_shared<Material>();
   }();
@@ -67,25 +74,34 @@ struct RobotLink {
         pose(pose), mesh(mesh), frame(moveit_link->getName()) {}
 };
 
-struct RobotModel {
+struct RobotModel
+{
   moveit::core::RobotModelConstPtr moveit_robot;
   std::vector<std::shared_ptr<RobotLink>> links;
-  RobotModel(const std::string &name, RobotModelImportOptions import_options) {
+  RobotModel(const std::string &name, RobotModelImportOptions import_options)
+  {
     {
+      // console_bridge::setLogLevel(console_bridge::CONSOLE_BRIDGE_LOG_DEBUG);
+      // ROS_DEBUG("bla");
       robot_model_loader::RobotModelLoader moveit_loader(name, false);
       moveit_robot = moveit_loader.getModel();
-      if (!moveit_robot) {
+      if (!moveit_robot)
+      {
         LOG_ERROR("failed to load robot model " << name);
         return;
       }
     }
     auto urdf_model = moveit_robot->getURDF();
-    for (auto &urdf_link_pair : urdf_model->links_) {
+    for (auto &urdf_link_pair : urdf_model->links_)
+    {
       auto urdf_link = urdf_link_pair.second;
       if (const moveit::core::LinkModel *moveit_link =
-              moveit_robot->getLinkModel(urdf_link->name)) {
-        for (auto &urdf_visual : urdf_link->visual_array) {
-          if (urdf_visual->geometry) {
+              moveit_robot->getLinkModel(urdf_link->name))
+      {
+        for (auto &urdf_visual : urdf_link->visual_array)
+        {
+          if (urdf_visual->geometry)
+          {
             size_t part_index = 0;
             auto rot = urdf_visual->origin.rotation;
             auto pos = urdf_visual->origin.position;
@@ -93,9 +109,11 @@ struct RobotModel {
                 Eigen::Isometry3d(Eigen::Translation3d(pos.x, pos.y, pos.z)) *
                 Eigen::Isometry3d(
                     Eigen::Quaterniond(rot.w, rot.x, rot.y, rot.z));
-            if (auto mesh = createShapeMesh(urdf_visual)) {
+            if (auto mesh = createShapeMesh(urdf_visual))
+            {
               auto link = new RobotLink(moveit_link, visual_pose, mesh);
-              if (auto mat = urdf_visual->material) {
+              if (auto mat = urdf_visual->material)
+              {
                 LockScope ws;
                 LOG_DEBUG("urdf material color "
                           << urdf_link->name << " " << mat->color.r << " "
@@ -106,33 +124,49 @@ struct RobotModel {
                 link->material->color().b() = mat->color.b;
                 link->material->color().a() = mat->color.a;
                 link->material->texture() = mat->texture_filename;
-              } else {
+              }
+              else
+              {
                 LOG_DEBUG("no material for " << urdf_link->name);
               }
               links.emplace_back(link);
-            } else if (urdf_visual->geometry->type == urdf::Geometry::MESH) {
+            }
+            else if (urdf_visual->geometry->type == urdf::Geometry::MESH)
+            {
               auto *urdf_mesh = (const urdf::Mesh *)urdf_visual->geometry.get();
-              if (urdf_mesh->filename.empty()) {
+              if (urdf_mesh->filename.empty())
+              {
                 LOG_ERROR("empty mesh file name")
-              } else {
+              }
+              else
+              {
                 // LOG_INFO("loading mesh " << urdf_mesh->filename);
                 std::string data;
-                try {
+                try
+                {
                   loadResource(urdf_mesh->filename, data);
-                } catch (std::exception &ex) {
+                }
+                catch (std::exception &ex)
+                {
                   LOG_ERROR("failed to read mesh file " << urdf_mesh->filename);
                 }
-                if (data.empty()) {
+                if (data.empty())
+                {
                   LOG_ERROR("failed to read mesh file " << urdf_mesh->filename);
-                } else {
+                }
+                else
+                {
                   std::string assimp_hint;
                   if (auto *h =
-                          std::strrchr(urdf_mesh->filename.c_str(), '.')) {
+                          std::strrchr(urdf_mesh->filename.c_str(), '.'))
+                  {
                     assimp_hint = h + 1;
-                    for (auto &c : assimp_hint) {
+                    for (auto &c : assimp_hint)
+                    {
                       c = std::tolower(c);
                     }
-                    if (std::strstr(assimp_hint.c_str(), "stl")) {
+                    if (std::strstr(assimp_hint.c_str(), "stl"))
+                    {
                       assimp_hint = "stl";
                     }
                   }
@@ -143,7 +177,8 @@ struct RobotModel {
                   Assimp::Importer ai_importer;
                   ai_importer.SetPropertyFloat(
                       AI_CONFIG_PP_GSN_MAX_SMOOTHING_ANGLE, 60.0);
-                  if (import_options.recomputeNormals()) {
+                  if (import_options.recomputeNormals())
+                  {
                     ai_importer.SetPropertyInteger(
                         AI_CONFIG_PP_RVC_FLAGS,
                         aiComponent_NORMALS |
@@ -161,17 +196,22 @@ struct RobotModel {
                   auto *ai_scene = ai_importer.ReadFileFromMemory(
                       data.data(), data.size(), import_flags,
                       assimp_hint.c_str());
-                  if (ai_scene) {
+                  if (ai_scene)
+                  {
                     if (!import_options.recomputeNormals() &&
-                        import_options.smoothNormals()) {
+                        import_options.smoothNormals())
+                    {
                       bool has_normapmaps = false;
-                      for (size_t i = 0; i < ai_scene->mNumMaterials; i++) {
+                      for (size_t i = 0; i < ai_scene->mNumMaterials; i++)
+                      {
                         if (ai_scene->mMaterials[i]->GetTextureCount(
-                                aiTextureType_NORMALS) > 0) {
+                                aiTextureType_NORMALS) > 0)
+                        {
                           has_normapmaps = true;
                         }
                       }
-                      if (!has_normapmaps) {
+                      if (!has_normapmaps)
+                      {
                         ai_importer.FreeScene();
                         ai_importer.SetPropertyInteger(
                             AI_CONFIG_PP_RVC_FLAGS,
@@ -191,12 +231,15 @@ struct RobotModel {
                                        const aiNode *)>
                         load;
                     load = [&](const Eigen::Isometry3d &parent_pose,
-                               const aiNode *node) {
+                               const aiNode *node)
+                    {
                       // LOG_DEBUG("mesh node " << urdf_mesh->filename << " "
                       //                         << node->mName.C_Str());
                       Eigen::Matrix4d pose_matrix = Eigen::Matrix4d::Identity();
-                      for (size_t row = 0; row < 4; row++) {
-                        for (size_t col = 0; col < 4; col++) {
+                      for (size_t row = 0; row < 4; row++)
+                      {
+                        for (size_t col = 0; col < 4; col++)
+                        {
                           pose_matrix(row, col) =
                               node->mTransformation[row][col];
                         }
@@ -207,54 +250,68 @@ struct RobotModel {
                           parent_pose * Eigen::Isometry3d(pose_matrix);
                       for (size_t node_mesh_index = 0;
                            node_mesh_index < node->mNumMeshes;
-                           node_mesh_index++) {
+                           node_mesh_index++)
+                      {
                         auto *ai_mesh =
                             ai_scene->mMeshes[node->mMeshes[node_mesh_index]];
                         MeshData mesh_data;
-                        for (size_t i = 0; i < ai_mesh->mNumVertices; i++) {
+                        for (size_t i = 0; i < ai_mesh->mNumVertices; i++)
+                        {
                           mesh_data.positions.push_back(Eigen::Vector3f(
                               ai_mesh->mVertices[i].x, ai_mesh->mVertices[i].y,
                               ai_mesh->mVertices[i].z));
-                          if (ai_mesh->mNormals) {
+                          if (ai_mesh->mNormals)
+                          {
                             mesh_data.normals.push_back(Eigen::Vector3f(
                                 ai_mesh->mNormals[i].x, ai_mesh->mNormals[i].y,
                                 ai_mesh->mNormals[i].z));
                           }
-                          if (ai_mesh->mTextureCoords[0]) {
+                          if (ai_mesh->mTextureCoords[0])
+                          {
                             mesh_data.texcoords.push_back(Eigen::Vector2f(
                                 ai_mesh->mTextureCoords[0][i].x,
                                 ai_mesh->mTextureCoords[0][i].y));
                           }
-                          if (ai_mesh->mTangents) {
+                          if (ai_mesh->mTangents)
+                          {
                             mesh_data.tangents.push_back(
                                 Eigen::Vector3f(ai_mesh->mTangents[i].x,
                                                 ai_mesh->mTangents[i].y,
                                                 ai_mesh->mTangents[i].z));
                           }
-                          if (ai_mesh->mBitangents) {
+                          if (ai_mesh->mBitangents)
+                          {
                             mesh_data.bitangents.push_back(
                                 Eigen::Vector3f(ai_mesh->mBitangents[i].x,
                                                 ai_mesh->mBitangents[i].y,
                                                 ai_mesh->mBitangents[i].z));
                           }
                         }
-                        for (size_t i = 0; i < ai_mesh->mNumFaces; i++) {
-                          if (ai_mesh->mFaces[i].mNumIndices == 3) {
-                            for (size_t j = 0; j < 3; j++) {
+                        for (size_t i = 0; i < ai_mesh->mNumFaces; i++)
+                        {
+                          if (ai_mesh->mFaces[i].mNumIndices == 3)
+                          {
+                            for (size_t j = 0; j < 3; j++)
+                            {
                               mesh_data.indices.push_back(
                                   ai_mesh->mFaces[i].mIndices[j]);
                             }
-                          } else if (ai_mesh->mFaces[i].mNumIndices > 3) {
+                          }
+                          else if (ai_mesh->mFaces[i].mNumIndices > 3)
+                          {
                             LOG_ERROR("invalid triangle "
                                       << ai_mesh->mFaces[i].mNumIndices);
                           }
                         }
                         // mesh_data.computeNormals();
                         if (mesh_data.indices.empty() ||
-                            mesh_data.positions.empty()) {
+                            mesh_data.positions.empty())
+                        {
                           LOG_WARN("empty mesh " << urdf_mesh->filename << " "
                                                  << node->mName.C_Str());
-                        } else {
+                        }
+                        else
+                        {
                           // auto link = std::make_shared<RobotLink>(
                           //      moveit_link, pose, mesh_data);
                           auto link = std::shared_ptr<RobotLink>(
@@ -267,25 +324,31 @@ struct RobotModel {
                             aiColor4D color;
                             if (aiGetMaterialColor(ai_material,
                                                    AI_MATKEY_COLOR_DIFFUSE,
-                                                   &color) == AI_SUCCESS) {
+                                                   &color) == AI_SUCCESS)
+                            {
                               link->material->color().r() = color.r;
                               link->material->color().g() = color.g;
                               link->material->color().b() = color.b;
                             }
                           }
-                          auto tex = [&](std::string &url, aiTextureType type) {
-                            if (ai_material->GetTextureCount(type) > 0) {
+                          auto tex = [&](std::string &url, aiTextureType type)
+                          {
+                            if (ai_material->GetTextureCount(type) > 0)
+                            {
                               aiString str;
                               ai_material->GetTexture(type, 0, &str);
                               // TODO: ???
                               if (const char *new_end = std::strrchr(
-                                      urdf_mesh->filename.c_str(), '/')) {
+                                      urdf_mesh->filename.c_str(), '/'))
+                              {
                                 url =
                                     std::string(
                                         urdf_mesh->filename.c_str(),
                                         new_end - urdf_mesh->filename.c_str()) +
                                     "/" + str.C_Str();
-                              } else {
+                              }
+                              else
+                              {
                                 url = str.C_Str();
                               }
                             }
@@ -296,7 +359,8 @@ struct RobotModel {
                           links.push_back(link);
                         }
                       }
-                      for (size_t i = 0; i < node->mNumChildren; i++) {
+                      for (size_t i = 0; i < node->mNumChildren; i++)
+                      {
                         load(pose, node->mChildren[i]);
                       }
                     };
@@ -308,18 +372,24 @@ struct RobotModel {
                          ai_scene->mRootNode);
                     // LOG_INFO("mesh successfully loaded "
                     //         << urdf_mesh->filename);
-                  } else {
+                  }
+                  else
+                  {
                     LOG_ERROR("failed to decode mesh " << urdf_mesh->filename);
                   }
                 }
               }
-            } else {
+            }
+            else
+            {
               LOG_ERROR("  failed to create geometry for link "
                         << urdf_link->name);
             }
           }
         }
-      } else {
+      }
+      else
+      {
         LOG_ERROR("link not found " << urdf_link->name);
       }
     }
@@ -327,57 +397,70 @@ struct RobotModel {
   }
 };
 
-struct RobotState : SceneNode {
+struct RobotState : SceneNode
+{
   std::unordered_set<std::string> variable_names;
   std::vector<std::shared_ptr<MeshRenderer>> mesh_renderers;
   std::shared_ptr<RobotModel> robot_model;
   moveit::core::RobotState moveit_state;
   RobotState(const std::shared_ptr<RobotModel> &robot_model,
              std::shared_ptr<MaterialOverride> material_override)
-      : robot_model(robot_model), moveit_state(robot_model->moveit_robot) {
+      : robot_model(robot_model), moveit_state(robot_model->moveit_robot)
+  {
     moveit_state.setToDefaultValues();
     {
       ObjectScope ws;
-      for (size_t i = 0; i < robot_model->links.size(); i++) {
+      for (size_t i = 0; i < robot_model->links.size(); i++)
+      {
         mesh_renderers.push_back(create<MeshRenderer>(
             robot_model->links.at(i)->mesh, robot_model->links.at(i)->material,
             material_override));
       }
     }
-    for (auto &n : moveit_state.getVariableNames()) {
+    for (auto &n : moveit_state.getVariableNames())
+    {
       variable_names.insert(n);
     }
   }
 };
 
-void RobotDisplayBase::renderSync(const RenderSyncContext &context) {
+void RobotDisplayBase::renderSync(const RenderSyncContext &context)
+{
   MeshDisplayBase::renderSync(context);
   bool invalidated = _invalidated.poll();
   if (invalidated || _watcher.changed(description(), importOptions()) ||
-      !_robot_model_loader) {
+      !_robot_model_loader)
+  {
     static auto manager =
         std::make_shared<ResourceManager<Loader<RobotModel>, std::string,
                                          RobotModelImportOptions>>();
     _robot_model_loader = manager->load(description(), importOptions());
-    if (invalidated) {
+    if (invalidated)
+    {
       _robot_model_loader->clear();
     }
     _robot_state = nullptr;
     GlobalEvents::instance()->redraw();
   }
-  if (_robot_state) {
+  if (_robot_state)
+  {
     bool double_sided = doubleSided();
-    for (auto &r : _robot_state->mesh_renderers) {
+    for (auto &r : _robot_state->mesh_renderers)
+    {
       r->options().double_sided = double_sided;
     }
   }
 }
 
-void RobotDisplayBase::renderAsync(const RenderAsyncContext &context) {
+void RobotDisplayBase::renderAsync(const RenderAsyncContext &context)
+{
   MeshDisplayBase::renderAsync(context);
-  if (!_robot_state && _robot_model_loader) {
-    if (auto robot_model = _robot_model_loader->load()) {
-      if (robot_model->moveit_robot) {
+  if (!_robot_state && _robot_model_loader)
+  {
+    if (auto robot_model = _robot_model_loader->load())
+    {
+      if (robot_model->moveit_robot)
+      {
         _robot_state =
             node()->create<RobotState>(robot_model, _material_override);
         GlobalEvents::instance()->redraw();
@@ -386,43 +469,55 @@ void RobotDisplayBase::renderAsync(const RenderAsyncContext &context) {
   }
 }
 
-class RobotStateTimeSeriesListener : public TimeSeriesListener {
+class RobotStateTimeSeriesListener : public TimeSeriesListener
+{
   std::mutex _mutex;
   std::unordered_map<std::string, double> _positions, _temp;
-  void push(const sensor_msgs::JointState &message) {
+  void push(const sensor_msgs::JointState &message)
+  {
     for (size_t i = 0; i < message.name.size() && i < message.position.size();
-         i++) {
+         i++)
+    {
       _temp[message.name.at(i)] = message.position.at(i);
     }
   }
 
 public:
   virtual void push(const std::shared_ptr<const Message> &msg, int64_t start,
-                    int64_t end) override {
-    if (auto message = msg->instantiate<sensor_msgs::JointState>()) {
+                    int64_t end) override
+  {
+    if (auto message = msg->instantiate<sensor_msgs::JointState>())
+    {
       push(*message);
     }
-    if (auto message = msg->instantiate<moveit_msgs::DisplayRobotState>()) {
+    if (auto message = msg->instantiate<moveit_msgs::DisplayRobotState>())
+    {
       push(message->state.joint_state);
     }
   }
-  virtual void commit() override {
+  virtual void commit() override
+  {
     std::lock_guard<std::mutex> lock(_mutex);
     _positions = _temp;
   }
-  void apply(RobotState &robot_state) {
+  void apply(RobotState &robot_state)
+  {
     std::lock_guard<std::mutex> lock(_mutex);
-    for (auto &pair : _positions) {
+    for (auto &pair : _positions)
+    {
       if (robot_state.variable_names.find(pair.first) !=
-          robot_state.variable_names.end()) {
+          robot_state.variable_names.end())
+      {
         robot_state.moveit_state.setVariablePosition(pair.first, pair.second);
       }
     }
   }
 };
 
-void RobotStateDisplayBase::refreshTopic(const std::string &topic) {
-  if (!_subscriber || topic != _subscriber->topic()) {
+void RobotStateDisplayBase::refreshTopic(const std::string &topic)
+{
+  if (!_subscriber || topic != _subscriber->topic())
+  {
     _subscriber = std::make_shared<TimeSeriesSubscriber>(topic);
     _subscriber->duration(0.5);
     _listener = std::make_shared<RobotStateTimeSeriesListener>();
@@ -430,10 +525,13 @@ void RobotStateDisplayBase::refreshTopic(const std::string &topic) {
   }
 }
 
-void RobotStateDisplayBase::renderSync(const RenderSyncContext &context) {
-  if (_robot_state && _listener) {
+void RobotStateDisplayBase::renderSync(const RenderSyncContext &context)
+{
+  if (_robot_state && _listener)
+  {
     _listener->apply(*_robot_state);
-    for (size_t i = 0; i < _robot_state->robot_model->links.size(); i++) {
+    for (size_t i = 0; i < _robot_state->robot_model->links.size(); i++)
+    {
       auto &link = _robot_state->robot_model->links[i];
       _robot_state->mesh_renderers.at(i)->pose(
           pose_temp *
@@ -450,17 +548,23 @@ void RobotStateDisplayBase::renderSync(const RenderSyncContext &context) {
   RobotDisplayBase::renderSync(context);
 }
 
-void DisplayRobotStateDisplay::renderSync(const RenderSyncContext &context) {
+void DisplayRobotStateDisplay::renderSync(const RenderSyncContext &context)
+{
   // _display_robot_state_message = topic().message();
   auto message = topic().message();
-  if (_robot_state && message) {
-    try {
+  if (_robot_state && message)
+  {
+    try
+    {
       moveit::core::robotStateMsgToRobotState(message->state,
                                               _robot_state->moveit_state);
-    } catch (const std::exception &ex) {
+    }
+    catch (const std::exception &ex)
+    {
       LOG_ERROR(ex.what());
     }
-    for (size_t i = 0; i < _robot_state->robot_model->links.size(); i++) {
+    for (size_t i = 0; i < _robot_state->robot_model->links.size(); i++)
+    {
       auto &link = _robot_state->robot_model->links[i];
       _robot_state->mesh_renderers.at(i)->pose(
           pose_temp *
@@ -477,16 +581,19 @@ void DisplayRobotStateDisplay::renderSync(const RenderSyncContext &context) {
   RobotDisplayBase::renderSync(context);
 }
 
-void DisplayRobotStateDisplay::renderAsync(const RenderAsyncContext &context) {
+void DisplayRobotStateDisplay::renderAsync(const RenderAsyncContext &context)
+{
   RobotDisplayBase::renderAsync(context);
 }
 
-void RobotTrajectoryDisplay::renderSync(const RenderSyncContext &context) {
+void RobotTrajectoryDisplay::renderSync(const RenderSyncContext &context)
+{
   _display_trajectory_message = topic().message();
   _max_steps = maxSteps();
   _show_all = showAllStates();
   if (_update_parameter_watcher.changed(showAllStates(), speed(),
-                                        playTrajectory())) {
+                                        playTrajectory()))
+  {
     std::unique_lock<std::mutex> lock(_update_mutex);
     _update_show_all = showAllStates();
     _update_speed = speed();
@@ -498,60 +605,76 @@ void RobotTrajectoryDisplay::renderSync(const RenderSyncContext &context) {
   RobotDisplayBase::renderSync(context);
   {
     bool double_sided = doubleSided();
-    for (auto &state : _trajectory) {
-      for (auto &r : state.second->mesh_renderers) {
+    for (auto &state : _trajectory)
+    {
+      for (auto &r : state.second->mesh_renderers)
+      {
         r->options().double_sided = double_sided;
       }
     }
   }
 }
 
-void RobotTrajectoryDisplay::renderAsync(const RenderAsyncContext &context) {
+void RobotTrajectoryDisplay::renderAsync(const RenderAsyncContext &context)
+{
   std::shared_ptr<RobotModel> robot_model;
-  if (_robot_model_loader) {
+  if (_robot_model_loader)
+  {
     robot_model = _robot_model_loader->load();
   }
 
   if (_trajectory_watcher.changed(_display_trajectory_message, _max_steps,
-                                  robot_model)) {
+                                  robot_model))
+  {
     _trajectory.clear();
-    if (robot_model && _display_trajectory_message) {
-      if (robot_model->moveit_robot) {
+    if (robot_model && _display_trajectory_message)
+    {
+      if (robot_model->moveit_robot)
+      {
 
         std::map<ros::Duration, std::shared_ptr<RobotState>> states;
         {
           ros::Duration start_time = ros::Duration(0.0);
 
           for (auto &robot_trajectory :
-               _display_trajectory_message->trajectory) {
+               _display_trajectory_message->trajectory)
+          {
 
             {
               auto &joint_trajectory = robot_trajectory.joint_trajectory;
               for (size_t iframe = 0; iframe < joint_trajectory.points.size();
-                   iframe++) {
+                   iframe++)
+              {
                 auto &point = joint_trajectory.points[iframe];
                 auto &robot_state = states[start_time + point.time_from_start];
-                if (!robot_state) {
+                if (!robot_state)
+                {
                   robot_state = node()->create<RobotState>(robot_model,
                                                            _material_override);
                   robot_state->moveit_state.setToDefaultValues();
-                  try {
+                  try
+                  {
                     moveit::core::robotStateMsgToRobotState(
                         _display_trajectory_message->trajectory_start,
                         robot_state->moveit_state);
-                  } catch (const std::exception &ex) {
+                  }
+                  catch (const std::exception &ex)
+                  {
                     LOG_ERROR(ex.what());
                   }
                 }
                 for (size_t ijoint = 0;
                      ijoint <
                      robot_trajectory.joint_trajectory.joint_names.size();
-                     ijoint++) {
-                  if (ijoint < point.positions.size()) {
+                     ijoint++)
+                {
+                  if (ijoint < point.positions.size())
+                  {
                     if (robot_state->variable_names.find(
                             robot_trajectory.joint_trajectory
                                 .joint_names[ijoint]) !=
-                        robot_state->variable_names.end()) {
+                        robot_state->variable_names.end())
+                    {
                       robot_state->moveit_state.setVariablePosition(
                           robot_trajectory.joint_trajectory.joint_names[ijoint],
                           point.positions[ijoint]);
@@ -564,29 +687,36 @@ void RobotTrajectoryDisplay::renderAsync(const RenderAsyncContext &context) {
             {
               auto &md_trajectory = robot_trajectory.multi_dof_joint_trajectory;
               for (size_t iframe = 0; iframe < md_trajectory.points.size();
-                   iframe++) {
+                   iframe++)
+              {
                 for (size_t ijoint = 0;
-                     ijoint < md_trajectory.joint_names.size(); ijoint++) {
+                     ijoint < md_trajectory.joint_names.size(); ijoint++)
+                {
                   auto &joint_name = md_trajectory.joint_names[ijoint];
                   auto &transform =
                       md_trajectory.points[iframe].transforms[ijoint];
                   auto &robot_state =
                       states[start_time +
                              md_trajectory.points[iframe].time_from_start];
-                  if (!robot_state) {
+                  if (!robot_state)
+                  {
                     robot_state = node()->create<RobotState>(
                         robot_model, _material_override);
                     robot_state->moveit_state.setToDefaultValues();
-                    try {
+                    try
+                    {
                       moveit::core::robotStateMsgToRobotState(
                           _display_trajectory_message->trajectory_start,
                           robot_state->moveit_state);
-                    } catch (const std::exception &ex) {
+                    }
+                    catch (const std::exception &ex)
+                    {
                       LOG_ERROR(ex.what());
                     }
                   }
                   if (auto *joint_model =
-                          robot_state->moveit_state.getJointModel(joint_name)) {
+                          robot_state->moveit_state.getJointModel(joint_name))
+                  {
                     Eigen::Isometry3d pose = Eigen::Isometry3d::Identity();
                     tf::transformMsgToEigen(transform, pose);
                     robot_state->moveit_state.setJointPositions(joint_model,
@@ -598,12 +728,14 @@ void RobotTrajectoryDisplay::renderAsync(const RenderAsyncContext &context) {
 
             {
               ros::Duration duration = ros::Duration(0.0);
-              if (!robot_trajectory.joint_trajectory.points.empty()) {
+              if (!robot_trajectory.joint_trajectory.points.empty())
+              {
                 duration = std::max(
                     duration, robot_trajectory.joint_trajectory.points.back()
                                   .time_from_start);
               }
-              if (!robot_trajectory.multi_dof_joint_trajectory.points.empty()) {
+              if (!robot_trajectory.multi_dof_joint_trajectory.points.empty())
+              {
                 duration = std::max(
                     duration,
                     robot_trajectory.multi_dof_joint_trajectory.points.back()
@@ -615,10 +747,12 @@ void RobotTrajectoryDisplay::renderAsync(const RenderAsyncContext &context) {
         }
 
         _trajectory.clear();
-        for (auto &pair : states) {
+        for (auto &pair : states)
+        {
           auto &robot_state = pair.second;
           robot_state->moveit_state.update();
-          for (size_t i = 0; i < robot_state->robot_model->links.size(); i++) {
+          for (size_t i = 0; i < robot_state->robot_model->links.size(); i++)
+          {
             auto &link = robot_state->robot_model->links[i];
             robot_state->mesh_renderers.at(i)->pose(
                 pose_temp *
@@ -632,7 +766,9 @@ void RobotTrajectoryDisplay::renderAsync(const RenderAsyncContext &context) {
           _trajectory.emplace_back((pair.first - states.begin()->first).toSec(),
                                    robot_state);
         }
-      } else {
+      }
+      else
+      {
         LOG_WARN("no robot model");
       }
     }
@@ -640,7 +776,8 @@ void RobotTrajectoryDisplay::renderAsync(const RenderAsyncContext &context) {
     {
       std::unique_lock<std::mutex> lock(_update_mutex);
       _update_times.clear();
-      for (ssize_t i = 0; i < _trajectory.size(); i++) {
+      for (ssize_t i = 0; i < _trajectory.size(); i++)
+      {
         _update_times.push_back(_trajectory[i].first -
                                 _trajectory[std::max(ssize_t(0), i - 1)].first);
       }
@@ -650,33 +787,41 @@ void RobotTrajectoryDisplay::renderAsync(const RenderAsyncContext &context) {
 
   MeshDisplayBase::renderAsync(context);
 
-  if (!_trajectory.empty()) {
+  if (!_trajectory.empty())
+  {
     size_t j = 0;
     {
       std::unique_lock<std::mutex> lock(_update_mutex);
       j = _frame_update;
     }
     j = (j % _trajectory.size());
-    if (!_show_all && !_play_trajectory) {
-      for (size_t i = 0; i < _trajectory.size(); i++) {
+    if (!_show_all && !_play_trajectory)
+    {
+      for (size_t i = 0; i < _trajectory.size(); i++)
+      {
         j = i;
-        if (_trajectory_time < _trajectory[i].first) {
+        if (_trajectory_time < _trajectory[i].first)
+        {
           break;
         }
       }
     }
-    for (size_t i = 0; i < _trajectory.size(); i++) {
+    for (size_t i = 0; i < _trajectory.size(); i++)
+    {
       auto &pair = _trajectory[i];
       bool vis = (_show_all || i == j);
-      for (auto &renderer : pair.second->mesh_renderers) {
+      for (auto &renderer : pair.second->mesh_renderers)
+      {
         renderer->visible(vis);
       }
     }
   }
 }
 
-RobotTrajectoryDisplay::RobotTrajectoryDisplay() {
-  _update_thread = std::thread([this]() {
+RobotTrajectoryDisplay::RobotTrajectoryDisplay()
+{
+  _update_thread = std::thread([this]()
+                               {
     LOG_DEBUG("start robot trajectory update thread");
     size_t current_frame_index = 0;
     std::chrono::steady_clock::time_point last_tick =
@@ -707,11 +852,11 @@ RobotTrajectoryDisplay::RobotTrajectoryDisplay() {
         }
       }
     }
-    LOG_DEBUG("exit robot trajectory update thread");
-  });
+    LOG_DEBUG("exit robot trajectory update thread"); });
 }
 
-RobotTrajectoryDisplay::~RobotTrajectoryDisplay() {
+RobotTrajectoryDisplay::~RobotTrajectoryDisplay()
+{
   {
     std::unique_lock<std::mutex> lock(_update_mutex);
     _update_exit = true;
@@ -720,17 +865,23 @@ RobotTrajectoryDisplay::~RobotTrajectoryDisplay() {
   _update_thread.join();
 }
 
-void RobotModelDisplay::renderSync(const RenderSyncContext &c) {
+void RobotModelDisplay::renderSync(const RenderSyncContext &c)
+{
   auto context = c;
   context.pose.setIdentity();
   _transformer = LockScope()->document()->display()->transformer;
-  if (_robot_state) {
-    for (size_t i = 0; i < _robot_state->robot_model->links.size(); i++) {
+  if (_robot_state)
+  {
+    for (size_t i = 0; i < _robot_state->robot_model->links.size(); i++)
+    {
       auto &link = _robot_state->robot_model->links.at(i);
-      if (auto transform = link->frame.pose(_transformer)) {
+      if (auto transform = link->frame.pose(_transformer))
+      {
         _robot_state->mesh_renderers.at(i)->pose((*transform) * link->pose);
         _robot_state->mesh_renderers.at(i)->show();
-      } else {
+      }
+      else
+      {
         _robot_state->mesh_renderers.at(i)->hide();
       }
     }
@@ -738,6 +889,7 @@ void RobotModelDisplay::renderSync(const RenderSyncContext &c) {
   RobotDisplayBase::renderSync(context);
 }
 
-void RobotModelDisplay::renderAsync(const RenderAsyncContext &context) {
+void RobotModelDisplay::renderAsync(const RenderAsyncContext &context)
+{
   RobotDisplayBase::renderAsync(context);
 }

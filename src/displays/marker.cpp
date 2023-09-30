@@ -66,284 +66,303 @@ void VisualizationMarker::update(const visualization_msgs::Marker &marker) {
   _text.clear();
   double radius = marker.scale.x * 0.5;
   switch (marker.type) {
-  case visualization_msgs::Marker::POINTS:
-  case visualization_msgs::Marker::SPHERE_LIST: {
-    if (_mesh_watcher.changed(marker.type, points, colors, color, radius)) {
-      _mesh = std::make_shared<Mesh>([marker, radius](MeshData &mesh) {
-        for (size_t index = 0; index < marker.points.size(); index++) {
-          auto p = toVector3f(marker.points.at(index));
-          mesh.indices.push_back(mesh.positions.size() + 0);
-          mesh.indices.push_back(mesh.positions.size() + 1);
-          mesh.indices.push_back(mesh.positions.size() + 2);
-          mesh.indices.push_back(mesh.positions.size() + 0);
-          mesh.indices.push_back(mesh.positions.size() + 2);
-          mesh.indices.push_back(mesh.positions.size() + 3);
-          Eigen::Vector4f color = (index < marker.colors.size())
-                                      ? toVector4f(marker.colors.at(index))
-                                      : toVector4f(marker.color);
-          for (size_t i = 0; i < 4; i++) {
-            mesh.positions.push_back(p);
-            mesh.colors.push_back(color);
+    case visualization_msgs::Marker::POINTS:
+    case visualization_msgs::Marker::SPHERE_LIST: {
+      if (_mesh_watcher.changed(marker.type, points, colors, color, radius)) {
+        _mesh = std::make_shared<Mesh>([marker, radius](MeshData &mesh) {
+          for (size_t index = 0; index < marker.points.size(); index++) {
+            auto p = toVector3f(marker.points.at(index));
+            mesh.indices.push_back(mesh.positions.size() + 0);
+            mesh.indices.push_back(mesh.positions.size() + 1);
+            mesh.indices.push_back(mesh.positions.size() + 2);
+            mesh.indices.push_back(mesh.positions.size() + 0);
+            mesh.indices.push_back(mesh.positions.size() + 2);
+            mesh.indices.push_back(mesh.positions.size() + 3);
+            Eigen::Vector4f color = (index < marker.colors.size())
+                                        ? toVector4f(marker.colors.at(index))
+                                        : toVector4f(marker.color);
+            for (size_t i = 0; i < 4; i++) {
+              mesh.positions.push_back(p);
+              mesh.colors.push_back(color);
+            }
+            Eigen::Vector4f extra(radius, radius, 1.0, 0.0);
+            // if (marker.type == visualization_msgs::Marker::SPHERE_LIST) {
+            // extra.w() = 1.0;
+            // }
+            mesh.extras.emplace_back(extra);
+            mesh.extras.emplace_back(extra);
+            mesh.extras.emplace_back(extra);
+            mesh.extras.emplace_back(extra);
+            mesh.texcoords.emplace_back(-1, -1);
+            mesh.texcoords.emplace_back(+1, -1);
+            mesh.texcoords.emplace_back(+1, +1);
+            mesh.texcoords.emplace_back(-1, +1);
           }
-          Eigen::Vector4f extra(radius, radius, 1.0, 0.0);
-          // if (marker.type == visualization_msgs::Marker::SPHERE_LIST) {
-          // extra.w() = 1.0;
-          // }
-          mesh.extras.emplace_back(extra);
-          mesh.extras.emplace_back(extra);
-          mesh.extras.emplace_back(extra);
-          mesh.extras.emplace_back(extra);
-          mesh.texcoords.emplace_back(-1, -1);
-          mesh.texcoords.emplace_back(+1, -1);
-          mesh.texcoords.emplace_back(+1, +1);
-          mesh.texcoords.emplace_back(-1, +1);
-        }
-      });
+        });
+      }
+      break;
     }
-    break;
-  }
-  case visualization_msgs::Marker::CUBE_LIST: {
-    if (_mesh_watcher.changed(marker.type, points, colors, color, radius)) {
-      _mesh = std::make_shared<Mesh>([marker, points, colors, color,
-                                      radius](MeshData &mesh) {
-        static MeshData cube = makeBox();
-        Eigen::Vector3f scale = toVector3f(marker.scale) * 0.5f;
-        {
-          size_t n = cube.positions.size() * points.size();
-          mesh.positions.reserve(n);
-          mesh.colors.reserve(n);
-          mesh.normals.reserve(n);
+    case visualization_msgs::Marker::CUBE_LIST: {
+      if (_mesh_watcher.changed(marker.type, points, colors, color, radius)) {
+        _mesh = std::make_shared<Mesh>(
+            [marker, points, colors, color, radius](MeshData &mesh) {
+              static MeshData cube = makeBox();
+              Eigen::Vector3f scale = toVector3f(marker.scale) * 0.5f;
+              {
+                size_t n = cube.positions.size() * points.size();
+                mesh.positions.reserve(n);
+                mesh.colors.reserve(n);
+                mesh.normals.reserve(n);
+              }
+              {
+                size_t n = cube.indices.size() * points.size();
+                mesh.indices.reserve(n);
+              }
+              for (size_t index = 0; index < points.size(); index++) {
+                /*MeshData c = cube;
+                c.scale(scale);
+                c.colorize(index < colors.size() ? colors[index] : color);
+                c.translate(points[index]);
+                mesh += c;*/
+                for (size_t i : cube.indices) {
+                  mesh.indices.push_back(mesh.positions.size() + i);
+                }
+                for (auto &p : cube.positions) {
+                  mesh.positions.emplace_back(p.cwiseProduct(scale) +
+                                              points[index]);
+                }
+                for (auto &n : cube.normals) {
+                  mesh.normals.emplace_back(n);
+                }
+                if (colors.size() >= points.size()) {
+                  for (auto &c : cube.positions) {
+                    mesh.colors.push_back(colors[index]);
+                  }
+                } else {
+                  for (auto &c : cube.positions) {
+                    mesh.colors.push_back(color);
+                  }
+                }
+              }
+            });
+      }
+      break;
+    }
+    case visualization_msgs::Marker::LINE_LIST: {
+      if (_mesh_watcher.changed(marker.type, points, colors, color, radius)) {
+        _mesh = std::make_shared<Mesh>([marker, radius](MeshData &mesh) {
+          for (size_t line_index = 0; line_index < marker.points.size() / 2;
+               line_index++) {
+            mesh.indices.push_back(mesh.positions.size() + 0);
+            mesh.indices.push_back(mesh.positions.size() + 1);
+            mesh.indices.push_back(mesh.positions.size() + 2);
+            mesh.indices.push_back(mesh.positions.size() + 1);
+            mesh.indices.push_back(mesh.positions.size() + 3);
+            mesh.indices.push_back(mesh.positions.size() + 2);
+            auto a = toVector3f(marker.points.at(line_index * 2 + 0));
+            auto b = toVector3f(marker.points.at(line_index * 2 + 1));
+            mesh.positions.push_back(a);
+            mesh.positions.push_back(a);
+            mesh.positions.push_back(b);
+            mesh.positions.push_back(b);
+            mesh.tangents.push_back(a - b);
+            mesh.tangents.push_back(a - b);
+            mesh.tangents.push_back(a - b);
+            mesh.tangents.push_back(a - b);
+            mesh.extras.emplace_back(+radius, 0.0, 2.0, 0.0);
+            mesh.extras.emplace_back(-radius, 0.0, 2.0, 0.0);
+            mesh.extras.emplace_back(+radius, 0.0, 2.0, 0.0);
+            mesh.extras.emplace_back(-radius, 0.0, 2.0, 0.0);
+            Eigen::Vector4f ca =
+                (line_index * 2 + 0 < marker.colors.size())
+                    ? toVector4f(marker.colors.at(line_index * 2 + 0))
+                    : toVector4f(marker.color);
+            Eigen::Vector4f cb =
+                (line_index * 2 + 1 < marker.colors.size())
+                    ? toVector4f(marker.colors.at(line_index * 2 + 1))
+                    : toVector4f(marker.color);
+            mesh.colors.push_back(ca);
+            mesh.colors.push_back(ca);
+            mesh.colors.push_back(cb);
+            mesh.colors.push_back(cb);
+          }
+        });
+      }
+      break;
+    }
+    case visualization_msgs::Marker::LINE_STRIP: {
+      if (_mesh_watcher.changed(marker.type, points, colors, color, radius)) {
+        _mesh = std::make_shared<Mesh>([marker, radius](MeshData &mesh) {
+          for (size_t point_index = 0; point_index + 1 < marker.points.size();
+               point_index++) {
+            mesh.indices.push_back(mesh.positions.size() + 0);
+            mesh.indices.push_back(mesh.positions.size() + 1);
+            mesh.indices.push_back(mesh.positions.size() + 2);
+            mesh.indices.push_back(mesh.positions.size() + 1);
+            mesh.indices.push_back(mesh.positions.size() + 3);
+            mesh.indices.push_back(mesh.positions.size() + 2);
+            auto a = toVector3f(marker.points.at(point_index + 0));
+            auto b = toVector3f(marker.points.at(point_index + 1));
+            mesh.positions.push_back(a);
+            mesh.positions.push_back(a);
+            mesh.positions.push_back(b);
+            mesh.positions.push_back(b);
+            mesh.tangents.push_back(a - b);
+            mesh.tangents.push_back(a - b);
+            mesh.tangents.push_back(a - b);
+            mesh.tangents.push_back(a - b);
+            mesh.extras.emplace_back(+radius, 0.0, 2.0, 0.0);
+            mesh.extras.emplace_back(-radius, 0.0, 2.0, 0.0);
+            mesh.extras.emplace_back(+radius, 0.0, 2.0, 0.0);
+            mesh.extras.emplace_back(-radius, 0.0, 2.0, 0.0);
+            Eigen::Vector4f ca =
+                (point_index + 0 < marker.colors.size())
+                    ? toVector4f(marker.colors.at(point_index + 0))
+                    : toVector4f(marker.color);
+            Eigen::Vector4f cb =
+                (point_index + 1 < marker.colors.size())
+                    ? toVector4f(marker.colors.at(point_index + 1))
+                    : toVector4f(marker.color);
+            mesh.colors.push_back(ca);
+            mesh.colors.push_back(ca);
+            mesh.colors.push_back(cb);
+            mesh.colors.push_back(cb);
+          }
+        });
+      }
+      break;
+    }
+    case visualization_msgs::Marker::CUBE:
+      _mesh_watcher.changed();
+      static auto box_mesh = std::make_shared<Mesh>(makeBox());
+      _mesh = box_mesh;
+      _pose = Eigen::Scaling(toVector3d(marker.scale) * 0.5);
+      _color = toColor4(marker.color);
+      break;
+    case visualization_msgs::Marker::SPHERE:
+      _mesh_watcher.changed();
+      static auto sphere_mesh = std::make_shared<Mesh>(makeSphere(32, 16));
+      _mesh = sphere_mesh;
+      _pose = Eigen::Scaling(toVector3d(marker.scale) * 0.5);
+      _color = toColor4(marker.color);
+      break;
+    case visualization_msgs::Marker::CYLINDER:
+      _mesh_watcher.changed();
+      static auto cylinder_mesh = std::make_shared<Mesh>(makeCylinder(32));
+      _mesh = cylinder_mesh;
+      _pose = Eigen::Scaling(toVector3d(marker.scale) * 0.5);
+      _color = toColor4(marker.color);
+      break;
+    case visualization_msgs::Marker::ARROW: {
+      PROFILER("ARROW");
+      if (points.size() >= 2) {
+        if (_mesh_watcher.changed(marker.type, points, marker.scale.x,
+                                  marker.scale.y, marker.scale.z)) {
+          Eigen::Vector3d a = points.at(0).cast<double>();
+          Eigen::Vector3d b = points.at(1).cast<double>();
+          _mesh = std::make_shared<Mesh>([marker, a, b](MeshData &mesh) {
+            PROFILER("ARROW");
+            double len = (a - b).norm();
+            Eigen::Affine3d pose = Eigen::Affine3d(
+                Eigen::Translation3d(a) *
+                Eigen::AngleAxisd(Eigen::Quaterniond::FromTwoVectors(
+                    Eigen::Vector3d::UnitX(), b - a)) *
+                Eigen::Scaling(Eigen::Vector3d(len, len * 0.5, len * 0.5)));
+            float head_length = 0.23;
+            if (marker.scale.z > 0) {
+              head_length = std::max(0.0, std::min(marker.scale.z / len, 1.0));
+            }
+            mesh =
+                Eigen::AngleAxisf(M_PI / 2, Eigen::Vector3f::UnitY()) *
+                (Eigen::Translation3f(0.0f, 0.0f, (1.0f - head_length) * 0.5f) *
+                     Eigen::Scaling(0.5f, 0.5f, (1.0f - head_length) * 0.5f) *
+                     makeCylinder(32) +
+                 Eigen::Translation3f(0.0f, 0.0f, (1.0f - head_length)) *
+                     Eigen::Scaling(1.0f, 1.0f, head_length) * makeCone(32));
+            mesh = pose * mesh;
+          });
         }
-        {
-          size_t n = cube.indices.size() * points.size();
-          mesh.indices.reserve(n);
+      } else {
+        if (_mesh_watcher.changed(marker.type)) {
+          static auto arrow_mesh = std::make_shared<Mesh>(
+              Eigen::AngleAxisf(M_PI / 2, Eigen::Vector3f::UnitY()) *
+              (Eigen::Translation3f(0.0f, 0.0f, 0.77f * 0.5f) *
+                   Eigen::Scaling(0.5f, 0.5f, 0.77f * 0.5f) * makeCylinder(32) +
+               Eigen::Translation3f(0.0f, 0.0f, 0.77f) *
+                   Eigen::Scaling(1.0f, 1.0f, 0.23f) * makeCone(32)));
+          _mesh = arrow_mesh;
         }
-        for (size_t index = 0; index < points.size(); index++) {
-          /*MeshData c = cube;
-          c.scale(scale);
-          c.colorize(index < colors.size() ? colors[index] : color);
-          c.translate(points[index]);
-          mesh += c;*/
-          for (size_t i : cube.indices) {
-            mesh.indices.push_back(mesh.positions.size() + i);
-          }
-          for (auto &p : cube.positions) {
-            mesh.positions.emplace_back(p.cwiseProduct(scale) + points[index]);
-          }
-          for (auto &n : cube.normals) {
-            mesh.normals.emplace_back(n);
-          }
-          if (colors.size() >= points.size()) {
-            for (auto &c : cube.positions) {
-              mesh.colors.push_back(colors[index]);
+        _pose = Eigen::Scaling(toVector3d(marker.scale));
+      }
+      _color = toColor4(marker.color);
+      break;
+    }
+    case visualization_msgs::Marker::TRIANGLE_LIST: {
+      PROFILER("TRIANGLE_LIST");
+      if (_mesh_watcher.changed(marker.type, points, colors, color)) {
+        _mesh = std::make_shared<Mesh>([points, colors, color](MeshData &mesh) {
+          PROFILER("TRIANGLE_LIST");
+          // throw std::runtime_error("");
+          LOG_DEBUG("triangle list " << points.size() << " " << colors.size());
+          size_t triangle_count = points.size() / 3;
+          size_t vertex_count = triangle_count * 3;
+          if (colors.size() >= vertex_count) {
+            for (size_t vertex_index = 0; vertex_index < vertex_count;
+                 vertex_index++) {
+              mesh.positions.push_back(points[vertex_index]);
+              mesh.colors.push_back(colors[vertex_index]);
+            }
+          } else if (colors.size() >= triangle_count) {
+            for (size_t vertex_index = 0; vertex_index < vertex_count;
+                 vertex_index++) {
+              mesh.positions.push_back(points[vertex_index]);
+              mesh.colors.push_back(colors[vertex_index / 3]);
             }
           } else {
-            for (auto &c : cube.positions) {
+            for (size_t vertex_index = 0; vertex_index < vertex_count;
+                 vertex_index++) {
+              mesh.positions.push_back(points[vertex_index]);
               mesh.colors.push_back(color);
             }
           }
-        }
-      });
-    }
-    break;
-  }
-  case visualization_msgs::Marker::LINE_LIST: {
-    if (_mesh_watcher.changed(marker.type, points, colors, color, radius)) {
-      _mesh = std::make_shared<Mesh>([marker, radius](MeshData &mesh) {
-        for (size_t line_index = 0; line_index < marker.points.size() / 2;
-             line_index++) {
-          mesh.indices.push_back(mesh.positions.size() + 0);
-          mesh.indices.push_back(mesh.positions.size() + 1);
-          mesh.indices.push_back(mesh.positions.size() + 2);
-          mesh.indices.push_back(mesh.positions.size() + 1);
-          mesh.indices.push_back(mesh.positions.size() + 3);
-          mesh.indices.push_back(mesh.positions.size() + 2);
-          auto a = toVector3f(marker.points.at(line_index * 2 + 0));
-          auto b = toVector3f(marker.points.at(line_index * 2 + 1));
-          mesh.positions.push_back(a);
-          mesh.positions.push_back(a);
-          mesh.positions.push_back(b);
-          mesh.positions.push_back(b);
-          mesh.tangents.push_back(a - b);
-          mesh.tangents.push_back(a - b);
-          mesh.tangents.push_back(a - b);
-          mesh.tangents.push_back(a - b);
-          mesh.extras.emplace_back(+radius, 0.0, 2.0, 0.0);
-          mesh.extras.emplace_back(-radius, 0.0, 2.0, 0.0);
-          mesh.extras.emplace_back(+radius, 0.0, 2.0, 0.0);
-          mesh.extras.emplace_back(-radius, 0.0, 2.0, 0.0);
-          Eigen::Vector4f ca =
-              (line_index * 2 + 0 < marker.colors.size())
-                  ? toVector4f(marker.colors.at(line_index * 2 + 0))
-                  : toVector4f(marker.color);
-          Eigen::Vector4f cb =
-              (line_index * 2 + 1 < marker.colors.size())
-                  ? toVector4f(marker.colors.at(line_index * 2 + 1))
-                  : toVector4f(marker.color);
-          mesh.colors.push_back(ca);
-          mesh.colors.push_back(ca);
-          mesh.colors.push_back(cb);
-          mesh.colors.push_back(cb);
-        }
-      });
-    }
-    break;
-  }
-  case visualization_msgs::Marker::LINE_STRIP: {
-    if (_mesh_watcher.changed(marker.type, points, colors, color, radius)) {
-      _mesh = std::make_shared<Mesh>([marker, radius](MeshData &mesh) {
-        for (size_t point_index = 0; point_index + 1 < marker.points.size();
-             point_index++) {
-          mesh.indices.push_back(mesh.positions.size() + 0);
-          mesh.indices.push_back(mesh.positions.size() + 1);
-          mesh.indices.push_back(mesh.positions.size() + 2);
-          mesh.indices.push_back(mesh.positions.size() + 1);
-          mesh.indices.push_back(mesh.positions.size() + 3);
-          mesh.indices.push_back(mesh.positions.size() + 2);
-          auto a = toVector3f(marker.points.at(point_index + 0));
-          auto b = toVector3f(marker.points.at(point_index + 1));
-          mesh.positions.push_back(a);
-          mesh.positions.push_back(a);
-          mesh.positions.push_back(b);
-          mesh.positions.push_back(b);
-          mesh.tangents.push_back(a - b);
-          mesh.tangents.push_back(a - b);
-          mesh.tangents.push_back(a - b);
-          mesh.tangents.push_back(a - b);
-          mesh.extras.emplace_back(+radius, 0.0, 2.0, 0.0);
-          mesh.extras.emplace_back(-radius, 0.0, 2.0, 0.0);
-          mesh.extras.emplace_back(+radius, 0.0, 2.0, 0.0);
-          mesh.extras.emplace_back(-radius, 0.0, 2.0, 0.0);
-          Eigen::Vector4f ca =
-              (point_index + 0 < marker.colors.size())
-                  ? toVector4f(marker.colors.at(point_index + 0))
-                  : toVector4f(marker.color);
-          Eigen::Vector4f cb =
-              (point_index + 1 < marker.colors.size())
-                  ? toVector4f(marker.colors.at(point_index + 1))
-                  : toVector4f(marker.color);
-          mesh.colors.push_back(ca);
-          mesh.colors.push_back(ca);
-          mesh.colors.push_back(cb);
-          mesh.colors.push_back(cb);
-        }
-      });
-    }
-    break;
-  }
-  case visualization_msgs::Marker::CUBE:
-    _mesh_watcher.changed();
-    static auto box_mesh = std::make_shared<Mesh>(makeBox());
-    _mesh = box_mesh;
-    _pose = Eigen::Scaling(toVector3d(marker.scale) * 0.5);
-    _color = toColor4(marker.color);
-    break;
-  case visualization_msgs::Marker::SPHERE:
-    _mesh_watcher.changed();
-    static auto sphere_mesh = std::make_shared<Mesh>(makeSphere(32, 16));
-    _mesh = sphere_mesh;
-    _pose = Eigen::Scaling(toVector3d(marker.scale) * 0.5);
-    _color = toColor4(marker.color);
-    break;
-  case visualization_msgs::Marker::CYLINDER:
-    _mesh_watcher.changed();
-    static auto cylinder_mesh = std::make_shared<Mesh>(makeCylinder(32));
-    _mesh = cylinder_mesh;
-    _pose = Eigen::Scaling(toVector3d(marker.scale) * 0.5);
-    _color = toColor4(marker.color);
-    break;
-  case visualization_msgs::Marker::ARROW: {
-    PROFILER("ARROW");
-    if (points.size() >= 2) {
-      if (_mesh_watcher.changed(marker.type, points, marker.scale.x,
-                                marker.scale.y, marker.scale.z)) {
-        Eigen::Vector3d a = points.at(0).cast<double>();
-        Eigen::Vector3d b = points.at(1).cast<double>();
-        _mesh = std::make_shared<Mesh>([marker, a, b](MeshData &mesh) {
-          PROFILER("ARROW");
-          double len = (a - b).norm();
-          Eigen::Affine3d pose = Eigen::Affine3d(
-              Eigen::Translation3d(a) *
-              Eigen::AngleAxisd(Eigen::Quaterniond::FromTwoVectors(
-                  Eigen::Vector3d::UnitX(), b - a)) *
-              Eigen::Scaling(Eigen::Vector3d(len, len * 0.5, len * 0.5)));
-          float head_length = 0.23;
-          if (marker.scale.z > 0) {
-            head_length = std::max(0.0, std::min(marker.scale.z / len, 1.0));
+
+          {
+            std::map<std::array<float, 6>, size_t> vertexmap;
+            for (size_t i = 0; i < mesh.positions.size(); i++) {
+              auto p = mesh.positions.at(i);
+              auto c = mesh.colors.at(i);
+              std::array<float, 6> v = {p.x(), p.y(), p.z(),
+                                        c.x(), c.y(), c.z()};
+              auto it = vertexmap.find(v);
+              if (it != vertexmap.end()) {
+                mesh.indices.push_back(it->second);
+              } else {
+                vertexmap[v] = i;
+                mesh.indices.push_back(i);
+              }
+            }
           }
-          mesh =
-              Eigen::AngleAxisf(M_PI / 2, Eigen::Vector3f::UnitY()) *
-              (Eigen::Translation3f(0.0f, 0.0f, (1.0f - head_length) * 0.5f) *
-                   Eigen::Scaling(0.5f, 0.5f, (1.0f - head_length) * 0.5f) *
-                   makeCylinder(32) +
-               Eigen::Translation3f(0.0f, 0.0f, (1.0f - head_length)) *
-                   Eigen::Scaling(1.0f, 1.0f, head_length) * makeCone(32));
-          mesh = pose * mesh;
+
+          mesh.computeNormals();
         });
       }
-    } else {
-      if (_mesh_watcher.changed(marker.type)) {
-        static auto arrow_mesh = std::make_shared<Mesh>(
-            Eigen::AngleAxisf(M_PI / 2, Eigen::Vector3f::UnitY()) *
-            (Eigen::Translation3f(0.0f, 0.0f, 0.77f * 0.5f) *
-                 Eigen::Scaling(0.5f, 0.5f, 0.77f * 0.5f) * makeCylinder(32) +
-             Eigen::Translation3f(0.0f, 0.0f, 0.77f) *
-                 Eigen::Scaling(1.0f, 1.0f, 0.23f) * makeCone(32)));
-        _mesh = arrow_mesh;
-      }
       _pose = Eigen::Scaling(toVector3d(marker.scale));
+      _render_options.double_sided = true;
+      break;
     }
-    _color = toColor4(marker.color);
-    break;
-  }
-  case visualization_msgs::Marker::TRIANGLE_LIST: {
-    PROFILER("TRIANGLE_LIST");
-    if (_mesh_watcher.changed(marker.type, points, colors, color)) {
-      _mesh = std::make_shared<Mesh>([points, colors, color](MeshData &mesh) {
-        PROFILER("TRIANGLE_LIST");
-        // throw std::runtime_error("");
-        LOG_DEBUG("triangle list " << points.size() << " " << colors.size());
-        size_t triangle_count = points.size() / 3;
-        size_t vertex_count = triangle_count * 3;
-        if (colors.size() >= vertex_count) {
-          for (size_t vertex_index = 0; vertex_index < vertex_count;
-               vertex_index++) {
-            mesh.positions.push_back(points[vertex_index]);
-            mesh.colors.push_back(colors[vertex_index]);
-          }
-        } else if (colors.size() >= triangle_count) {
-          for (size_t vertex_index = 0; vertex_index < vertex_count;
-               vertex_index++) {
-            mesh.positions.push_back(points[vertex_index]);
-            mesh.colors.push_back(colors[vertex_index / 3]);
-          }
-        } else {
-          for (size_t vertex_index = 0; vertex_index < vertex_count;
-               vertex_index++) {
-            mesh.positions.push_back(points[vertex_index]);
-            mesh.colors.push_back(color);
-          }
-        }
-        mesh.computeNormals();
-      });
+    case visualization_msgs::Marker::TEXT_VIEW_FACING: {
+      PROFILER("TEXT_VIEW_FACING");
+      _mesh_watcher.changed();
+      _text = marker.text;
+      _mesh = nullptr;
+      _color = toColor4(marker.color);
+      break;
     }
-    _pose = Eigen::Scaling(toVector3d(marker.scale));
-    _render_options.double_sided = true;
-    break;
-  }
-  case visualization_msgs::Marker::TEXT_VIEW_FACING: {
-    PROFILER("TEXT_VIEW_FACING");
-    _mesh_watcher.changed();
-    _text = marker.text;
-    _mesh = nullptr;
-    _color = toColor4(marker.color);
-    break;
-  }
-  default:
-    _mesh_watcher.changed();
-    LOG_WARN_THROTTLE(1.0, "unknown marker type " << marker.type);
-    _mesh = nullptr;
-    break;
+    default:
+      _mesh_watcher.changed();
+      LOG_WARN_THROTTLE(1.0, "unknown marker type " << marker.type);
+      _mesh = nullptr;
+      break;
   }
   _scale = marker.scale.x;
   if (marker.type == visualization_msgs::Marker::TEXT_VIEW_FACING) {
