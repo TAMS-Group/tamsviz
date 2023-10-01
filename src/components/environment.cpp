@@ -27,11 +27,14 @@ void EnvironmentComponent::renderSync(const RenderSyncContext &context) {
   }
   _use_environment_map = useEnvironmentMap();
 
+  _prescale = (float)backgroundPrescaling();
   // setup environment cube material
-  _environment_material_block.color = backgroundColor().toLinearVector4f();
-  _environment_material_block.brightness =
-      (float)(ambientLighting() * backgroundBrightness());
-  _environment_material_block.flags = (2 | 8);
+  _environment_material_block.color =
+      backgroundColor().toLinearVector4f() * _prescale;
+  // _environment_material_block.brightness =
+  //     (float)(ambientLighting() * backgroundBrightness());
+  _environment_material_block.brightness = (float)backgroundBrightness();
+  _environment_material_block.flags = (2 | 8 | 64);
 }
 
 void EnvironmentComponent::renderAsync(const RenderAsyncContext &context) {
@@ -50,7 +53,6 @@ void EnvironmentComponent::renderAsync(const RenderAsyncContext &context) {
 
       _environment_map_texture = nullptr;
       if (!data->url.empty()) {
-
         _environment_map_texture = std::make_shared<Texture>();
         _environment_map_texture->create();
         _environment_map_texture->update(data->image);
@@ -72,13 +74,17 @@ void EnvironmentComponent::renderAsync(const RenderAsyncContext &context) {
   //      (_use_environment_map && _environment_map_texture ?
   //      _environment_cube_size : 32);
   size_t cube_map_size = _environment_cube_size;
-  if (_environment_cube_watcher.changed(cube_map_size)) {
+  if (_environment_cube_watcher.changed(cube_map_size, _prescale)) {
     environment_changed = true;
     LOG_DEBUG("creating environment cube map");
+    _environment_cube_map.destroy();
     _environment_cube_map.create();
     V_GL(glActiveTexture(GL_TEXTURE0 + uint32_t(Samplers::environment)));
     V_GL(glBindTexture(GL_TEXTURE_CUBE_MAP, _environment_cube_map.id()));
 
+    LOG_DEBUG("env tex image " << _environment_cube_map.id() << " "
+                               << _environment_mip_levels << " "
+                               << cube_map_size);
     V_GL(glTexStorage2D(GL_TEXTURE_CUBE_MAP, _environment_mip_levels,
                         GL_RGBA16F, cube_map_size, cube_map_size));
 
@@ -110,7 +116,6 @@ void EnvironmentComponent::renderAsync(const RenderAsyncContext &context) {
       size_t s = cube_map_size;
       for (size_t level = 0; level < _environment_mip_levels; level++) {
         for (size_t face = 0; face < 6; face++) {
-
           _env_shader->use();
 
           V_GL(glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
@@ -121,7 +126,6 @@ void EnvironmentComponent::renderAsync(const RenderAsyncContext &context) {
           V_GL(glClear(GL_COLOR_BUFFER_BIT));
 
           if (_environment_map_texture) {
-
             V_GL(glActiveTexture(GL_TEXTURE0 + (int)Samplers::color));
             V_GL(glBindTexture(GL_TEXTURE_2D, _environment_map_texture->id()));
 
@@ -140,6 +144,10 @@ void EnvironmentComponent::renderAsync(const RenderAsyncContext &context) {
                 _environment_mip_levels));
             V_GL(glUniform1i(
                 glGetUniformLocation(_env_shader->program(), "level"), level));
+
+            V_GL(glUniform1f(
+                glGetUniformLocation(_env_shader->program(), "prescale"),
+                _prescale));
 
             _environment_mesh->bind();
 

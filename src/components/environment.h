@@ -15,7 +15,6 @@
 #include "../render/transformations.h"
 
 struct EnvironmentComponent : Component {
-
   std::shared_ptr<Shader> _env_shader = std::make_shared<Shader>(
       "package://" ROS_PACKAGE_NAME "/shaders/env.vert",
       "package://" ROS_PACKAGE_NAME "/shaders/env.frag");
@@ -24,10 +23,14 @@ struct EnvironmentComponent : Component {
       (size_t)UniformBindingPoint::camera};
 
   PROPERTY(Color4, backgroundColor, Color4(0.3, 0.3, 0.3, 1.0));
+  PROPERTY(double, backgroundPrescaling, 1, min = 0);
   PROPERTY(double, backgroundBrightness, 1, min = 0);
-  PROPERTY(double, ambientLighting, 1.0, min = 0.0, max = 1.0);
+  // PROPERTY(double, ambientLighting, 1.0, min = 0.0, max = 1.0);
+  PROPERTY(double, ambientLighting, 1.0, min = 0.0);
   PROPERTY(Color3, groundColor, Color3(0.0, 0.0, 0.0));
   PROPERTY(double, hemisphericLighting, 0.5, min = 0.0, max = 1.0);
+
+  float _prescale = 1;
 
   EventFlag _invalidated{ResourceEvents::instance().reload};
 

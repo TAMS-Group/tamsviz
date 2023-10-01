@@ -26,14 +26,14 @@ typedef ResourceManager<Texture, std::string, TextureType> TextureManager;
 class ImageLoader;
 
 class TextureBase : public ResourceBase {
-protected:
+ protected:
   GLuint _id = 0;
-  void destroy();
 
-public:
+ public:
   ~TextureBase() { destroy(); }
   inline GLuint id() const { return _id; }
   void create();
+  void destroy();
 };
 
 class Texture : public TextureBase {
@@ -45,7 +45,7 @@ class Texture : public TextureBase {
   bool _transparent = false;
   bool _mipmap = true;
 
-public:
+ public:
   Texture(TextureType type = TextureType::Color) : _type(type) {}
   Texture(const std::string &url, TextureType type);
   void mipmap(bool mipmap) { _mipmap = mipmap; }

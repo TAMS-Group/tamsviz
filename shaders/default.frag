@@ -50,7 +50,14 @@ void main() {
 
     out_blend = vec4(alpha, 0.0, 0.0, 1.0);
     if(material.color_texture != 0) {
+
         vec4 t = texture2D(color_sampler, x_texcoord);
+
+        // vec4 t = textureGrad(color_sampler, x_texcoord, 
+        //     vec2(dFdx(x_texcoord.x),dFdy(x_texcoord.x))*30, 
+        //     vec2(dFdx(x_texcoord.y),dFdy(x_texcoord.y))*30
+        //     );
+
         if((material.flags & 1) != 0) {
             if(t.x < 0.5) {
                 discard;
@@ -58,6 +65,8 @@ void main() {
         } else {
             alpha *= t.w;
             albedo *= t.xyz;
+            alpha = max(0.0, min(alpha, 1.0));
+            albedo = max(vec3(0.0), min(albedo, vec3(1.0)));
         }
     }
 
@@ -125,13 +134,18 @@ void main() {
 
             //vec4 vp4 = lights.light_array[light_index].view_matrix * p4;
 
+            int shadow_sample_range = 3;
+
+            // float shadow_bias = lights.light_array[light_index].shadow_bias * 2.0;
+            float shadow_bias = lights.light_array[light_index].shadow_bias * 2.0 * (1.0 + shadow_sample_range);
+
             if ((type & 3) == 1) {
-                p4.xyz += normal * (lights.light_array[light_index].shadow_bias * 2.0 / lights.light_array[light_index].projection_matrix[0][0]);
+                p4.xyz += normal * (shadow_bias / lights.light_array[light_index].projection_matrix[0][0]);
             } else {
                 vec4 vp4 = lights.light_array[light_index].view_matrix * p4;
                 vec4 f4 = lights.light_array[light_index].projection_matrix * vec4(0.01, 0.0, vp4.z, 1.0);
                 float f = f4.w / f4.x * 0.01;
-                p4.xyz += normal * (lights.light_array[light_index].shadow_bias * 2.0 * f);
+                p4.xyz += normal * (shadow_bias * f);
             }
 
             p4 = lights.light_array[light_index].view_matrix * p4;
@@ -140,10 +154,23 @@ void main() {
 
             if((type & 64) != 0) {
                 float smi = float(lights.light_array[light_index].shadow_index);
-                vec2 smxy = p4.xy / p4.w * 0.5 + 0.5;
-                float smz = p4.z / p4.w * 0.5 + 0.5;
+                
+                // vec2 smxy = p4.xy / p4.w * 0.5 + 0.5;
+                // float smz = p4.z / p4.w * 0.5 + 0.5;
+                // shadow = texture(shadow_map_sampler, vec4(smxy, smi, smz));
 
-                shadow = texture(shadow_map_sampler, vec4(smxy, smi, smz));
+                vec2 smstep = 1.0 / vec2(textureSize(shadow_map_sampler, 0));
+
+                shadow = 0.0;
+                for(int ox = -shadow_sample_range; ox <= shadow_sample_range; ox++) {
+                    for(int oy = -shadow_sample_range; oy <= shadow_sample_range; oy++) {
+                        vec2 off = vec2(float(ox), float(oy)) * smstep;
+                        vec2 smxy = p4.xy / p4.w * 0.5 + 0.5 + off * 1;
+                        float smz = p4.z / p4.w * 0.5 + 0.5;
+                        shadow += texture(shadow_map_sampler, vec4(smxy, smi, smz));
+                    }
+                }
+                shadow *= 1.0 / ((shadow_sample_range * 2 + 1) * (shadow_sample_range * 2 + 1));
             }
         }
 

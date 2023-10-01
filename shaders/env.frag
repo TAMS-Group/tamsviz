@@ -8,6 +8,7 @@ uniform sampler2D color_sampler;
 
 uniform int level;
 uniform int levels;
+uniform float prescale;
 
 in vec2 x_texcoord;
 in vec3 x_position;
@@ -33,6 +34,7 @@ vec3 sampleEnvironment(vec3 dir, float smoothing) {
         vec2(smoothing /*/ length(dir.xy)*/, 0.0), 
         vec2(0.0, smoothing)
         ).xyz;
+    color = max(vec3(0.0), min(color * prescale, vec3(1.0)));
     color = map_color_inverse(color);
     return color;
 }
