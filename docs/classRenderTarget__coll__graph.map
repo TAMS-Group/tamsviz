@@ -1,8 +1,0 @@
-<map id="RenderTarget" name="RenderTarget">
-<area shape="rect" id="node2" href="$classResourceBase.html" title="ResourceBase" alt="" coords="161,96,269,123"/>
-<area shape="rect" id="node4" href="$classRenderbuffer.html" title="Renderbuffer" alt="" coords="5,185,103,212"/>
-<area shape="rect" id="node7" href="$classTextureBase.html" title="TextureBase" alt="" coords="210,185,306,212"/>
-<area shape="rect" id="node8" href="$classFramebuffer.html" title="Framebuffer" alt="" coords="307,236,399,263"/>
-<area shape="rect" id="node5" href="$classWatcher.html" title="Watcher" alt="" coords="19,96,89,123"/>
-<area shape="rect" id="node6" href="$classTexture.html" title="Texture" alt="" coords="214,332,281,359"/>
-</map>

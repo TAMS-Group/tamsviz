@@ -1,6 +1,14 @@
 // TAMSVIZ
 // (c) 2020-2021 Philipp Ruppel
 
+// material.flags
+// 1: alpha testing
+// 2: unlit
+// 4: sbgr vertex colors
+// 8: viewspace
+// 32: glow
+// 64: envmap?
+
 // #include <package://tamsviz/shaders/common.glsl>
 #include "common.glsl"
 #include "hdr.glsl"
@@ -33,6 +41,8 @@ void main() {
       return;
     }*/
 
+    bool glow = ((material.flags & 32) != 0);
+
     const float pi = 3.14159265359;
 
     if(x_extra.z > 0.5 && x_extra.z < 1.5) {
@@ -41,8 +51,13 @@ void main() {
         }
     }
 
-    vec3 albedo = material.color.xyz * x_color.xyz;
-    float alpha = material.color.w * x_color.w;
+    vec3 albedo = material.color.xyz;
+    float alpha = material.color.w;
+
+    if(!glow) {
+        albedo *= x_color.xyz;
+        alpha *= x_color.w;
+    }
 
     out_id = material.id;
 
@@ -70,7 +85,7 @@ void main() {
         }
     }
 
-    if((camera.flags & uint(4)) != uint(0)) { // rendering shadow map
+    if((camera.flags & 4) != 0) { // rendering shadow map
         out_color = vec4(0.0);
         return;
     }
@@ -296,4 +311,11 @@ void main() {
         }
     }
     out_color = vec4(lighting, alpha);
+
+    if (glow) {
+        vec3 v = x_color.rgb;
+        v = max(vec3(0.0), v);
+        v *= v;
+        out_color.rgb += v;
+    }
 }

@@ -1,7 +1,0 @@
-<map id="DisplayGroup" name="DisplayGroup">
-<area shape="rect" id="node2" href="$classGenericFrameDisplay.html" title="GenericFrameDisplay\l\&lt; DisplayGroupBase \&gt;" alt="" coords="79,319,234,360"/>
-<area shape="rect" id="node3" href="$structDisplayGroupBase.html" title="DisplayGroupBase" alt="" coords="13,244,143,271"/>
-<area shape="rect" id="node4" href="$structDisplay.html" title="Display" alt="" coords="45,169,111,196"/>
-<area shape="rect" id="node5" href="$classObject.html" title="Object" alt="" coords="48,95,108,121"/>
-<area shape="rect" id="node7" href="$classFrameDisplayMixin.html" title="FrameDisplayMixin" alt="" coords="168,244,303,271"/>
-</map>

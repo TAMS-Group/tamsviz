@@ -38,7 +38,7 @@ struct MaterialIDFactory {
   size_t _counter = 1;
   std::vector<uint32_t> _free;
 
-public:
+ public:
   uint32_t allocate() {
     std::lock_guard<std::mutex> lock(_mutex);
     if (_free.empty()) {
@@ -82,8 +82,7 @@ void MaterialRenderer::updateSync(const Material &material) {
   _block.color.w() = (float)material.opacity();
   _block.roughness = (float)material.roughness();
   _block.metallic = (float)material.metallic();
-  if (material.unlit())
-    _block.metallic = -1;
+  if (material.unlit()) _block.metallic = -1;
   _color_texture_url = material.texture();
   _normal_texture_url = material.normals();
   if (!material._alive) {
@@ -91,20 +90,23 @@ void MaterialRenderer::updateSync(const Material &material) {
   }
 }
 
-void MaterialRenderer::updateSync(const MaterialOverride &material_override) {
-  if (!material_override._alive) {
+void MaterialOverride::applySync(MaterialBlock &block) const {
+  if (!_alive) {
     throw std::runtime_error("material override already destroyed");
   }
-  if (material_override.color()) {
-    _block.color = material_override.material()->color().toLinearVector4f();
+  if (color()) {
+    block.color = material()->color().toLinearVector4f();
   }
-  if (material_override.parameters()) {
-    _block.roughness = (float)material_override.material()->roughness();
-    _block.metallic = (float)material_override.material()->metallic();
-    if (material_override.material()->unlit())
-      _block.metallic = -1;
+  if (parameters()) {
+    block.roughness = (float)material()->roughness();
+    block.metallic = (float)material()->metallic();
+    if (material()->unlit()) block.metallic = -1;
   }
-  _block.color.w() = (float)material_override.material()->opacity();
+  block.color.w() = (float)material()->opacity();
+}
+
+void MaterialRenderer::updateSync(const MaterialOverride &material_override) {
+  material_override.applySync(_block);
   if (material_override.texture()) {
     _color_texture_url = material_override.material()->texture();
   }

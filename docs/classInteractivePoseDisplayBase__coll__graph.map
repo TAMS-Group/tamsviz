@@ -1,7 +1,0 @@
-<map id="InteractivePoseDisplayBase" name="InteractivePoseDisplayBase">
-<area shape="rect" id="node2" href="$classInteractiveMarkerDisplayBase.html" title="InteractiveMarkerDisplayBase" alt="" coords="5,324,203,351"/>
-<area shape="rect" id="node3" href="$classMeshDisplayBase.html" title="MeshDisplayBase" alt="" coords="40,248,168,275"/>
-<area shape="rect" id="node4" href="$structDisplay.html" title="Display" alt="" coords="71,172,137,199"/>
-<area shape="rect" id="node5" href="$classObject.html" title="Object" alt="" coords="74,96,134,123"/>
-<area shape="rect" id="node7" href="$classWatcher.html" title="Watcher" alt="" coords="227,324,298,351"/>
-</map>

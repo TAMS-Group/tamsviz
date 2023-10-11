@@ -32,11 +32,12 @@ struct MaterialOverride : Object {
   PROPERTY(std::shared_ptr<Material>, material, std::make_shared<Material>());
   MaterialOverride();
   ~MaterialOverride();
+  virtual void applySync(MaterialBlock &block) const;
 };
 DECLARE_TYPE(MaterialOverride, Object);
 
 class MaterialRenderer {
-private:
+ private:
   std::shared_ptr<const Material> _material;
   std::shared_ptr<const MaterialOverride> _material_override;
   MaterialBlock _block;
@@ -45,7 +46,7 @@ private:
   void updateSync(const Material &material);
   void updateSync(const MaterialOverride &material_override);
 
-public:
+ public:
   MaterialRenderer(const MaterialRenderer &) = delete;
   MaterialRenderer &operator=(const MaterialRenderer &) = delete;
   MaterialRenderer(

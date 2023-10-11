@@ -1,7 +1,0 @@
-<map id="UniformBufferBase" name="UniformBufferBase">
-<area shape="rect" id="node4" href="$classUniformBuffer.html" title="UniformBuffer\&lt; T \&gt;" alt="" coords="620,5,755,32"/>
-<area shape="rect" id="node5" href="$classUniformBuffer.html" title="UniformBuffer\&lt; CameraBlock \&gt;" alt="" coords="584,56,791,83"/>
-<area shape="rect" id="node6" href="$classUniformBuffer.html" title="UniformBuffer\&lt; LightArray\lBlock \&gt;" alt="" coords="600,107,775,149"/>
-<area shape="rect" id="node7" href="$classUniformBuffer.html" title="UniformBuffer\&lt; MaterialBlock \&gt;" alt="" coords="584,173,791,200"/>
-<area shape="rect" id="node2" href="$classResourceBase.html" title="ResourceBase" alt="" coords="247,85,355,112"/>
-</map>

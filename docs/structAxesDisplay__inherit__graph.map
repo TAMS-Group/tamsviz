@@ -1,8 +1,0 @@
-<map id="AxesDisplay" name="AxesDisplay">
-<area shape="rect" id="node2" href="$classFrameDisplayBase.html" title="FrameDisplayBase" alt="" coords="89,408,222,435"/>
-<area shape="rect" id="node3" href="$classGenericFrameDisplay.html" title="GenericFrameDisplay\l\&lt; MeshDisplayBase \&gt;" alt="" coords="79,319,231,360"/>
-<area shape="rect" id="node4" href="$classMeshDisplayBase.html" title="MeshDisplayBase" alt="" coords="14,244,142,271"/>
-<area shape="rect" id="node5" href="$structDisplay.html" title="Display" alt="" coords="45,169,111,196"/>
-<area shape="rect" id="node6" href="$classObject.html" title="Object" alt="" coords="48,95,108,121"/>
-<area shape="rect" id="node8" href="$classFrameDisplayMixin.html" title="FrameDisplayMixin" alt="" coords="167,244,301,271"/>
-</map>

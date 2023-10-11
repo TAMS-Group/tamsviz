@@ -1,9 +1,0 @@
-<map id="PoseDisplayBase" name="PoseDisplayBase">
-<area shape="rect" id="node6" href="$classPoseDisplay.html" title="PoseDisplay" alt="" coords="5,393,101,420"/>
-<area shape="rect" id="node7" href="$classPoseStampedDisplay.html" title="PoseStampedDisplay" alt="" coords="126,393,274,420"/>
-<area shape="rect" id="node8" href="$classQuaternionDisplay.html" title="QuaternionDisplay" alt="" coords="298,393,427,420"/>
-<area shape="rect" id="node9" href="$classQuaternionStampedDisplay.html" title="QuaternionStampedDisplay" alt="" coords="452,393,633,420"/>
-<area shape="rect" id="node2" href="$classMeshDisplayBase.html" title="MeshDisplayBase" alt="" coords="217,244,345,271"/>
-<area shape="rect" id="node3" href="$structDisplay.html" title="Display" alt="" coords="248,169,315,196"/>
-<area shape="rect" id="node4" href="$classObject.html" title="Object" alt="" coords="251,95,311,121"/>
-</map>

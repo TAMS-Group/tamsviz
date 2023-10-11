@@ -1,6 +1,0 @@
-<map id="ItemBase" name="ItemBase">
-<area shape="rect" id="node3" href="$classScaleItem.html" title="ScaleItem" alt="" coords="5,155,87,181"/>
-<area shape="rect" id="node4" href="$classScene.html" title="Scene" alt="" coords="111,155,170,181"/>
-<area shape="rect" id="node5" href="$classSeekHead.html" title="SeekHead" alt="" coords="194,155,277,181"/>
-<area shape="rect" id="node6" href="$classTimeBar.html" title="TimeBar" alt="" coords="301,155,372,181"/>
-</map>

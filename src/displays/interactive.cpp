@@ -34,10 +34,9 @@ void InteractiveMarkerControl::update(
   _markers.resize(message.markers.size());
   for (size_t i = 0; i < message.markers.size(); i++) {
     if (!_markers.at(i)) {
-      _markers.at(i) = create<VisualizationMarker>(message.markers[i]);
-    } else {
-      _markers.at(i)->update(message.markers[i]);
+      _markers.at(i) = create<VisualizationMarker>();
     }
+    _markers.at(i)->update(message.markers[i]);
   }
 }
 
@@ -52,65 +51,68 @@ bool InteractiveMarkerControl::interact(const Interaction &interaction) {
           _parent->renderPose() * Eigen::AngleAxisd(_orientation);
       Eigen::Matrix3d control_orientation = control_pose.linear();
       switch (_interaction_mode) {
-      case visualization_msgs::InteractiveMarkerControl::MOVE_3D: {
-        p.translation() +=
-            _parent->framePose().linear().inverse() *
-            (interaction.current.point - interaction.previous.point);
-        break;
-      }
-      case visualization_msgs::InteractiveMarkerControl::MOVE_PLANE: {
-        p.translation() += _parent->framePose().linear().inverse() *
-                           interaction.projectPlane(control_orientation *
-                                                    Eigen::Vector3d::UnitX());
-        break;
-      }
-      case visualization_msgs::InteractiveMarkerControl::MOVE_AXIS: {
-        p.translation() += _parent->framePose().linear().inverse() *
-                           interaction.projectToAxis(control_orientation *
-                                                     Eigen::Vector3d::UnitX());
-        break;
-      }
-      case visualization_msgs::InteractiveMarkerControl::ROTATE_AXIS:
-      case visualization_msgs::InteractiveMarkerControl::MOVE_ROTATE: {
-        Eigen::Vector3d a = control_pose.inverse() *
-                            interaction.previous.projectPlane(
-                                control_pose.translation(),
-                                control_orientation * Eigen::Vector3d::UnitX());
-        Eigen::Vector3d b = control_pose.inverse() *
-                            interaction.current.projectPlane(
-                                control_pose.translation(),
-                                control_orientation * Eigen::Vector3d::UnitX());
-        Eigen::Matrix3d rotation =
-            Eigen::AngleAxisd(
-                std::atan2(a.y(), a.z()) - std::atan2(b.y(), b.z()),
-                Eigen::AngleAxisd(_orientation) * Eigen::Vector3d::UnitX())
-                .matrix();
-        p.linear() = (p.linear() * rotation).eval();
-        if (_interaction_mode ==
-            visualization_msgs::InteractiveMarkerControl::MOVE_ROTATE) {
+        case visualization_msgs::InteractiveMarkerControl::MOVE_3D: {
           p.translation() +=
               _parent->framePose().linear().inverse() *
-              (control_orientation * (b.normalized() * (b.norm() - a.norm())));
+              (interaction.current.point - interaction.previous.point);
+          break;
         }
-        break;
-      }
-      case visualization_msgs::InteractiveMarkerControl::ROTATE_3D:
-      case visualization_msgs::InteractiveMarkerControl::MOVE_ROTATE_3D: {
-        Eigen::Vector3d a =
-            _parent->renderPose().inverse() * interaction.previous.point;
-        Eigen::Vector3d b =
-            _parent->renderPose().inverse() * interaction.current.point;
-        Eigen::Quaterniond quat = Eigen::Quaterniond::Identity();
-        quat.setFromTwoVectors(a, b);
-        p *= Eigen::AngleAxisd(quat);
-        if (_interaction_mode ==
-            visualization_msgs::InteractiveMarkerControl::MOVE_ROTATE_3D) {
+        case visualization_msgs::InteractiveMarkerControl::MOVE_PLANE: {
           p.translation() += _parent->framePose().linear().inverse() *
-                             (_parent->renderPose().linear() *
-                              (b.normalized() * (b.norm() - a.norm())));
+                             interaction.projectPlane(control_orientation *
+                                                      Eigen::Vector3d::UnitX());
+          break;
         }
-        break;
-      }
+        case visualization_msgs::InteractiveMarkerControl::MOVE_AXIS: {
+          p.translation() +=
+              _parent->framePose().linear().inverse() *
+              interaction.projectToAxis(control_orientation *
+                                        Eigen::Vector3d::UnitX());
+          break;
+        }
+        case visualization_msgs::InteractiveMarkerControl::ROTATE_AXIS:
+        case visualization_msgs::InteractiveMarkerControl::MOVE_ROTATE: {
+          Eigen::Vector3d a =
+              control_pose.inverse() *
+              interaction.previous.projectPlane(
+                  control_pose.translation(),
+                  control_orientation * Eigen::Vector3d::UnitX());
+          Eigen::Vector3d b =
+              control_pose.inverse() *
+              interaction.current.projectPlane(
+                  control_pose.translation(),
+                  control_orientation * Eigen::Vector3d::UnitX());
+          Eigen::Matrix3d rotation =
+              Eigen::AngleAxisd(
+                  std::atan2(a.y(), a.z()) - std::atan2(b.y(), b.z()),
+                  Eigen::AngleAxisd(_orientation) * Eigen::Vector3d::UnitX())
+                  .matrix();
+          p.linear() = (p.linear() * rotation).eval();
+          if (_interaction_mode ==
+              visualization_msgs::InteractiveMarkerControl::MOVE_ROTATE) {
+            p.translation() += _parent->framePose().linear().inverse() *
+                               (control_orientation *
+                                (b.normalized() * (b.norm() - a.norm())));
+          }
+          break;
+        }
+        case visualization_msgs::InteractiveMarkerControl::ROTATE_3D:
+        case visualization_msgs::InteractiveMarkerControl::MOVE_ROTATE_3D: {
+          Eigen::Vector3d a =
+              _parent->renderPose().inverse() * interaction.previous.point;
+          Eigen::Vector3d b =
+              _parent->renderPose().inverse() * interaction.current.point;
+          Eigen::Quaterniond quat = Eigen::Quaterniond::Identity();
+          quat.setFromTwoVectors(a, b);
+          p *= Eigen::AngleAxisd(quat);
+          if (_interaction_mode ==
+              visualization_msgs::InteractiveMarkerControl::MOVE_ROTATE_3D) {
+            p.translation() += _parent->framePose().linear().inverse() *
+                               (_parent->renderPose().linear() *
+                                (b.normalized() * (b.norm() - a.norm())));
+          }
+          break;
+        }
       }
       _parent->pose(p);
       {
@@ -129,9 +131,9 @@ bool InteractiveMarkerControl::interact(const Interaction &interaction) {
         }
         feedback.header.frame_id = _parent->frame().name();
         feedback.client_id = ros::this_node::getNamespace();
-        tf::pointEigenToMsg(_parent->framePose().inverse() *
-                                interaction.current.point,
-                            feedback.mouse_point);
+        tf::pointEigenToMsg(
+            _parent->framePose().inverse() * interaction.current.point,
+            feedback.mouse_point);
         feedback.mouse_point_valid = true;
         tf::poseEigenToMsg(_parent->pose(), feedback.pose);
         parentInteractiveMarker()->parentInteractiveMarkerArray()->feedback(
@@ -260,8 +262,8 @@ void InteractiveMarkerArray::update(
   }
 }
 
-std::shared_ptr<InteractiveMarker>
-InteractiveMarkerArray::marker(const std::string &name) {
+std::shared_ptr<InteractiveMarker> InteractiveMarkerArray::marker(
+    const std::string &name) {
   auto iter = _markers.find(name);
   if (iter != _markers.end()) {
     return iter->second;

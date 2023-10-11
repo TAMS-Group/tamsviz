@@ -31,17 +31,15 @@ class VisualizationMarker : public SceneNode {
   Watcher _mesh_watcher;
   std::shared_ptr<MaterialOverride> _material_override;
   double _scale = 1.0;
+  uint32_t _material_flags = 0;
 
-public:
+ public:
   void update(const visualization_msgs::Marker &marker);
   virtual void renderSync(const RenderSyncContext &context) override;
   VisualizationMarker() {}
   VisualizationMarker(
       const std::shared_ptr<MaterialOverride> &material_override)
       : _material_override(material_override) {}
-  VisualizationMarker(const visualization_msgs::Marker &marker) {
-    update(marker);
-  }
 };
 
 class VisualizationMarkerArray : public SceneNode {
@@ -52,27 +50,29 @@ class VisualizationMarkerArray : public SceneNode {
   std::shared_ptr<MaterialOverride> _material_override;
   void _update_nolock(const visualization_msgs::Marker &marker);
 
-public:
+ public:
   void update(const visualization_msgs::Marker &marker);
   void update(const visualization_msgs::MarkerArray &marker_array);
   virtual void renderSync(const RenderSyncContext &context) override;
-  VisualizationMarkerArray() {}
   VisualizationMarkerArray(
       const std::shared_ptr<MaterialOverride> &material_override)
       : _material_override(material_override) {}
-  VisualizationMarkerArray(const visualization_msgs::Marker &marker) {
-    update(marker);
-  }
-  VisualizationMarkerArray(
-      const visualization_msgs::MarkerArray &marker_array) {
-    update(marker_array);
-  }
 };
 
+struct MarkerMaterialOverride : MaterialOverride {
+  PROPERTY(bool, vertexGlow, false);
+  virtual void applySync(MaterialBlock &block) const override;
+};
+DECLARE_TYPE(MarkerMaterialOverride, MaterialOverride);
+
 class MarkerDisplayBase : public MeshDisplayBase {
-protected:
-  std::shared_ptr<MaterialOverride> _material_override =
-      std::make_shared<MaterialOverride>();
+  //  public:
+  //   PROPERTY(std::shared_ptr<MarkerOptions>, markerOptions,
+  //            std::make_shared<MarkerOptions>());
+
+ protected:
+  std::shared_ptr<MarkerMaterialOverride> _material_override =
+      std::make_shared<MarkerMaterialOverride>();
   std::shared_ptr<VisualizationMarkerArray> _marker_array =
       node()->create<VisualizationMarkerArray>(_material_override);
   void update(const visualization_msgs::Marker &marker) {
@@ -83,21 +83,19 @@ protected:
   }
   MarkerDisplayBase() {}
 
-public:
-  PROPERTY(std::shared_ptr<MaterialOverride>, materialOverride,
+ public:
+  PROPERTY(std::shared_ptr<MarkerMaterialOverride>, materialOverride,
            _material_override);
 };
 DECLARE_TYPE(MarkerDisplayBase, MeshDisplayBase);
 
 class MarkerFrameDisplayBase : public GenericFrameDisplay<MarkerDisplayBase> {
-
-public:
+ public:
   // PROPERTY(Pose, transform);
 };
 
 class MarkerDisplay : public MarkerDisplayBase {
-
-public:
+ public:
   PROPERTY(TopicProperty<visualization_msgs::Marker>, topic,
            "visualization_marker");
   MarkerDisplay();
@@ -105,8 +103,7 @@ public:
 DECLARE_TYPE_C(MarkerDisplay, MarkerDisplayBase, Marker);
 
 class MarkerArrayDisplay : public MarkerDisplayBase {
-
-public:
+ public:
   PROPERTY(TopicProperty<visualization_msgs::MarkerArray>, topic,
            "visualization_marker_array");
   MarkerArrayDisplay();

@@ -1,5 +1,0 @@
-<map id="InteractiveMarkerArray" name="InteractiveMarkerArray">
-<area shape="rect" id="node2" href="$classSceneNode.html" title="SceneNode" alt="" coords="47,103,138,130"/>
-<area shape="rect" id="node4" href="$classEvent.html" title="Event\&lt; void(const visualization\l_msgs::InteractiveMarkerFeedback &amp;)\&gt;" alt="" coords="163,96,415,137"/>
-<area shape="rect" id="node5" href="$classEventBase.html" title="EventBase" alt="" coords="245,13,332,39"/>
-</map>

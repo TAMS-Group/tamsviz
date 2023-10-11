@@ -63,6 +63,7 @@ void VisualizationMarker::update(const visualization_msgs::Marker &marker) {
   _type = marker.type;
   _color = Color4(1, 1, 1, 1);
   _render_options = RenderOptions();
+  // _material_flags = 0;
   _text.clear();
   double radius = marker.scale.x * 0.5;
   switch (marker.type) {
@@ -348,6 +349,9 @@ void VisualizationMarker::update(const visualization_msgs::Marker &marker) {
       }
       _pose = Eigen::Scaling(toVector3d(marker.scale));
       _render_options.double_sided = true;
+      // if (marker.text == "tamsviz_glow") {
+      //   _material_flags |= 32;
+      // }
       break;
     }
     case visualization_msgs::Marker::TEXT_VIEW_FACING: {
@@ -402,6 +406,7 @@ void VisualizationMarker::renderSync(const RenderSyncContext &context) {
       if (auto r = std::dynamic_pointer_cast<MeshRenderer>(_renderer)) {
         r->options() = _render_options;
         // r->materialRenderer()->block().flags |= 4;
+        // r->materialRenderer()->block().flags = _material_flags;
       }
       if (auto r = std::dynamic_pointer_cast<TextRenderer>(_renderer)) {
         r->text(_text);
@@ -428,6 +433,14 @@ void VisualizationMarkerArray::_update_nolock(
   if (marker.action == visualization_msgs::Marker::DELETEALL) {
     _markers.clear();
   }
+}
+
+void MarkerMaterialOverride::applySync(MaterialBlock &block) const {
+  MaterialOverride::applySync(block);
+  auto updateFlag = [](uint32_t &flags, uint32_t mask, bool value) {
+    flags = ((flags & ~mask) | (value ? mask : 0));
+  };
+  updateFlag(block.flags, 32, vertexGlow());
 }
 
 void VisualizationMarkerArray::update(
