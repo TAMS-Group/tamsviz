@@ -34,7 +34,7 @@ void InteractiveMarkerControl::update(
   _markers.resize(message.markers.size());
   for (size_t i = 0; i < message.markers.size(); i++) {
     if (!_markers.at(i)) {
-      _markers.at(i) = create<VisualizationMarker>();
+      _markers.at(i) = create<VisualizationMarker>(_params->material_override);
     }
     _markers.at(i)->update(message.markers[i]);
   }
@@ -275,6 +275,7 @@ std::shared_ptr<InteractiveMarker> InteractiveMarkerArray::marker(
 InteractiveMarkerDisplayBase::InteractiveMarkerDisplayBase() {
   _params = std::make_shared<InteractiveMarkerParameters>();
   _params->description_material = std::make_shared<Material>();
+  _params->material_override = materialOverride();
   _markers = node()->create<InteractiveMarkerArray>(_params);
 }
 

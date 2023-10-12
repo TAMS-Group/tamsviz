@@ -63,6 +63,15 @@ void main() {
 
     bool unlit = (((material.flags & 2) != 0) || (x_extra.z > 0.1) || (material.metallic < 0.0));
 
+    if (x_extra.z > 0.1 && glow) {
+        vec3 v = x_color.rgb;
+        v = max(vec3(0.0), v);
+        v *= v;
+        out_color.rgb = v.rgb;
+        out_color.a = x_color.a;
+        return;
+    }
+
     out_blend = vec4(alpha, 0.0, 0.0, 1.0);
     if(material.color_texture != 0) {
 
@@ -313,6 +322,7 @@ void main() {
     out_color = vec4(lighting, alpha);
 
     if (glow) {
+        // out_color = max(vec4(0.0), out_color);
         vec3 v = x_color.rgb;
         v = max(vec3(0.0), v);
         v *= v;

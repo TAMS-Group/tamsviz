@@ -26,6 +26,7 @@ struct InteractiveMarkerParameters {
   double description_size = 1.0;
   Eigen::Vector2d description_offset = Eigen::Vector2d::Zero();
   std::shared_ptr<Material> description_material;
+  std::shared_ptr<MaterialOverride> material_override;
 };
 
 class InteractiveMarkerControl : public SceneNode {
@@ -37,7 +38,7 @@ class InteractiveMarkerControl : public SceneNode {
   std::string _name;
   std::shared_ptr<InteractiveMarkerParameters> _params;
 
-public:
+ public:
   InteractiveMarkerControl(
       const visualization_msgs::InteractiveMarkerControl &message,
       const std::shared_ptr<InteractiveMarkerParameters> &params,
@@ -58,7 +59,7 @@ class InteractiveMarker : public SceneNode {
   std::shared_ptr<InteractiveMarkerParameters> _params;
   double _scale = 1.0;
 
-public:
+ public:
   InteractiveMarker(const visualization_msgs::InteractiveMarker &message,
                     const std::shared_ptr<InteractiveMarkerParameters> &params,
                     InteractiveMarkerArray *parent);
@@ -75,7 +76,7 @@ class InteractiveMarkerArray : public SceneNode {
   std::map<std::string, std::shared_ptr<InteractiveMarker>> _markers;
   std::shared_ptr<InteractiveMarkerParameters> _params;
 
-public:
+ public:
   InteractiveMarkerArray(
       const std::shared_ptr<InteractiveMarkerParameters> &params);
   void init(const visualization_msgs::InteractiveMarkerInit &message);
@@ -86,7 +87,7 @@ public:
 };
 
 class InteractiveMarkerDisplayBase : public MeshDisplayBase {
-protected:
+ protected:
   std::shared_ptr<InteractiveMarkerParameters> _params;
   std::shared_ptr<InteractiveMarkerArray> _markers;
   InteractiveMarkerDisplayBase();
@@ -94,8 +95,10 @@ protected:
   visualization_msgs::InteractiveMarker makePoseMarker();
   visualization_msgs::InteractiveMarker makeRotationMarker();
 
-public:
+ public:
   virtual void renderSync(const RenderSyncContext &context) override;
+  PROPERTY(std::shared_ptr<MaterialOverride>, materialOverride,
+           std::make_shared<MaterialOverride>());
 };
 DECLARE_TYPE(InteractiveMarkerDisplayBase, MeshDisplayBase);
 
@@ -109,7 +112,7 @@ class InteractiveMarkerDisplay : public InteractiveMarkerDisplayBase {
       _publisher;
   static std::vector<std::string> listTopicNamespaces();
 
-public:
+ public:
   PROPERTY(
       std::string, topicNamespace, "", list = [](const Property &property) {
         return InteractiveMarkerDisplay::listTopicNamespaces();
@@ -133,7 +136,7 @@ class InteractivePoseDisplayBase : public InteractiveMarkerDisplayBase {
   };
   std::shared_ptr<PublishThreadData> _publish_thread_data;
 
-protected:
+ protected:
   InteractivePoseDisplayBase();
   ~InteractivePoseDisplayBase();
   Watcher _publish_watcher;
@@ -145,7 +148,7 @@ protected:
         .count();
   };
 
-public:
+ public:
   PROPERTY(Frame, frame);
   PROPERTY(Pose, transform);
   PROPERTY(double, scale, 1.0, min = 0.0);
