@@ -18,6 +18,7 @@
 #include "searchwidget.h"
 #include "splitwindow.h"
 #include "timeline.h"
+#include "filewidget.h"
 
 #include <ros/package.h>
 #include <ros/ros.h>
@@ -154,9 +155,9 @@ void MainWindow::findAndOpenBag(const std::string &name) {
     }
   }
   {
-    QString path = QFileDialog::getOpenFileName(this, tr("Locate Bag File"),
-                                                QString::fromStdString(name),
-                                                tr("Bags (*.bag)"));
+    QString path = QFileDialog::getOpenFileName(
+        this, tr("Locate Bag File"), QString::fromStdString(name),
+        tr("Bags (*.bag)"), nullptr, QFileDialog::DontUseNativeDialog);
     if (path.isNull()) {
       return;
     }
@@ -170,7 +171,8 @@ void MainWindow::openBrowse() {
   QString path = QFileDialog::getOpenFileName(
       this, tr("Open File"), QString(),
       tr("Supported file types (*.tmv *.bag);;Documents (*.tmv);;Bags "
-         "(*.bag)"));
+         "(*.bag)"),
+      nullptr, QFileDialog::DontUseNativeDialog);
   if (path.isNull()) {
     return;
   }
@@ -329,7 +331,6 @@ MainWindow *g_main_window_instance = nullptr;
 MainWindow *MainWindow::instance() { return g_main_window_instance; }
 
 MainWindow::MainWindow(bool embedded) {
-
   this->embedded = embedded;
 
   g_main_window_instance = this;
@@ -382,12 +383,16 @@ MainWindow::MainWindow(bool embedded) {
   search_widget->hide();
   search_widget->toggleViewAction()->setIcon(QIcon::fromTheme("edit-find"));
 
+  auto *file_widget = new FileWidget();
+  addDockWidget(Qt::RightDockWidgetArea, file_widget);
+  file_widget->hide();
+  file_widget->toggleViewAction()->setIcon(QIcon::fromTheme("folder"));
+
   menuBar()->setNativeMenuBar(false);
   auto *toolbar = addToolBar(tr("Tools"));
   toolbar->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
 
   if (!embedded) {
-
     auto setupAction = [&](QAction *item, const std::function<void()> &callback,
                            const std::function<bool()> &predicate) {
       if (callback) {
@@ -454,7 +459,7 @@ MainWindow::MainWindow(bool embedded) {
     {
       auto *menu = menuBar()->addMenu(tr("&Edit"));
       createMenuAndToolbarItem(
-          menu, "&Undo", // FA_S_ICON("undo", 0.15),
+          menu, "&Undo",  // FA_S_ICON("undo", 0.15),
           QIcon::fromTheme("edit-undo"),
           [this]() {
             LockScope ws;
@@ -467,7 +472,7 @@ MainWindow::MainWindow(bool embedded) {
           })
           ->setShortcut(QKeySequence(Qt::CTRL + Qt::Key_Z));
       createMenuAndToolbarItem(
-          menu, "&Redo", // FA_S_ICON("redo", 0.15),
+          menu, "&Redo",  // FA_S_ICON("redo", 0.15),
           QIcon::fromTheme("edit-redo"),
           [this]() {
             LockScope ws;
@@ -481,7 +486,7 @@ MainWindow::MainWindow(bool embedded) {
           ->setShortcuts({QKeySequence(Qt::CTRL + Qt::Key_Y),
                           QKeySequence(Qt::CTRL + Qt::SHIFT + Qt::Key_Z)});
       createMenuAndToolbarItem(
-          menu, "&Copy", // FA_R_ICON("copy"),
+          menu, "&Copy",  // FA_R_ICON("copy"),
           QIcon::fromTheme("edit-copy"),
           [this]() {
             LOG_INFO("copy to clipboard");
@@ -587,7 +592,7 @@ MainWindow::MainWindow(bool embedded) {
         update_paste();
       }
       createMenuAndToolbarItem(
-          menu, "&Delete", // FA_R_ICON("trash-alt"),
+          menu, "&Delete",  // FA_R_ICON("trash-alt"),
           QIcon::fromTheme("edit-delete"),
           [this]() {
             LOG_INFO("delete");
@@ -628,6 +633,7 @@ MainWindow::MainWindow(bool embedded) {
           ->setShortcut(QKeySequence(Qt::Key_F5));
     }
     toolbar->addAction(search_widget->toggleViewAction());
+    toolbar->addAction(file_widget->toggleViewAction());
 
     {
       auto *menu = menuBar()->addMenu(tr("&Windows"));

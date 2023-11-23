@@ -113,6 +113,7 @@ add_library(${LIBRARY_NAME}
     src/displays/text.cpp
     src/displays/transform.cpp
     src/gui/displaytree.cpp
+    src/gui/filewidget.cpp
     src/gui/guicommon.cpp
     src/gui/imagewindow.cpp
     src/gui/mainwindow.cpp
