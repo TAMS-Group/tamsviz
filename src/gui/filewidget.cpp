@@ -40,13 +40,43 @@ void FileWidget::showEvent(QShowEvent* event) {
     tree_widget->header()->setSectionHidden(1, true);
     tree_widget->header()->setSectionHidden(2, true);
     tree_widget->header()->resizeSection(0, 500);
-    connect(tree_widget, &QTreeView::doubleClicked,
-            [](const QModelIndex& index) {
-              auto* file_model = (const QFileSystemModel*)index.model();
-              auto file_path = file_model->filePath(index);
-              LOG_INFO("open " << file_path.toStdString());
-              MainWindow::instance()->openAny(file_path);
+    static const auto file_path = [](const QModelIndex& index) {
+      auto* file_model = (const QFileSystemModel*)index.model();
+      auto file_path = file_model->filePath(index);
+      return file_path;
+    };
+    static const auto open_file = [](const QModelIndex& index) {
+      MainWindow::instance()->openAny(file_path(index));
+    };
+    connect(tree_widget, &QTreeView::doubleClicked, open_file);
+    // connect(tree_widget, &QTreeView::clicked, [](const QModelIndex& index)
+    // {});
+    tree_widget->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(tree_widget, &QTreeView::customContextMenuRequested,
+            [tree_widget](const QPoint& point) {
+              QModelIndex index = tree_widget->indexAt(point);
+              if (index.isValid()) {
+                QMenu menu;
+                menu.addAction("Open", [index]() { open_file(index); });
+                menu.addAction("Copy file path", [index]() {
+                  QGuiApplication::clipboard()->setText(file_path(index));
+                });
+                menu.addAction("Copy file name", [index]() {
+                  QGuiApplication::clipboard()->setText(
+                      QFileInfo(file_path(index)).fileName());
+                });
+                menu.exec(tree_widget->viewport()->mapToGlobal(point));
+              }
             });
+    // {
+    //   auto* action = new QAction("Open");
+    //   connect(action, &QAction::triggered, [tree_widget]() {
+    //     auto l = tree_widget->selec();
+    //     if (l.size() == 1) {
+    //     }
+    //   });
+    //   tree_widget->addAction(action);
+    // }
 
     auto update_filters = [file_model](const QString& filter = "") {
       if (filter.isEmpty()) {
