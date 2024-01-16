@@ -200,7 +200,8 @@ bool MainWindow::closeDocument() {
   if ((ws->saved_document !=
        Snapshot<std::shared_ptr<Document>>::save(
            ws->document(), ws->saved_document, nullptr)) &&
-      !embedded) {
+      (ws->history->canUndo() || ws->history->canRedo()) && !embedded) {
+    // if ((ws->history->canUndo() || ws->history->canRedo()) && !embedded) {
     auto rs = QMessageBox::question(
         this, tr("Save changes?"),
         tr("The current document has been modified. Do "

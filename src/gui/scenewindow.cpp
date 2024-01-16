@@ -18,7 +18,6 @@
 SceneWindow::SceneWindow()
     : _uniform_buffer(
           new UniformBuffer<CameraBlock>((size_t)UniformBindingPoint::camera)) {
-
   {
     auto *button = new FlatButton();
     button->setText("Annotate");
@@ -32,75 +31,75 @@ SceneWindow::SceneWindow()
       }
       QString label = type->name().c_str();
       label = label.replace("SceneAnnotation", "");
-      connect(menu->addAction(label), &QAction::triggered, this,
-              [type, label, button, this](bool checked) {
-                ActionScope ws("Annotate");
-                if (!ws->player) {
-                  return;
-                }
-                auto timeline = ws->document()->timeline();
-                if (!timeline) {
-                  return;
-                }
-                double current_time = ws->player->time();
-                std::shared_ptr<AnnotationTrack> current_track =
-                    ws->currentAnnotationTrack().resolve(ws());
-                if (!current_track) {
-                  for (auto &track_base : timeline->tracks()) {
-                    if (auto track = std::dynamic_pointer_cast<AnnotationTrack>(
-                            track_base)) {
-                      if (auto branch = track->branch(ws(), false)) {
-                        for (auto &span : branch->spans()) {
-                          if (span->start() <= current_time &&
-                              span->start() + span->duration() >=
-                                  current_time) {
-                            current_track = track;
-                            break;
-                          }
-                        }
-                        if (current_track) {
-                          break;
-                        }
+      connect(
+          menu->addAction(label), &QAction::triggered, this,
+          [type, label, button, this](bool checked) {
+            ActionScope ws("Annotate");
+            if (!ws->player) {
+              return;
+            }
+            auto timeline = ws->document()->timeline();
+            if (!timeline) {
+              return;
+            }
+            double current_time = ws->player->time();
+            std::shared_ptr<AnnotationTrack> current_track =
+                ws->currentAnnotationTrack().resolve(ws());
+            if (!current_track) {
+              for (auto &track_base : timeline->tracks()) {
+                if (auto track = std::dynamic_pointer_cast<AnnotationTrack>(
+                        track_base)) {
+                  if (auto branch = track->branch(ws(), false)) {
+                    for (auto &span : branch->spans()) {
+                      if (span->start() <= current_time &&
+                          span->start() + span->duration() >= current_time) {
+                        current_track = track;
+                        break;
                       }
                     }
-                  }
-                }
-                if (!current_track) {
-                  for (auto &track_base : timeline->tracks()) {
-                    if (auto track = std::dynamic_pointer_cast<AnnotationTrack>(
-                            track_base)) {
-                      current_track = track;
+                    if (current_track) {
                       break;
                     }
                   }
                 }
-                if (!current_track) {
-                  timeline->tracks().push_back(
-                      current_track = std::make_shared<AnnotationTrack>());
+              }
+            }
+            if (!current_track) {
+              for (auto &track_base : timeline->tracks()) {
+                if (auto track = std::dynamic_pointer_cast<AnnotationTrack>(
+                        track_base)) {
+                  current_track = track;
+                  break;
                 }
-                ws->currentAnnotationTrack() = current_track;
-                std::shared_ptr<AnnotationSpan> current_span;
-                if (auto branch = current_track->branch(ws(), false)) {
-                  for (auto &span : branch->spans()) {
-                    if (span->start() <= current_time &&
-                        span->start() + span->duration() >= current_time) {
-                      current_span = span;
-                      break;
-                    }
-                  }
+              }
+            }
+            if (!current_track) {
+              timeline->tracks().push_back(
+                  current_track = std::make_shared<AnnotationTrack>());
+            }
+            ws->currentAnnotationTrack() = current_track;
+            std::shared_ptr<AnnotationSpan> current_span;
+            if (auto branch = current_track->branch(ws(), false)) {
+              for (auto &span : branch->spans()) {
+                if (span->start() <= current_time &&
+                    span->start() + span->duration() >= current_time) {
+                  current_span = span;
+                  break;
                 }
-                if (current_span == nullptr) {
-                  current_span = std::make_shared<AnnotationSpan>();
-                  current_span->start() = current_time;
-                  current_span->duration() = 0.1;
-                  current_track->branch(ws(), true)
-                      ->spans()
-                      .push_back(current_span);
-                }
-                auto annotation = type->instantiate<SceneAnnotationBase>();
-                current_span->annotations().push_back(annotation);
-                ws->modified();
-              });
+              }
+            }
+            if (current_span == nullptr) {
+              current_span = std::make_shared<AnnotationSpan>();
+              current_span->start() = current_time;
+              current_span->duration() = 0.1;
+              current_track->branch(ws(), true)
+                  ->spans()
+                  .push_back(current_span);
+            }
+            auto annotation = type->instantiate<SceneAnnotationBase>();
+            current_span->annotations().push_back(annotation);
+            ws->modified();
+          });
     }
   }
 }
@@ -135,17 +134,16 @@ void SceneWindow::renderWindowSync(const RenderWindowSyncContext &context) {
 
   if (auto rendering_component = std::dynamic_pointer_cast<RenderingComponent>(
           ws->document()->display()->rendering())) {
-
     _multi_sampling = rendering_component->multiSampling();
 
     switch (rendering_component->sampleShading()) {
-    case 1:
-      _camera_block.flags |= CameraBlock::SampleShadingFlag;
-      break;
-    case 2:
-      _camera_block.flags |= CameraBlock::SampleShadingFlag;
-      _camera_block.flags |= CameraBlock::TransparentSampleShadingFlag;
-      break;
+      case 1:
+        _camera_block.flags |= CameraBlock::SampleShadingFlag;
+        break;
+      case 2:
+        _camera_block.flags |= CameraBlock::SampleShadingFlag;
+        _camera_block.flags |= CameraBlock::TransparentSampleShadingFlag;
+        break;
     }
   } else {
     // LOG_ERROR_THROTTLE(1, "document broken, no rendering component");
@@ -189,68 +187,68 @@ void SceneWindow::pushAction(
 }
 
 void SceneWindow::handleEvent(QEvent *event) {
-
   switch (event->type()) {
-  case QEvent::Wheel: {
-
-    LockScope ws;
-    auto *wheel = static_cast<QWheelEvent *>(event);
-    double degrees = wheel->angleDelta().y() * (1.0 / 8);
-    double exponent = degrees / 90;
-    double factor = std::pow(0.5, exponent);
-    viewPosition() = (viewPosition() - viewTarget()) * factor + viewTarget();
-    ws->modified();
-    GlobalEvents::instance()->redraw();
-    break;
-  }
-  case QEvent::MouseButtonPress: {
-    LOG_DEBUG("press");
-    auto *mouse = static_cast<QMouseEvent *>(event);
-    {
+    case QEvent::Wheel: {
       LockScope ws;
-      _mouse_position = mouse->pos();
-      _mouse_buttons = mouse->buttons();
+      auto *wheel = static_cast<QWheelEvent *>(event);
+      double degrees = wheel->angleDelta().y() * (1.0 / 8);
+      double exponent = degrees / 90;
+      double factor = std::pow(0.5, exponent);
+      viewPosition() = (viewPosition() - viewTarget()) * factor + viewTarget();
+      ws->modified();
       GlobalEvents::instance()->redraw();
+      break;
     }
-    if (mouse->button() == Qt::LeftButton) {
-      _left_dragged = false;
-      int x = mouse->x();
-      int y = mouse->y();
-      pushAction([this, x, y](const RenderWindowAsyncContext &context) {
-        auto pick_result = context.renderer->pick(
-            renderTarget(), _camera_block, *context.render_list, x,
-            (int)renderTarget()._height - 1 - y);
-        _pick_depth = pick_result.depth;
-        _pick_id = pick_result.id;
-        _picked.reset();
+    case QEvent::MouseButtonPress: {
+      LOG_DEBUG("press");
+      auto *mouse = static_cast<QMouseEvent *>(event);
+      {
         LockScope ws;
-        _picked = ws->document()->display();
-        if (pick_result.id) {
-          {
-            ws->document()->display()->recurseDisplays(
-                [&](const std::shared_ptr<Display> &display) {
-                  if (display->pick(pick_result.id)) {
-                    LOG_DEBUG("pick Display");
-                    _picked = display;
-                  }
-                });
-          }
-          {
-            if (ws->player && ws->document()->timeline()) {
-              auto current_time = ws->player->time();
-              for (auto &track : ws->document()->timeline()->tracks()) {
-                if (auto annotation_track =
-                        std::dynamic_pointer_cast<AnnotationTrack>(track)) {
-                  if (auto branch = annotation_track->branch(ws(), false)) {
-                    for (auto &span : branch->spans()) {
-                      if (span->start() <= current_time &&
-                          span->start() + span->duration() >= current_time) {
-                        for (auto &annotation : span->annotations()) {
-                          if (auto scene_annotation = std::dynamic_pointer_cast<
-                                  SceneAnnotationBase>(annotation)) {
-                            if (scene_annotation->pick(pick_result.id)) {
-                              LOG_DEBUG("pick SceneAnnotationBase");
-                              _picked = scene_annotation;
+        _mouse_position = mouse->pos();
+        _mouse_buttons = mouse->buttons();
+        GlobalEvents::instance()->redraw();
+      }
+      if (mouse->button() == Qt::LeftButton) {
+        _left_dragged = false;
+        int x = mouse->x();
+        int y = mouse->y();
+        pushAction([this, x, y](const RenderWindowAsyncContext &context) {
+          auto pick_result = context.renderer->pick(
+              renderTarget(), _camera_block, *context.render_list, x,
+              (int)renderTarget()._height - 1 - y);
+          _pick_depth = pick_result.depth;
+          _pick_id = pick_result.id;
+          _picked.reset();
+          LockScope ws;
+          _picked = ws->document()->display();
+          if (pick_result.id) {
+            {
+              ws->document()->display()->recurseDisplays(
+                  [&](const std::shared_ptr<Display> &display) {
+                    if (display->pick(pick_result.id)) {
+                      LOG_DEBUG("pick Display");
+                      _picked = display;
+                    }
+                  });
+            }
+            {
+              if (ws->player && ws->document()->timeline()) {
+                auto current_time = ws->player->time();
+                for (auto &track : ws->document()->timeline()->tracks()) {
+                  if (auto annotation_track =
+                          std::dynamic_pointer_cast<AnnotationTrack>(track)) {
+                    if (auto branch = annotation_track->branch(ws(), false)) {
+                      for (auto &span : branch->spans()) {
+                        if (span->start() <= current_time &&
+                            span->start() + span->duration() >= current_time) {
+                          for (auto &annotation : span->annotations()) {
+                            if (auto scene_annotation =
+                                    std::dynamic_pointer_cast<
+                                        SceneAnnotationBase>(annotation)) {
+                              if (scene_annotation->pick(pick_result.id)) {
+                                LOG_DEBUG("pick SceneAnnotationBase");
+                                _picked = scene_annotation;
+                              }
                             }
                           }
                         }
@@ -261,90 +259,89 @@ void SceneWindow::handleEvent(QEvent *event) {
               }
             }
           }
-        }
-      });
-      GlobalEvents::instance()->redraw();
+        });
+        GlobalEvents::instance()->redraw();
+      }
+      break;
     }
-    break;
-  }
-  case QEvent::MouseButtonRelease: {
-    _mouse_buttons = 0;
-    auto *mouse = static_cast<QMouseEvent *>(event);
-    if (mouse->button() == Qt::LeftButton && !_left_dragged) {
-      auto modifiers = mouse->modifiers();
-      pushAction([this, modifiers](const RenderWindowAsyncContext &context) {
-        auto picked = _picked.lock();
-        startOnMainThreadAsync([picked, modifiers]() {
+    case QEvent::MouseButtonRelease: {
+      _mouse_buttons = 0;
+      auto *mouse = static_cast<QMouseEvent *>(event);
+      if (mouse->button() == Qt::LeftButton && !_left_dragged) {
+        auto modifiers = mouse->modifiers();
+        pushAction([this, modifiers](const RenderWindowAsyncContext &context) {
+          auto picked = _picked.lock();
+          startOnMainThreadAsync([picked, modifiers]() {
+            LockScope ws;
+            auto s = ws->selection();
+            LOG_DEBUG("modifiers " << modifiers);
+            if ((modifiers & Qt::ShiftModifier) == Qt::ShiftModifier) {
+              s.add(picked);
+            } else if ((modifiers & Qt::ControlModifier) ==
+                       Qt::ControlModifier) {
+              s.toggle(picked);
+            } else {
+              s = picked;
+            }
+            if (s != ws->selection()) {
+              // ActionScope ws("Pick");
+              ws->selection() = s;
+              ws->modified();
+            }
+          });
+        });
+        GlobalEvents::instance()->redraw();
+      }
+      break;
+    }
+    case QEvent::MouseMove: {
+      auto *mouse = static_cast<QMouseEvent *>(event);
+      if (event->type() == QEvent::MouseMove && mouse->buttons() != 0 &&
+          mouse->buttons() == _mouse_buttons) {
+        if (mouse->buttons() == Qt::LeftButton) {
+          _left_dragged = true;
+        }
+        if (mouse->buttons() == Qt::RightButton) {
           LockScope ws;
-          auto s = ws->selection();
-          LOG_DEBUG("modifiers " << modifiers);
-          if ((modifiers & Qt::ShiftModifier) == Qt::ShiftModifier) {
-            s.add(picked);
-          } else if ((modifiers & Qt::ControlModifier) == Qt::ControlModifier) {
-            s.toggle(picked);
-          } else {
-            s = picked;
-          }
-          if (s != ws->selection()) {
-            ActionScope ws("Pick");
-            ws->selection() = s;
+          QPoint d = mouse->pos() - _mouse_position;
+          double s =
+              1.0f / std::tan((double)(fieldOfView() * M_PI / 180) * 0.5);
+          double meters_per_pixel = (viewTarget() - viewPosition()).norm() /
+                                    std::sqrt(1.0 * width() * height()) / s * 2;
+          double dx = d.x() * meters_per_pixel;
+          double dy = d.y() * meters_per_pixel;
+          Eigen::Vector3d mx = (viewTarget() - viewPosition())
+                                   .cross(Eigen::Vector3d::UnitZ())
+                                   .normalized() *
+                               -dx;
+          Eigen::Vector3d my = (viewTarget() - viewPosition())
+                                   .cross(Eigen::Vector3d::UnitZ())
+                                   .cross(viewTarget() - viewPosition())
+                                   .normalized() *
+                               dy;
+          viewTarget() += mx + my;
+          viewPosition() += mx + my;
+          if (event->type() == QEvent::MouseButtonRelease) {
             ws->modified();
           }
-        });
-      });
-      GlobalEvents::instance()->redraw();
-    }
-    break;
-  }
-  case QEvent::MouseMove: {
-    auto *mouse = static_cast<QMouseEvent *>(event);
-    if (event->type() == QEvent::MouseMove && mouse->buttons() != 0 &&
-        mouse->buttons() == _mouse_buttons) {
-      if (mouse->buttons() == Qt::LeftButton) {
-        _left_dragged = true;
-      }
-      if (mouse->buttons() == Qt::RightButton) {
-
-        LockScope ws;
-        QPoint d = mouse->pos() - _mouse_position;
-        double s = 1.0f / std::tan((double)(fieldOfView() * M_PI / 180) * 0.5);
-        double meters_per_pixel = (viewTarget() - viewPosition()).norm() /
-                                  std::sqrt(1.0 * width() * height()) / s * 2;
-        double dx = d.x() * meters_per_pixel;
-        double dy = d.y() * meters_per_pixel;
-        Eigen::Vector3d mx = (viewTarget() - viewPosition())
-                                 .cross(Eigen::Vector3d::UnitZ())
-                                 .normalized() *
-                             -dx;
-        Eigen::Vector3d my = (viewTarget() - viewPosition())
-                                 .cross(Eigen::Vector3d::UnitZ())
-                                 .cross(viewTarget() - viewPosition())
-                                 .normalized() *
-                             dy;
-        viewTarget() += mx + my;
-        viewPosition() += mx + my;
-        if (event->type() == QEvent::MouseButtonRelease) {
-          ws->modified();
+          GlobalEvents::instance()->redraw();
         }
-        GlobalEvents::instance()->redraw();
-      }
-      if (mouse->buttons() == Qt::MiddleButton) {
-
-        LockScope ws;
-        QPoint d = mouse->pos() - _mouse_position;
-        double exponent = d.y() * 0.01;
-        double factor = std::pow(0.5, exponent);
-        viewPosition() =
-            (viewPosition() - viewTarget()) * factor + viewTarget();
-        if (event->type() == QEvent::MouseButtonRelease) {
-          ws->modified();
+        if (mouse->buttons() == Qt::MiddleButton) {
+          LockScope ws;
+          QPoint d = mouse->pos() - _mouse_position;
+          double exponent = d.y() * 0.01;
+          double factor = std::pow(0.5, exponent);
+          viewPosition() =
+              (viewPosition() - viewTarget()) * factor + viewTarget();
+          if (event->type() == QEvent::MouseButtonRelease) {
+            ws->modified();
+          }
+          GlobalEvents::instance()->redraw();
         }
-        GlobalEvents::instance()->redraw();
       }
+      _mouse_position = mouse->pos();
+      break;
     }
-    _mouse_position = mouse->pos();
-    break;
-  }
   }
   if (((event->type() == QEvent::MouseButtonPress ||
         event->type() == QEvent::MouseButtonDblClick) &&
@@ -403,11 +400,12 @@ void SceneWindow::handleEvent(QEvent *event) {
               if (auto p =
                       std::dynamic_pointer_cast<SceneAnnotationBase>(picked)) {
                 LOG_DEBUG("SceneAnnotationBase::interact");
+                ActionScope ws("Interact");
                 interactive = p->interact(_interaction);
               }
-              if (_interaction.finished) {
-                ActionScope ws("Interact");
-              }
+              // if (_interaction.finished) {
+              //   ActionScope ws("Interact");
+              // }
             }
             if (!interactive) {
               interact(_interaction);
