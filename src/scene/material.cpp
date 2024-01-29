@@ -102,7 +102,7 @@ void MaterialOverride::applySync(MaterialBlock &block) const {
     block.metallic = (float)material()->metallic();
     if (material()->unlit()) block.metallic = -1;
   }
-  block.color.w() = (float)material()->opacity();
+  block.color.w() *= (float)material()->opacity();
 }
 
 void MaterialRenderer::updateSync(const MaterialOverride &material_override) {
