@@ -170,14 +170,14 @@ struct RobotModel {
                   if (ai_scene) {
                     if (!import_options.recomputeNormals() &&
                         import_options.smoothNormals()) {
-                      bool has_normapmaps = false;
+                      bool has_normalmaps = false;
                       for (size_t i = 0; i < ai_scene->mNumMaterials; i++) {
                         if (ai_scene->mMaterials[i]->GetTextureCount(
                                 aiTextureType_NORMALS) > 0) {
-                          has_normapmaps = true;
+                          has_normalmaps = true;
                         }
                       }
-                      if (!has_normapmaps) {
+                      if (!has_normalmaps) {
                         ai_importer.FreeScene();
                         ai_importer.SetPropertyInteger(
                             AI_CONFIG_PP_RVC_FLAGS,
@@ -255,7 +255,9 @@ struct RobotModel {
                                       << ai_mesh->mFaces[i].mNumIndices);
                           }
                         }
-                        // mesh_data.computeNormals();
+                        if (import_options.recomputeNormals()) {
+                          mesh_data.computeNormals();
+                        }
                         if (mesh_data.indices.empty() ||
                             mesh_data.positions.empty()) {
                           LOG_WARN("empty mesh " << urdf_mesh->filename << " "
