@@ -10,7 +10,6 @@
 #include <boost/thread.hpp>
 
 struct TopicRegistry {
-
   std::unordered_map<std::string, std::weak_ptr<Topic>> topic_map;
   std::mutex topic_map_mutex;
 
@@ -23,9 +22,9 @@ struct TopicRegistry {
   }
 };
 
-std::shared_ptr<MessageType>
-MessageType::instance(const std::string &hash, const std::string &name,
-                      const std::string &definition) {
+std::shared_ptr<MessageType> MessageType::instance(
+    const std::string &hash, const std::string &name,
+    const std::string &definition) {
   static std::map<std::string, std::shared_ptr<MessageType>> _cache;
   static std::mutex _mutex;
   std::lock_guard<std::mutex> lock(_mutex);
@@ -40,8 +39,8 @@ MessageType::instance(const std::string &hash, const std::string &name,
   return instance;
 }
 
-std::vector<std::string>
-TopicManager::listTopics(const std::string &type_name) {
+std::vector<std::string> TopicManager::listTopics(
+    const std::string &type_name) {
   std::set<std::string> topic_set;
   {
     ros::master::V_TopicInfo ros_topics;
@@ -91,7 +90,7 @@ void Topic::_subscribe(const std::shared_ptr<Topic> &topic) {
   }
   topic->connected();
   topic->_ros_subscriber = _ros_node.subscribe<Message>(
-      topic->_topic_name, 5,
+      topic->_topic_name, 20,
       boost::function<void(const Message &)>([topic_weak](const Message &msg) {
         if (auto topic = topic_weak.lock()) {
           {

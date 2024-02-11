@@ -69,7 +69,11 @@ void VisualizationMarker::update(const visualization_msgs::Marker &marker) {
   switch (marker.type) {
     case visualization_msgs::Marker::POINTS:
     case visualization_msgs::Marker::SPHERE_LIST: {
-      if (_mesh_watcher.changed(marker.type, points, colors, color, radius)) {
+      bool changed =
+          _mesh_watcher.changed(marker.type, points, colors, color, radius);
+      LOG_DEBUG("point marker " << this << " " << marker.type << " "
+                                << points.size() << " " << changed);
+      if (changed) {
         _mesh = std::make_shared<Mesh>([marker, radius](MeshData &mesh) {
           for (size_t index = 0; index < marker.points.size(); index++) {
             auto p = toVector3f(marker.points.at(index));
