@@ -42,15 +42,15 @@ class TransformMessageListener : public TimeSeriesListener {
     }
   }
 
-public:
+ public:
   TransformMessageListener(
       const std::function<
           void(const std::shared_ptr<const geometry_msgs::TransformStamped> &)>
           &callback)
       : _callback(callback) {}
   TransformMessageListener(const TransformMessageListener &) = delete;
-  TransformMessageListener &
-  operator=(const TransformMessageListener &) = delete;
+  TransformMessageListener &operator=(const TransformMessageListener &) =
+      delete;
   virtual void push(const std::shared_ptr<const Message> &message,
                     int64_t start, int64_t end) override {
     PROFILER("TransformMessageListener");
@@ -92,8 +92,7 @@ static void normalizeFrameName(std::string &name) {
 }
 
 class FrameManager {
-
-public:
+ public:
   std::mutex _mutex;
   std::unordered_map<std::string, int64_t> _references;
   static std::shared_ptr<FrameManager> instance() {
@@ -210,7 +209,8 @@ struct Transformer::Data {
         std::unique_lock<std::mutex> lock(_mutex);
         auto parent = nameToIndexCreate(tf.header.frame_id);
         auto child = nameToIndexCreate(tf.child_frame_id);
-        if (parent != child) {
+        if (parent != child &&
+            !(_connections[parent][child].isApprox(transform))) {
           if ((parent < _poses.size() && (bool)_poses[parent]) !=
               (child < _poses.size() && (bool)_poses[child])) {
             _redraw = true;
@@ -435,8 +435,8 @@ Frame::~Frame() {
   }
 }
 
-Optional<Eigen::Isometry3d>
-Frame::pose(const std::shared_ptr<Transformer> &transformer) {
+Optional<Eigen::Isometry3d> Frame::pose(
+    const std::shared_ptr<Transformer> &transformer) {
   if (!_active) {
     _active = true;
     FrameManager::instance()->count(_name, +1);
