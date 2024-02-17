@@ -19,7 +19,7 @@ RenderWindowBase::RenderWindowBase() {
   class RenderWidget : public QOpenGLWidget {
     RenderWindowBase *_parent = nullptr;
 
-  public:
+   public:
     RenderWidget(RenderWindowBase *parent)
         : QOpenGLWidget(parent), _parent(parent) {}
     void initializeGL() override { V_GL(glClearColor(1, 1, 1, 1)); }
@@ -99,13 +99,20 @@ RenderWindowBase::RenderWindowBase() {
           std::string bagname = ws->player->fileName();
           for (auto &c : bagname) {
             if (!std::isalnum(c)) {
-              c = '_';
+              c = '-';
             }
           }
-          namesuggest = QFileInfo(ws->player->path().c_str())
-                            .absoluteDir()
-                            .filePath((bagname + "-" + namesuggest).c_str())
-                            .toStdString();
+          std::string tstr = std::to_string(ws->player->time());
+          for (auto &c : tstr) {
+            if (c == '.') {
+              c = '-';
+            }
+          }
+          namesuggest =
+              QFileInfo(ws->player->path().c_str())
+                  .absoluteDir()
+                  .filePath((bagname + "-" + tstr + "-" + namesuggest).c_str())
+                  .toStdString();
         }
       }
       QString file_name = QFileDialog::getSaveFileName(
