@@ -49,7 +49,7 @@ STRUCT_PROPERTY(smoothNormals);
 STRUCT_END();
 
 class RobotDisplayBase : public MeshDisplayBase {
-protected:
+ protected:
   std::shared_ptr<Loader<RobotModel>> _robot_model_loader;
   std::shared_ptr<RobotState> _robot_state;
   Eigen::Isometry3d pose_temp = Eigen::Isometry3d::Identity();
@@ -59,7 +59,7 @@ protected:
       std::make_shared<MaterialOverride>();
   RobotDisplayBase() {}
 
-public:
+ public:
   virtual void renderSync(const RenderSyncContext &context) override;
   virtual void renderAsync(const RenderAsyncContext &context) override;
   PROPERTY(std::shared_ptr<MaterialOverride>, materialOverride,
@@ -76,31 +76,31 @@ class RobotStateDisplayBase : public GenericFrameDisplay<RobotDisplayBase> {
   std::shared_ptr<TimeSeriesSubscriber> _subscriber;
   std::shared_ptr<RobotStateTimeSeriesListener> _listener;
 
-protected:
-  virtual void refreshTopic(const std::string &topic);
+ protected:
+  virtual void refreshTopic(const std::string &topic, bool visible = true);
   RobotStateDisplayBase() {}
 
-public:
+ public:
   virtual void renderSync(const RenderSyncContext &context) override;
 };
 DECLARE_TYPE_C(RobotStateDisplayBase, RobotDisplayBase, Robot);
 
 class RobotStateDisplay : public RobotStateDisplayBase {
-
-public:
-  PROPERTY(TopicProperty<sensor_msgs::JointState>, topic, "/joint_states");
+ public:
+  PROPERTY(TopicProperty<sensor_msgs::JointState>, topic,
+           TopicProperty<sensor_msgs::JointState>("/joint_states", false));
   virtual void refresh() override {
-    refreshTopic(topic().topic());
+    refreshTopic(topic().topic(), false);
     RobotStateDisplayBase::refresh();
   }
 };
 DECLARE_TYPE_C(RobotStateDisplay, RobotStateDisplayBase, Robot);
 
 class DisplayRobotStateDisplay : public GenericFrameDisplay<RobotDisplayBase> {
-
-public:
-  PROPERTY(TopicProperty<moveit_msgs::DisplayRobotState>, topic,
-           "/display_robot_state");
+ public:
+  PROPERTY(
+      TopicProperty<moveit_msgs::DisplayRobotState>, topic,
+      TopicProperty<moveit_msgs::DisplayRobotState>("/display_robot_state"));
   virtual void renderSync(const RenderSyncContext &context) override;
   virtual void renderAsync(const RenderAsyncContext &context) override;
 };
@@ -127,7 +127,7 @@ class RobotTrajectoryDisplay : public GenericFrameDisplay<RobotDisplayBase> {
   bool _play_trajectory = false;
   double _trajectory_time = 0;
 
-public:
+ public:
   PROPERTY(TopicProperty<moveit_msgs::DisplayTrajectory>, topic,
            "/move_group/display_planned_path");
   PROPERTY(int, maxSteps, 10, min = 1);
@@ -146,7 +146,7 @@ class Transformer;
 class RobotModelDisplay : public RobotDisplayBase {
   std::shared_ptr<Transformer> _transformer;
 
-public:
+ public:
   virtual void renderSync(const RenderSyncContext &context) override;
   virtual void renderAsync(const RenderAsyncContext &context) override;
 };

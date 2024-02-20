@@ -102,6 +102,7 @@ class FrameManager {
   void count(std::string name, int64_t d) {
     normalizeFrameName(name);
     if (!name.empty()) {
+      LOG_DEBUG("count frame " << name << " " << d);
       bool redraw = false;
       {
         std::lock_guard<std::mutex> lock(_mutex);
@@ -209,16 +210,19 @@ struct Transformer::Data {
         std::unique_lock<std::mutex> lock(_mutex);
         auto parent = nameToIndexCreate(tf.header.frame_id);
         auto child = nameToIndexCreate(tf.child_frame_id);
-        if (parent != child &&
-            !(_connections[parent][child].isApprox(transform))) {
-          if ((parent < _poses.size() && (bool)_poses[parent]) !=
-              (child < _poses.size() && (bool)_poses[child])) {
-            _redraw = true;
-          }
-          if ((_connections[parent][child].matrix() != transform.matrix()) &&
-              ((parent < _used.size() && _used[parent]) &&
-               (child < _used.size() && _used[child]))) {
-            _redraw = true;
+        if (parent != child) {
+          if (!(_connections[parent][child].isApprox(transform))) {
+            LOG_DEBUG("transform changed " << tf.header.frame_id << " "
+                                           << tf.child_frame_id);
+            if ((parent < _poses.size() && (bool)_poses[parent]) !=
+                (child < _poses.size() && (bool)_poses[child])) {
+              _redraw = true;
+            }
+            if ((_connections[parent][child].matrix() != transform.matrix()) &&
+                ((parent < _used.size() && _used[parent]) &&
+                 (child < _used.size() && _used[child]))) {
+              _redraw = true;
+            }
           }
           _connections[parent][child] = transform;
           _connections[child][parent] = transform_inverse;

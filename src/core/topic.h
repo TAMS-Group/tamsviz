@@ -17,11 +17,14 @@
 #include <unordered_map>
 #include <vector>
 
+class Topic;
+
 class TopicManager {
-public:
+ public:
   std::vector<std::string> listTopics(const std::string &type_name);
   std::vector<std::string> listTopics();
-  Event<void()> received{"received"};
+  Event<void(const Topic &, const std::shared_ptr<const Message> &message)>
+      received{"received"};
   static const std::shared_ptr<TopicManager> &instance();
 };
 
@@ -40,7 +43,7 @@ class Topic {
   static void _subscribe(const std::shared_ptr<Topic> &topic);
   static void _unsubscribe(const std::shared_ptr<Topic> &topic);
 
-public:
+ public:
   ~Topic();
   void countConnection(size_t d) { _connections += d; }
   void publish(const std::shared_ptr<const Message> &message);
@@ -62,18 +65,19 @@ class MessagePlaybackScope {
   std::vector<std::string> _topics;
   std::shared_ptr<TopicRegistry> _registry;
 
-public:
+ public:
   MessagePlaybackScope(const std::vector<std::string> &topics);
   ~MessagePlaybackScope();
   MessagePlaybackScope(const MessagePlaybackScope &) = delete;
   MessagePlaybackScope &operator=(const MessagePlaybackScope &) = delete;
 };
 
-template <class Message> class Publisher {
+template <class Message>
+class Publisher {
   std::string _topic;
   std::unique_ptr<ros::Publisher> _publisher;
 
-public:
+ public:
   Publisher() {}
   Publisher(const std::string &topic) { this->topic(topic); }
   Publisher(const Publisher &) = delete;
@@ -120,7 +124,8 @@ public:
   }
 };
 
-template <class M> class Subscriber {
+template <class M>
+class Subscriber {
   struct Callback {
     std::weak_ptr<const void> receiver;
   };
@@ -133,11 +138,12 @@ template <class M> class Subscriber {
   class MessageCast {
     std::shared_ptr<const Message> _message;
 
-  public:
+   public:
     inline MessageCast(const std::shared_ptr<const Message> &message)
         : _message(message) {}
     inline operator std::shared_ptr<const Message>() { return _message; }
-    template <class T> inline operator std::shared_ptr<T>() {
+    template <class T>
+    inline operator std::shared_ptr<T>() {
       return _message ? _message->instantiate<T>() : nullptr;
     }
   };
@@ -150,7 +156,7 @@ template <class M> class Subscriber {
     callback(MessageCast(message));
   }
 
-public:
+ public:
   Subscriber(const std::string &name, bool visible = true) {
     _topic = Topic::instance(name);
     _visible = visible;
@@ -205,16 +211,18 @@ public:
 class NoMessageScope {
   std::shared_ptr<void> _instance;
 
-public:
+ public:
   NoMessageScope();
   ~NoMessageScope();
   NoMessageScope(const NoMessageScope &) = delete;
   NoMessageScope &operator=(const NoMessageScope &) = delete;
 };
 
-template <class Message> class TopicProperty {
-private:
+template <class Message>
+class TopicProperty {
+ private:
   std::string _topic;
+  bool _visible = true;
   bool _used = false;
   std::shared_ptr<void> _callback_object;
   std::function<void(const std::shared_ptr<const Message> &)>
@@ -228,19 +236,21 @@ private:
       if (!_subscriber || _subscriber->topic()->name() != _topic) {
         if (_callback_object && _callback_function) {
           _subscriber = std::make_shared<Subscriber<Message>>(
-              _topic, _callback_object, _callback_function);
+              _topic, _callback_object, _callback_function, _visible);
         } else {
-          _subscriber = std::make_shared<Subscriber<Message>>(_topic);
+          _subscriber = std::make_shared<Subscriber<Message>>(_topic, _visible);
         }
       }
     }
   }
 
-public:
+ public:
   TopicProperty() {}
-  TopicProperty(const std::string &topic) : _topic(topic) {}
+  TopicProperty(const std::string &topic, bool visible = true)
+      : _topic(topic), _visible(visible) {}
   TopicProperty(const TopicProperty &other) {
     _topic = other._topic;
+    _visible = other._visible;
     _sync();
   }
   TopicProperty &operator=(const TopicProperty &other) {
@@ -297,7 +307,8 @@ template <class T>
 bool operator!=(const TopicProperty<T> &a, const TopicProperty<T> &b) {
   return a.topic() != b.topic();
 }
-template <class T> struct DefaultPropertyAttributes<TopicProperty<T>> {
+template <class T>
+struct DefaultPropertyAttributes<TopicProperty<T>> {
   static inline void initialize(PropertyAttributes *attributes) {
     attributes->list = [](const Property &property) {
       // return std::vector<std::string>({"test", "bla"});

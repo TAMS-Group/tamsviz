@@ -87,7 +87,7 @@ void RenderThread::_run() {
         break;
       }
     }
-    // LOG_DEBUG("render");
+    LOG_DEBUG("render");
 
     PROFILER();
 
@@ -267,8 +267,10 @@ void RenderThread::stop() {
   }
 }
 
-void RenderThread::start() {
+static const std::string g_topic_name_tf = "/tf";
+static const std::string g_topic_name_tf_static = "/tf_static";
 
+void RenderThread::start() {
   auto &instance = renderThreadInstance();
 
   instance = std::make_shared<RenderThread>();
@@ -288,8 +290,14 @@ void RenderThread::start() {
                                             [ptr]() { ptr->invalidate(); });
   LoaderThread::instance()->finished.connect(instance,
                                              [ptr]() { ptr->invalidate(); });
-  TopicManager::instance()->received.connect(instance,
-                                             [ptr]() { ptr->invalidate(); });
+  TopicManager::instance()->received.connect(
+      instance,
+      [ptr](const Topic &topic, const std::shared_ptr<const Message> &message) {
+        auto &topic_name = topic.name();
+        if (topic_name != g_topic_name_tf &&
+            topic_name != g_topic_name_tf_static)
+          ptr->invalidate();
+      });
 }
 
 RenderThread *RenderThread::instance() { return renderThreadInstance().get(); }

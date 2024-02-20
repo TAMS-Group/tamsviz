@@ -109,7 +109,8 @@ void TimeSeriesSubscriber::Impl::handleMessage(
   }
 }
 
-TimeSeriesSubscriber::TimeSeriesSubscriber(const std::string &topic) {
+TimeSeriesSubscriber::TimeSeriesSubscriber(const std::string &topic,
+                                           bool visible) {
   _impl->_topic = Topic::instance(topic);
   auto *impl = _impl.get();
   {
@@ -118,9 +119,11 @@ TimeSeriesSubscriber::TimeSeriesSubscriber(const std::string &topic) {
     impl->_player = player;
   }
   _subscriber = std::make_shared<Subscriber<Message>>(
-      topic, _impl, [impl](const std::shared_ptr<const Message> &message) {
+      topic, _impl,
+      [impl](const std::shared_ptr<const Message> &message) {
         impl->handleMessage(message);
-      });
+      },
+      visible);
   LockScope()->modified.connect(_impl, [impl]() {
     auto player = LockScope()->player;
     std::unique_lock<std::mutex> lock(impl->_mutex);
@@ -153,8 +156,8 @@ void TimeSeriesSubscriber::addListener(
   _impl->_listeners.emplace_back(listener);
 }
 
-const std::shared_ptr<Subscriber<Message>> &
-TimeSeriesSubscriber::subscriber() const {
+const std::shared_ptr<Subscriber<Message>> &TimeSeriesSubscriber::subscriber()
+    const {
   return _subscriber;
 }
 

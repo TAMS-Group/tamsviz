@@ -403,6 +403,30 @@ class RobotStateTimeSeriesListener : public TimeSeriesListener {
       _temp[message.name.at(i)] = message.position.at(i);
     }
   }
+  static bool poses_equal(const std::unordered_map<std::string, double> &a,
+                          const std::unordered_map<std::string, double> &b) {
+    if (a.size() != b.size()) {
+      return false;
+    }
+    for (auto &p : a) {
+      if (b.find(p.first) == b.end()) {
+        return false;
+      }
+    }
+    for (auto &p : b) {
+      if (a.find(p.first) == a.end()) {
+        return false;
+      }
+    }
+    for (auto &p : a) {
+      double x = p.second;
+      double y = b.at(p.first);
+      if (!(std::abs(x - y) < 1e-6)) {
+        return false;
+      }
+    }
+    return true;
+  }
 
  public:
   virtual void push(const std::shared_ptr<const Message> &msg, int64_t start,
@@ -415,8 +439,18 @@ class RobotStateTimeSeriesListener : public TimeSeriesListener {
     }
   }
   virtual void commit() override {
-    std::lock_guard<std::mutex> lock(_mutex);
-    _positions = _temp;
+    bool redraw = false;
+    {
+      std::lock_guard<std::mutex> lock(_mutex);
+      if (!poses_equal(_positions, _temp)) {
+        redraw = true;
+      }
+      _positions = _temp;
+    }
+    if (redraw) {
+      LOG_DEBUG("joint states changed");
+      GlobalEvents::instance()->redraw();
+    }
   }
   void apply(RobotState &robot_state) {
     std::lock_guard<std::mutex> lock(_mutex);
@@ -429,9 +463,10 @@ class RobotStateTimeSeriesListener : public TimeSeriesListener {
   }
 };
 
-void RobotStateDisplayBase::refreshTopic(const std::string &topic) {
+void RobotStateDisplayBase::refreshTopic(const std::string &topic,
+                                         bool visible) {
   if (!_subscriber || topic != _subscriber->topic()) {
-    _subscriber = std::make_shared<TimeSeriesSubscriber>(topic);
+    _subscriber = std::make_shared<TimeSeriesSubscriber>(topic, visible);
     _subscriber->duration(0.5);
     _listener = std::make_shared<RobotStateTimeSeriesListener>();
     _subscriber->addListener(_listener);

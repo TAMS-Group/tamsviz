@@ -33,8 +33,8 @@ class TimeSeriesSubscriber {
   std::shared_ptr<Impl> _impl = std::make_shared<Impl>();
   std::shared_ptr<Subscriber<Message>> _subscriber;
 
-public:
-  TimeSeriesSubscriber(const std::string &topic);
+ public:
+  TimeSeriesSubscriber(const std::string &topic, bool visible = true);
   TimeSeriesSubscriber(const TimeSeriesSubscriber &) = delete;
   TimeSeriesSubscriber &operator=(const TimeSeriesSubscriber &) = delete;
   const std::string &topic() const;
@@ -49,7 +49,7 @@ class TimeSeriesTransformer : public TimeSeriesListener {
   mutable std::mutex _mutex;
   std::map<int64_t, Output> _data;
 
-public:
+ public:
   TimeSeriesTransformer() {}
   TimeSeriesTransformer(const TimeSeriesTransformer &) = delete;
   TimeSeriesTransformer &operator=(const TimeSeriesTransformer &) = delete;
@@ -81,7 +81,7 @@ public:
     return std::move(ret);
   }
 
-protected:
+ protected:
   virtual bool transform(const std::shared_ptr<const Message> &message,
                          Output &output) = 0;
 };
@@ -91,11 +91,11 @@ class TimeSeriesQuery
   MessageQuery _query;
   MessageQuery _stamp_query = MessageQuery("header.stamp");
 
-public:
+ public:
   TimeSeriesQuery(const MessageQuery &query) : _query(query) {}
   const MessageQuery &query() const { return _query; }
 
-protected:
+ protected:
   virtual bool transform(const std::shared_ptr<const Message> &message,
                          std::pair<int64_t, double> &output) override;
 };

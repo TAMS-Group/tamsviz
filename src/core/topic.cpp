@@ -212,7 +212,7 @@ void Topic::publish(const std::shared_ptr<const Message> &message) {
   }
   received(message);
   if (_connections > 0) {
-    TopicManager::instance()->received();
+    TopicManager::instance()->received(*this, message);
   }
 }
 NoMessageScope::NoMessageScope() {
