@@ -538,6 +538,14 @@ void RobotTrajectoryDisplay::renderSync(const RenderSyncContext &context) {
   }
   _play_trajectory = playTrajectory();
   _trajectory_time = trajectoryTime();
+  {
+    bool double_sided = doubleSided();
+    for (auto &state : _trajectory) {
+      for (auto &r : state.second->mesh_renderers) {
+        r->options().double_sided = double_sided;
+      }
+    }
+  }
   RobotDisplayBase::renderSync(context);
   {
     bool double_sided = doubleSided();

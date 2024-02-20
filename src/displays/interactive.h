@@ -143,9 +143,10 @@ class InteractivePoseDisplayBase : public InteractiveMarkerDisplayBase {
   virtual void publish(const std::string &frame,
                        const Eigen::Isometry3d &pose) = 0;
   static uint64_t publisherClock() {
-    return std::chrono::duration_cast<std::chrono::seconds>(
+    return std::chrono::duration_cast<std::chrono::milliseconds>(
                std::chrono::steady_clock::now().time_since_epoch())
-        .count();
+               .count() /
+           200;
   };
 
  public:

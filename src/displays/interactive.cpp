@@ -358,7 +358,7 @@ void InteractivePoseDisplayBase::refresh() {
       LOG_DEBUG("start publisher thread");
       auto t = std::chrono::steady_clock::now();
       while (true) {
-        t += std::chrono::seconds(1);
+        t += std::chrono::milliseconds(200);
         {
           std::unique_lock<std::mutex> lock(
               publish_thread_data->_publish_mutex);
