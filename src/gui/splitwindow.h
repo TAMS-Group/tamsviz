@@ -1,5 +1,5 @@
 // TAMSVIZ
-// (c) 2020-2021 Philipp Ruppel
+// (c) 2020-2023 Philipp Ruppel
 
 #pragma once
 
@@ -10,6 +10,8 @@
 
 #include <atomic>
 #include <typeindex>
+
+extern bool g_show_split_window_bars;
 
 class WindowBase : public Window, public QFrame {
 
@@ -23,6 +25,7 @@ protected:
 DECLARE_TYPE(WindowBase, Window);
 
 class ContentWindowBase : public WindowBase {
+  QWidget *bar_widget = nullptr;
   QHBoxLayout *bar = nullptr;
   QVBoxLayout *layout = nullptr;
   QWidget *spacer = nullptr;

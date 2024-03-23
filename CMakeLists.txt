@@ -1,14 +1,13 @@
 cmake_minimum_required(VERSION 3.1)
 # TAMSVIZ
-# (c) 2020 Philipp Ruppel
+# (c) 2020-2023 Philipp Ruppel
 
 project(tamsviz)
 
-#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
-#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O3")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Os")
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Os")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Os -g")
 
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 14)
 
 find_package(OpenCV REQUIRED)
 
@@ -36,6 +35,7 @@ find_package(catkin REQUIRED COMPONENTS
     laser_geometry
     tf
     image_transport
+    pybind11_catkin
 )
 
 catkin_package(
@@ -54,6 +54,7 @@ catkin_package(
         std_msgs
         eigen_conversions
         laser_geometry
+        pybind11_catkin
 )
 
 include_directories(
@@ -62,7 +63,8 @@ include_directories(
 
 find_package(Boost REQUIRED COMPONENTS program_options)
 
-add_executable(${PROJECT_NAME}
+set(LIBRARY_NAME "tamsviz_core")
+add_library(${LIBRARY_NAME}
     src/annotations/image.cpp
     src/annotations/scene.cpp
     src/components/environment.cpp
@@ -94,6 +96,7 @@ add_executable(${PROJECT_NAME}
     src/core/watcher.cpp
     src/core/workspace.cpp
     src/displays/axes.cpp
+    src/displays/camera.cpp
     src/displays/drvcam.cpp
     src/displays/frame.cpp
     src/displays/geometry.cpp
@@ -138,5 +141,20 @@ add_executable(${PROJECT_NAME}
     src/scene/mesh.cpp
     src/scene/node.cpp
 )
-add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES} ${OpenCV_LIBS} ${Boost_LIBRARIES} ${QT_LIBRARIES} ${ASSIMP_LIBRARIES} -lGL -lEGL -lGLEW yaml-cpp)
+add_dependencies(${LIBRARY_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(${LIBRARY_NAME} ${catkin_LIBRARIES} ${OpenCV_LIBS} ${Boost_LIBRARIES} ${QT_LIBRARIES} ${ASSIMP_LIBRARIES} -lGL -lEGL -lGLEW yaml-cpp)
+
+
+add_executable(${PROJECT_NAME}
+    src/gui/main.cpp
+)
+add_dependencies(${PROJECT_NAME} ${LIBRARY_NAME})
+target_link_libraries(${PROJECT_NAME} ${LIBRARY_NAME} ${catkin_LIBRARIES} ${OpenCV_LIBS} ${Boost_LIBRARIES} ${QT_LIBRARIES} ${ASSIMP_LIBRARIES} -lGL -lEGL -lGLEW yaml-cpp)
+
+
+pybind_add_module(pytamsviz MODULE
+    src/python/python.cpp
+)
+add_dependencies(pytamsviz ${LIBRARY_NAME} ${catkin_LIBRARIES} ${OpenCV_LIBS} ${Boost_LIBRARIES} ${QT_LIBRARIES} ${ASSIMP_LIBRARIES} -lGL -lEGL -lGLEW yaml-cpp)
+target_link_libraries(pytamsviz PRIVATE ${LIBRARY_NAME} ${catkin_LIBRARIES} ${QT_LIBRARIES} )
+set_target_properties(pytamsviz PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CATKIN_DEVEL_PREFIX}/${CATKIN_GLOBAL_PYTHON_DESTINATION})

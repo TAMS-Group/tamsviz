@@ -1,5 +1,5 @@
 // TAMSVIZ
-// (c) 2020-2021 Philipp Ruppel
+// (c) 2020-2023 Philipp Ruppel
 
 #include "text.h"
 
@@ -210,7 +210,7 @@ public:
                                              << " glyphs");
       instance = std::make_shared<Font>(font, font_size, merged_glyph_indices);
     } else {
-      LOG_DEBUG("re-using font texture");
+      // LOG_DEBUG("re-using font texture");
     }
     return instance;
   }

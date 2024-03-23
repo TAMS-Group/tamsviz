@@ -1,13 +1,14 @@
 // TAMSVIZ
-// (c) 2020-2021 Philipp Ruppel
+// (c) 2020-2023 Philipp Ruppel
 
 #pragma once
 
 #include "property.h"
 
 template <class T>
-auto properties(T &v, std::vector<Property> &properties) -> decltype(
-    (*(T *)nullptr).properties(*((std::vector<Property> *)nullptr))) {
+auto properties(T &v, std::vector<Property> &properties)
+    -> decltype((*(T *)nullptr)
+                    .properties(*((std::vector<Property> *)nullptr))) {
   v.properties(properties);
 }
 
@@ -74,10 +75,10 @@ auto properties(T &v, std::vector<Property> &properties) -> decltype(
         static std::shared_ptr<PropertyInfo> info =                            \
             std::make_shared<PropertyInfoImpl<                                 \
                 typename std::remove_reference<decltype(v.fieldname)>::type>>( \
-                #fieldname, GENERATE_PROPERTY_ATTRIBUTES(                      \
-                                typename std::remove_reference<decltype(       \
-                                    v.fieldname)>::type,                       \
-                                __VA_ARGS__));                                 \
+                #fieldname,                                                    \
+                GENERATE_PROPERTY_ATTRIBUTES(typename std::remove_reference<   \
+                                                 decltype(v.fieldname)>::type, \
+                                             __VA_ARGS__));                    \
         return info;                                                           \
       }(),                                                                     \
       &v.fieldname);
@@ -86,8 +87,8 @@ auto properties(T &v, std::vector<Property> &properties) -> decltype(
   properties.emplace_back(                                                     \
       []() {                                                                   \
         static std::shared_ptr<PropertyInfo> info = std::make_shared<          \
-            PropertyInfoImpl<typename std::remove_reference<decltype(          \
-                v.propname())>::type>>(                                        \
+            PropertyInfoImpl<typename std::remove_reference<                   \
+                decltype(v.propname())>::type>>(                               \
             #propname,                                                         \
             GENERATE_PROPERTY_ATTRIBUTES(                                      \
                 typename std::remove_reference<decltype(v.propname())>::type,  \

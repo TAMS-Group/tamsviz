@@ -1,5 +1,5 @@
 // TAMSVIZ
-// (c) 2020-2021 Philipp Ruppel
+// (c) 2020-2023 Philipp Ruppel
 
 #include "pointcloud.h"
 
@@ -90,7 +90,6 @@ void PointCloudDisplayBase::setPointCloud(
     bool use_point_colors = pointColors();
     _mesh_renderer = node()->create<MeshRenderer>(
         std::make_shared<Mesh>([message, use_point_colors](MeshData &mesh) {
-
           std::shared_ptr<const sensor_msgs::PointCloud2> cloud;
           {
             PROFILER("instantiate point cloud");
@@ -209,7 +208,6 @@ void PointCloudDisplayBase::setPointCloud(
               }
             }
           }
-
         }),
         _material_renderer);
 

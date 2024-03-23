@@ -1,5 +1,5 @@
 // TAMSVIZ
-// (c) 2020-2021 Philipp Ruppel
+// (c) 2020-2023 Philipp Ruppel
 
 #pragma once
 
@@ -51,9 +51,12 @@ public:
   void show() { _visible = true; }
   void hide() { _visible = false; }
   bool visible() const { return _visible; }
-  bool visible(bool v) { _visible = v; return _visible;}
+  bool visible(bool v) {
+    _visible = v;
+    return _visible;
+  }
   template <class T, class... Args>
-  std::shared_ptr<T> create(const Args &... args) {
+  std::shared_ptr<T> create(const Args &...args) {
     auto instance = std::make_shared<T>(args...);
     connect(instance);
     return instance;

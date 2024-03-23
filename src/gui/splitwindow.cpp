@@ -1,11 +1,13 @@
 // TAMSVIZ
-// (c) 2020-2021 Philipp Ruppel
+// (c) 2020-2023 Philipp Ruppel
 
 #include "splitwindow.h"
 
 #include "../core/log.h"
 #include "../core/workspace.h"
 #include "mainwindow.h"
+
+bool g_show_split_window_bars = true;
 
 WindowBase::WindowBase() {
   LOG_DEBUG("new split window created");
@@ -88,7 +90,9 @@ SplitWindowBase::SplitWindowBase(Qt::Orientation orientation)
   LockScope ws;
   a() = std::make_shared<EmptyWindow>();
   b() = std::make_shared<EmptyWindow>();
-  splitter->setMinimumSize(8, 8);
+  if (g_show_split_window_bars) {
+    splitter->setMinimumSize(8, 8);
+  }
   this->splitter = splitter;
   sync();
   ws->modified.connect(this, [this, layout, splitter]() { sync(); });
@@ -166,7 +170,8 @@ ContentWindowBase::ContentWindowBase() {
   layout->addLayout(bar);
   bar->setSpacing(0);
   layout->setSpacing(0);
-  {
+
+  if (g_show_split_window_bars) {
     auto *button = new FlatButton();
     button->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
     QTimer::singleShot(0, this, [button, this]() {
@@ -195,6 +200,7 @@ ContentWindowBase::ContentWindowBase() {
     });
     bar->addWidget(button);
   }
+
   {
     class Spacer : public QWidget {
       ContentWindowBase *_parent = nullptr;
@@ -215,79 +221,78 @@ ContentWindowBase::ContentWindowBase() {
     bar->addWidget(spacer);
   }
 
-  {
-    auto *button = new FlatButton();
-    button->setIcon(MATERIAL_ICON("edit"));
-    button->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
-    connect(button, &QPushButton::clicked, this, [this]() {
-      LockScope ws;
-      ws->selection() = shared_from_this();
-      ws->modified();
-    });
-    bar->addWidget(button);
-  }
-  {
-    auto *button = new FlatButton();
-    button->setIcon(MATERIAL_ICON("border_vertical"));
-    button->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
-    connect(button, &QPushButton::clicked, this, [this]() {
-      LockScope ws;
-      replace(std::make_shared<SplitWindowVertical>());
-    });
-    bar->addWidget(button);
-  }
-  {
-    auto *button = new FlatButton();
-    button->setIcon(MATERIAL_ICON("border_horizontal"));
-    button->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
-    connect(button, &QPushButton::clicked, this, [this]() {
-      LockScope ws;
-      replace(std::make_shared<SplitWindowHorizontal>());
-    });
-    bar->addWidget(button);
-  }
-  {
-
-    auto *button = new FlatButton();
-
-    button->setIcon(style()->standardIcon(QStyle::SP_DockWidgetCloseButton));
-    button->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
-    bar->addWidget(button);
-    connect(button, &QAbstractButton::clicked, this, [this]() {
-      QTimer::singleShot(0, this, [this]() {
-
+  if (g_show_split_window_bars) {
+    {
+      auto *button = new FlatButton();
+      button->setIcon(MATERIAL_ICON("edit"));
+      button->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
+      connect(button, &QPushButton::clicked, this, [this]() {
         LockScope ws;
-        auto me = std::dynamic_pointer_cast<Window>(this->shared_from_this());
-        std::shared_ptr<Object> window_old;
-        std::shared_ptr<Window> window_new;
-        ws->recurseObjects([&](const std::shared_ptr<Object> &window) {
-          if (auto split = std::dynamic_pointer_cast<SplitWindowBase>(window)) {
-            if (split->a() == me) {
-              window_old = split;
-              window_new = split->b();
-              split->b() = std::make_shared<EmptyWindow>();
+        ws->selection() = shared_from_this();
+        ws->modified();
+      });
+      bar->addWidget(button);
+    }
+    {
+      auto *button = new FlatButton();
+      button->setIcon(MATERIAL_ICON("border_vertical"));
+      button->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
+      connect(button, &QPushButton::clicked, this, [this]() {
+        LockScope ws;
+        replace(std::make_shared<SplitWindowVertical>());
+      });
+      bar->addWidget(button);
+    }
+    {
+      auto *button = new FlatButton();
+      button->setIcon(MATERIAL_ICON("border_horizontal"));
+      button->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
+      connect(button, &QPushButton::clicked, this, [this]() {
+        LockScope ws;
+        replace(std::make_shared<SplitWindowHorizontal>());
+      });
+      bar->addWidget(button);
+    }
+    {
+      auto *button = new FlatButton();
+      button->setIcon(style()->standardIcon(QStyle::SP_DockWidgetCloseButton));
+      button->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
+      bar->addWidget(button);
+      connect(button, &QAbstractButton::clicked, this, [this]() {
+        QTimer::singleShot(0, this, [this]() {
+          LockScope ws;
+          auto me = std::dynamic_pointer_cast<Window>(this->shared_from_this());
+          std::shared_ptr<Object> window_old;
+          std::shared_ptr<Window> window_new;
+          ws->recurseObjects([&](const std::shared_ptr<Object> &window) {
+            if (auto split =
+                    std::dynamic_pointer_cast<SplitWindowBase>(window)) {
+              if (split->a() == me) {
+                window_old = split;
+                window_new = split->b();
+                split->b() = std::make_shared<EmptyWindow>();
+              }
+              if (split->b() == me) {
+                window_old = split;
+                window_new = split->a();
+                split->a() = std::make_shared<EmptyWindow>();
+              }
             }
-            if (split->b() == me) {
-              window_old = split;
-              window_new = split->a();
-              split->a() = std::make_shared<EmptyWindow>();
+            if (auto parent = std::dynamic_pointer_cast<Document>(window)) {
+              if (typeid(*me) != typeid(EmptyWindow)) {
+                window_old = me;
+                window_new = std::make_shared<EmptyWindow>();
+              }
             }
-          }
-          if (auto parent = std::dynamic_pointer_cast<Document>(window)) {
-            if (typeid(*me) != typeid(EmptyWindow)) {
-              window_old = me;
-              window_new = std::make_shared<EmptyWindow>();
-            }
+          });
+          if (window_old) {
+            ActionScope action("Close Split Window");
+            replaceWindow(window_old, window_new);
+            ws->modified();
           }
         });
-        if (window_old) {
-          ActionScope action("Close Split Window");
-          replaceWindow(window_old, window_new);
-          ws->modified();
-        }
-
       });
-    });
+    }
   }
   setContentWidget(new QWidget(this));
   setLayout(layout);
@@ -295,10 +300,14 @@ ContentWindowBase::ContentWindowBase() {
 void ContentWindowBase::addToolWidget(QWidget *widget) {
   widget->setParent(this);
   bar->insertWidget(bar->indexOf(spacer), widget);
+  if (!g_show_split_window_bars)
+    widget->hide();
 }
 void ContentWindowBase::addToolWidgetRight(QWidget *widget) {
   widget->setParent(this);
   bar->insertWidget(bar->indexOf(spacer) + 1, widget);
+  if (!g_show_split_window_bars)
+    widget->hide();
 }
 
 void ContentWindowBase::setContentWidget(QWidget *widget) {

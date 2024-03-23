@@ -1,5 +1,5 @@
 // TAMSVIZ
-// (c) 2020-2021 Philipp Ruppel
+// (c) 2020-2023 Philipp Ruppel
 
 #pragma once
 
@@ -32,7 +32,7 @@ template <class FNC> class Event : public EventBase {
   struct Listener {
     std::function<FNC> callback;
     virtual bool check() const = 0;
-    template <class... ARGS> void call(const ARGS &... args) const {
+    template <class... ARGS> void call(const ARGS &...args) const {
       callback(args...);
     }
     virtual std::shared_ptr<void> pin() { return nullptr; }
@@ -97,7 +97,7 @@ public:
         std::make_shared<ListenerQ>(listenerMakeQPointer(obj), callback));
   }
 
-  template <class... ARGS> void operator()(const ARGS &... args) {
+  template <class... ARGS> void operator()(const ARGS &...args) {
     begin();
     std::vector<std::shared_ptr<Listener>> ll;
     {

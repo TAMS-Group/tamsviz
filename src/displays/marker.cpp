@@ -1,5 +1,5 @@
 // TAMSVIZ
-// (c) 2020-2021 Philipp Ruppel
+// (c) 2020-2023 Philipp Ruppel
 
 #include "marker.h"
 
@@ -336,6 +336,7 @@ void VisualizationMarker::update(const visualization_msgs::Marker &marker) {
     _mesh_watcher.changed();
     _text = marker.text;
     _mesh = nullptr;
+    _color = toColor4(marker.color);
     break;
   }
   default:
@@ -345,6 +346,9 @@ void VisualizationMarker::update(const visualization_msgs::Marker &marker) {
     break;
   }
   _scale = marker.scale.x;
+  if (marker.type == visualization_msgs::Marker::TEXT_VIEW_FACING) {
+    _scale = marker.scale.z;
+  }
   Eigen::Affine3d pose;
   tf::poseMsgToEigen(marker.pose, pose);
   _pose = pose * _pose;

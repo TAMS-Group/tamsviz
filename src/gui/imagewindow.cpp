@@ -1,5 +1,5 @@
 // TAMSVIZ
-// (c) 2020-2021 Philipp Ruppel
+// (c) 2020-2023 Philipp Ruppel
 
 #include "imagewindow.h"
 
@@ -522,6 +522,8 @@ ImageWindow::ImageWindow() {
 
           PROFILER();
 
+          LOG_DEBUG("imagewindow start processing");
+
           cv::Mat mat;
           std::string encoding;
           bool ok = msg2mat(image, mat, encoding);
@@ -561,6 +563,10 @@ ImageWindow::ImageWindow() {
             _pixmap = pixmap;
             _pixmap_time = _image_time;
           }
+
+          LOG_DEBUG("imagewindow processing finished, image size "
+                    << pixmap.width() << " x " << pixmap.height());
+
           ready();
         }
       });
@@ -574,6 +580,7 @@ ImageWindow::ImageWindow() {
       _worker.join();
     }
     void putImage(const std::shared_ptr<const Message> &msg) {
+      LOG_DEBUG("imagewindow queue put");
       std::unique_lock<std::mutex> lock(_mutex);
       _pending = true;
       _image = nullptr;
@@ -585,12 +592,14 @@ ImageWindow::ImageWindow() {
       _put_condition.notify_one();
     }
     void refresh(const ImageWindowOptions &options) {
+      LOG_DEBUG("imagewindow queue refresh");
       std::unique_lock<std::mutex> lock(_mutex);
       _options = options;
       _pending = true;
       _put_condition.notify_one();
     }
     void fetchPixmap(QPixmap *pixmap, ros::Time *time) {
+      LOG_DEBUG("imagewindow queue fetch");
       std::unique_lock<std::mutex> lock(_mutex);
       *pixmap = _pixmap;
       *time = _pixmap_time;
@@ -771,6 +780,9 @@ ImageWindow::ImageWindow() {
 
   private:
     void sync() {
+      if (QApplication::instance()->thread() != QThread::currentThread()) {
+        throw std::runtime_error("image view sync called on background thread");
+      }
       {
         double s = 1000000;
         scene()->setSceneRect(-s, -s, 2 * s, 2 * s);
@@ -872,11 +884,18 @@ ImageWindow::ImageWindow() {
         // TODO: is this safe?
         QObject o;
         QObject::connect(&o, &QObject::destroyed, this, [this](QObject *o) {
-          _buffer->fetchPixmap(&_image_pixmap, &_pixmap_time);
-          sync();
+          //_buffer->fetchPixmap(&_image_pixmap, &_pixmap_time);
+          // sync();
+          startOnMainThreadAsync([this]() {
+            _buffer->fetchPixmap(&_image_pixmap, &_pixmap_time);
+            sync();
+          });
         });
       });
-      LockScope()->modified.connect(this, [this]() { sync(); });
+      LockScope()->modified.connect(this, [this]() {
+        // sync();
+        startOnMainThreadAsync([this]() { sync(); });
+      });
     }
     void focusOutEvent(QFocusEvent *event) {
       QGraphicsView::focusOutEvent(event);
@@ -1114,7 +1133,8 @@ ImageWindow::ImageWindow() {
               [buffer](const std::shared_ptr<const Message> &msg) {
                 // LOG_DEBUG("image " << msg->time());
                 buffer->putImage(msg);
-              });
+              },
+              false);
         }
       }
     });

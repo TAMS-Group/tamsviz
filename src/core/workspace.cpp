@@ -1,5 +1,5 @@
 // TAMSVIZ
-// (c) 2020-2021 Philipp Ruppel
+// (c) 2020-2023 Philipp Ruppel
 
 #include "workspace.h"
 
@@ -106,7 +106,9 @@ Workspace::Workspace() {
 
   modified.connect([this]() {
     document()->display()->refreshRecursive();
-    document()->window()->refreshRecursive();
+    if (document()->window()) {
+      document()->window()->refreshRecursive();
+    }
   });
 }
 Workspace::~Workspace() { object_ptr_test.clear(); }
@@ -132,7 +134,8 @@ ObjectScope::ObjectScope() { Property::unlockScope(+1); }
 ObjectScope::~ObjectScope() { Property::unlockScope(-1); }
 
 LockScope::LockScope() {
-  if (!ws()->history->current) {
+  auto &w = ws();
+  if (w && w->history && !w->history->current) {
     auto item = std::make_shared<History<std::shared_ptr<Workspace>>::Item>();
     item->snapshot =
         Snapshot<std::shared_ptr<Workspace>>::save(ws(), nullptr, nullptr);

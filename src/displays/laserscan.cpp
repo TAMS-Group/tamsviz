@@ -1,5 +1,5 @@
 // TAMSVIZ
-// (c) 2020-2021 Philipp Ruppel
+// (c) 2020-2023 Philipp Ruppel
 
 #include "laserscan.h"
 
@@ -21,7 +21,6 @@ void LaserScanDisplay::renderSync(const RenderSyncContext &context) {
       auto projector = _projector;
       _mesh_renderer = node()->create<MeshRenderer>(
           std::make_shared<Mesh>([message, radius, projector]() {
-
             sensor_msgs::PointCloud cloud;
             projector->projectLaser(*message, cloud);
 

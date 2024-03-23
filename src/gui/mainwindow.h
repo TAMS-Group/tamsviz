@@ -1,5 +1,5 @@
 // TAMSVIZ
-// (c) 2020-2021 Philipp Ruppel
+// (c) 2020-2023 Philipp Ruppel
 
 #pragma once
 
@@ -7,6 +7,7 @@
 
 class MainWindow : public QMainWindow {
 
+  bool embedded = false;
   QMenu *open_recent_menu = nullptr;
 
 protected:
@@ -26,7 +27,7 @@ public:
   void updateRecentMenu();
   void findAndOpenBag(const std::string &name);
 
-  MainWindow();
+  MainWindow(bool embedded = false);
   ~MainWindow();
   virtual void closeEvent(QCloseEvent *event) override;
   static MainWindow *instance();
