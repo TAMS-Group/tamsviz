@@ -12,6 +12,9 @@
 #include "transformations.h"
 #include "uniformbuffer.h"
 
+#include <cstdint>
+#include <array>
+
 Renderer::Renderer()
     : camera_uniform_buffer((size_t)UniformBindingPoint::camera),
       material_buffer((size_t)UniformBindingPoint::material),

@@ -3,6 +3,9 @@
 
 #include "transformations.h"
 
+#include <cstdint>
+#include <array>
+
 Eigen::Matrix4d projectionMatrix(double fov_y, double aspect, double near,
                                  double far) {
   double s = 1.0f / std::tan((double)fov_y * 0.5);

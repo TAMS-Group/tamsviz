@@ -9,6 +9,7 @@
 #include <memory>
 #include <mutex>
 #include <vector>
+#include <string>
 
 class QObject;
 template <class T> class QPointer;

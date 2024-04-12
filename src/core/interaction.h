@@ -4,6 +4,7 @@
 #pragma once
 
 #include <Eigen/Dense>
+#include <cstdint>
 
 struct InteractionRay {
   int x = 0;
