@@ -1,11 +1,15 @@
 // TAMSVIZ
 // (c) 2020-2023 Philipp Ruppel
 
+#include "../render/opengl.h"
+
 #include "imagewindow.h"
 
 #include "../core/bagplayer.h"
 #include "../core/log.h"
 #include "../core/workspace.h"
+
+#include "../render/shader.h"
 
 #include <cv_bridge/cv_bridge.h>
 #include <sensor_msgs/CompressedImage.h>
@@ -21,6 +25,10 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
+
+#include <QGLContext>
+
+// #include <QGraphicsShaderEffect>
 
 struct AnnotationView : QGraphicsItem {
   bool ok = false;
@@ -38,7 +46,8 @@ struct AnnotationView : QGraphicsItem {
     AnnotationView *_parent = nullptr;
     size_t _control_point_index = 0;
     ControlPointHandle(AnnotationView *parent, size_t control_point_index)
-        : QGraphicsEllipseItem(parent), _parent(parent),
+        : QGraphicsEllipseItem(parent),
+          _parent(parent),
           _control_point_index(control_point_index) {
       double r = 5;
       setRect(-r, -r, 2 * r, 2 * r);
@@ -159,7 +168,6 @@ struct AnnotationView : QGraphicsItem {
   }
   virtual void paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
                      QWidget *widget) override {
-
     painter->setPen(QPen(QBrush(QColor(0, 0, 0, 255)), 0, Qt::SolidLine,
                          Qt::SquareCap, Qt::MiterJoin));
     auto color = _color;
@@ -167,7 +175,6 @@ struct AnnotationView : QGraphicsItem {
     painter->drawPath(_visual);
 
     if (_selected && _window->annotation_type == nullptr) {
-
       painter->save();
 
       painter->setRenderHint(QPainter::Antialiasing, false);
@@ -264,7 +271,6 @@ struct AnnotationView : QGraphicsItem {
 };
 
 ImageWindow::ImageWindow() {
-
   {
     auto *button = new FlatButton();
     button->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
@@ -351,101 +357,101 @@ ImageWindow::ImageWindow() {
     QPixmap _pixmap;
     bool _stop = false;
     ros::Time _image_time, _pixmap_time;
-    ImageWindowOptions _options;
+    ImageWindowOptions _options_in, _options_out;
 
     static QImage mat2image(const cv::Mat &mat,
                             const std::string &img_encoding) {
       switch (mat.type()) {
-      case CV_8UC1:
-        return QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
-                      QImage::Format_Grayscale8);
-      case CV_8UC2:
-        LOG_WARN_THROTTLE(1, "image format not yet supported " << mat.type()
-                                                               << " CV_8UC2");
-        return QImage();
-      case CV_8UC3:
-        if (img_encoding == "bgr8" || img_encoding == "bgr16") {
-          cv::cvtColor(mat, mat, cv::COLOR_BGR2RGB);
-        }
-        return QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
-                      QImage::Format_RGB888);
-      case CV_8UC4:
-        if (img_encoding == "bgra8" || img_encoding == "bgra16") {
-          cv::cvtColor(mat, mat, cv::COLOR_BGRA2RGBA);
-        }
-        return QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
-                      QImage::Format_RGBA8888);
-        break;
-      default:
-        LOG_WARN_THROTTLE(1, "image format not yet supported " << mat.type());
-        return QImage();
+        case CV_8UC1:
+          return QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
+                        QImage::Format_Grayscale8);
+        case CV_8UC2:
+          LOG_WARN_THROTTLE(
+              1, "image format not yet supported " << mat.type() << " CV_8UC2");
+          return QImage();
+        case CV_8UC3:
+          if (img_encoding == "bgr8" || img_encoding == "bgr16") {
+            cv::cvtColor(mat, mat, cv::COLOR_BGR2RGB);
+          }
+          return QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
+                        QImage::Format_RGB888);
+        case CV_8UC4:
+          if (img_encoding == "bgra8" || img_encoding == "bgra16") {
+            cv::cvtColor(mat, mat, cv::COLOR_BGRA2RGBA);
+          }
+          return QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
+                        QImage::Format_RGBA8888);
+          break;
+        default:
+          LOG_WARN_THROTTLE(1, "image format not yet supported " << mat.type());
+          return QImage();
       }
     }
 
     static void removeNotFinite(cv::Mat &mat) {
       switch (mat.type()) {
-      case CV_32FC1:
-      case CV_32FC2:
-      case CV_32FC3:
-      case CV_32FC4:
-        for (size_t y = 0; y < mat.rows; y++) {
-          auto *pixel = mat.ptr<float>(y);
-          size_t n = mat.cols * mat.channels();
-          for (size_t x = 0; x < n; x++) {
-            if (!std::isfinite(*pixel)) {
-              *pixel = 0;
+        case CV_32FC1:
+        case CV_32FC2:
+        case CV_32FC3:
+        case CV_32FC4:
+          for (size_t y = 0; y < mat.rows; y++) {
+            auto *pixel = mat.ptr<float>(y);
+            size_t n = mat.cols * mat.channels();
+            for (size_t x = 0; x < n; x++) {
+              if (!std::isfinite(*pixel)) {
+                *pixel = 0;
+              }
+              pixel++;
             }
-            pixel++;
           }
-        }
-        break;
-      case CV_64FC1:
-      case CV_64FC2:
-      case CV_64FC3:
-      case CV_64FC4:
-        for (size_t y = 0; y < mat.rows; y++) {
-          auto *pixel = mat.ptr<double>(y);
-          size_t n = mat.cols * mat.channels();
-          for (size_t x = 0; x < n; x++) {
-            if (!std::isfinite(*pixel)) {
-              *pixel = 0;
+          break;
+        case CV_64FC1:
+        case CV_64FC2:
+        case CV_64FC3:
+        case CV_64FC4:
+          for (size_t y = 0; y < mat.rows; y++) {
+            auto *pixel = mat.ptr<double>(y);
+            size_t n = mat.cols * mat.channels();
+            for (size_t x = 0; x < n; x++) {
+              if (!std::isfinite(*pixel)) {
+                *pixel = 0;
+              }
+              pixel++;
             }
-            pixel++;
           }
-        }
-        break;
+          break;
       }
     }
 
     static void to8Bit(cv::Mat &mat) {
       switch (mat.type()) {
-      case CV_16UC1:
-        mat.convertTo(mat, CV_8U, 1.0 / 256);
-        break;
-      case CV_32FC1:
-        mat.convertTo(mat, CV_8U, 255.0);
-        break;
-      case CV_64FC1:
-        mat.convertTo(mat, CV_8U, 255.0);
-        break;
-      case CV_16UC3:
-        mat.convertTo(mat, CV_8UC3, 1.0 / 256.0);
-        break;
-      case CV_32FC3:
-        mat.convertTo(mat, CV_8UC3, 255.0);
-        break;
-      case CV_64FC3:
-        mat.convertTo(mat, CV_8UC3, 255.0);
-        break;
-      case CV_16UC4:
-        mat.convertTo(mat, CV_8UC4, 1.0 / 256.0);
-        break;
-      case CV_32FC4:
-        mat.convertTo(mat, CV_8UC4, 255.0);
-        break;
-      case CV_64FC4:
-        mat.convertTo(mat, CV_8UC4, 255.0);
-        break;
+        case CV_16UC1:
+          mat.convertTo(mat, CV_8U, 1.0 / 256);
+          break;
+        case CV_32FC1:
+          mat.convertTo(mat, CV_8U, 255.0);
+          break;
+        case CV_64FC1:
+          mat.convertTo(mat, CV_8U, 255.0);
+          break;
+        case CV_16UC3:
+          mat.convertTo(mat, CV_8UC3, 1.0 / 256.0);
+          break;
+        case CV_32FC3:
+          mat.convertTo(mat, CV_8UC3, 255.0);
+          break;
+        case CV_64FC3:
+          mat.convertTo(mat, CV_8UC3, 255.0);
+          break;
+        case CV_16UC4:
+          mat.convertTo(mat, CV_8UC4, 1.0 / 256.0);
+          break;
+        case CV_32FC4:
+          mat.convertTo(mat, CV_8UC4, 255.0);
+          break;
+        case CV_64FC4:
+          mat.convertTo(mat, CV_8UC4, 255.0);
+          break;
       }
     }
 
@@ -492,12 +498,13 @@ ImageWindow::ImageWindow() {
       return false;
     }
 
-  public:
+   public:
     Event<void()> ready;
     MessageBuffer() {
       _worker = std::thread([this]() {
         while (true) {
           std::shared_ptr<const Message> image;
+          ImageWindowOptions options;
           {
             std::unique_lock<std::mutex> lock(_mutex);
             while (true) {
@@ -507,6 +514,7 @@ ImageWindow::ImageWindow() {
               if (_pending) {
                 _pending = false;
                 image = _image;
+                options = _options_in;
                 break;
               }
               _put_condition.wait(lock);
@@ -534,24 +542,24 @@ ImageWindow::ImageWindow() {
 
           removeNotFinite(mat);
 
-          if (_options.normalizeDepth) {
+          if (options.normalizeDepth) {
             switch (mat.type()) {
-            case CV_16UC1:
-              cv::normalize(mat, mat, 0x0000, 0xffff, cv::NORM_MINMAX);
-              break;
-            case CV_32FC1:
-            case CV_64FC1:
-              cv::normalize(mat, mat, 0.0, 1.0, cv::NORM_MINMAX);
-              break;
+              case CV_16UC1:
+                cv::normalize(mat, mat, 0x0000, 0xffff, cv::NORM_MINMAX);
+                break;
+              case CV_32FC1:
+              case CV_64FC1:
+                cv::normalize(mat, mat, 0.0, 1.0, cv::NORM_MINMAX);
+                break;
             }
           }
 
           to8Bit(mat);
 
-          if (_options.colorMapApply &&
+          if (options.colorMapApply &&
               (mat.type() == CV_8UC1 || mat.type() == CV_8UC3)) {
             try {
-              cv::applyColorMap(mat, mat, _options.colorMapType);
+              cv::applyColorMap(mat, mat, options.colorMapType);
             } catch (const cv::Exception &ex) {
               LOG_ERROR_THROTTLE(1.0, "Failed to apply color map: " + ex.msg);
             }
@@ -562,6 +570,7 @@ ImageWindow::ImageWindow() {
             std::unique_lock<std::mutex> lock(_mutex);
             _pixmap = pixmap;
             _pixmap_time = _image_time;
+            _options_out = options;
           }
 
           LOG_DEBUG("imagewindow processing finished, image size "
@@ -594,15 +603,17 @@ ImageWindow::ImageWindow() {
     void refresh(const ImageWindowOptions &options) {
       LOG_DEBUG("imagewindow queue refresh");
       std::unique_lock<std::mutex> lock(_mutex);
-      _options = options;
+      _options_in = options;
       _pending = true;
       _put_condition.notify_one();
     }
-    void fetchPixmap(QPixmap *pixmap, ros::Time *time) {
+    void fetchPixmap(QPixmap *pixmap, ros::Time *time,
+                     ImageWindowOptions *options) {
       LOG_DEBUG("imagewindow queue fetch");
       std::unique_lock<std::mutex> lock(_mutex);
       *pixmap = _pixmap;
       *time = _pixmap_time;
+      *options = _options_out;
     }
   };
   std::shared_ptr<MessageBuffer> buffer = std::make_shared<MessageBuffer>();
@@ -618,7 +629,8 @@ ImageWindow::ImageWindow() {
     connect(button, &QPushButton::clicked, this, [this, buffer]() {
       QPixmap screenshot;
       ros::Time time;
-      buffer->fetchPixmap(&screenshot, &time);
+      ImageWindowOptions opts;
+      buffer->fetchPixmap(&screenshot, &time, &opts);
       if (!screenshot) {
         QMessageBox::warning(nullptr, "Error",
                              "No image received. Select image topic.");
@@ -692,12 +704,57 @@ ImageWindow::ImageWindow() {
     addToolWidgetRight(button);
   }
 
+  class GraphicsPixmapItemGL : public QGraphicsPixmapItem {
+    std::unique_ptr<Shader> _shader;
+    std::unique_ptr<QOpenGLTexture> _texture;
+    ImageWindowOptions _options;
+
+   public:
+    void setOptions(const ImageWindowOptions &options) { _options = options; }
+    virtual void paint(QPainter *painter,
+                       const QStyleOptionGraphicsItem *option,
+                       QWidget *widget) override {
+      // LOG_INFO(typeid(painter->device()).name());
+      painter->beginNativePainting();
+      if (!_shader) {
+        _shader.reset(new Shader(
+            "package://" ROS_PACKAGE_NAME "/shaders/image_vert.glsl",
+            "package://" ROS_PACKAGE_NAME "/shaders/image_frag.glsl", false));
+      }
+      // glClearColor(1, 0, 0, 1);
+      // glClear(GL_COLOR_BUFFER_BIT);
+      if (!_texture) {
+        _texture.reset(new QOpenGLTexture(QOpenGLTexture::Target2D));
+      }
+      // QOpenGLTexture tex(pixmap().toImage());
+      _shader->use();
+      _texture->setData(pixmap().toImage());
+      glUniform1f(glGetUniformLocation(_shader->program(), "brightness"),
+                  _options.brightness);
+      glUniform1f(glGetUniformLocation(_shader->program(), "saturation"),
+                  _options.saturation);
+      glUniform1i(glGetUniformLocation(_shader->program(), "tonemapping"),
+                  (int)_options.toneMapping);
+      ((QGLContext *)QGLContext::currentContext())
+          ->drawTexture(boundingRect(), _texture->textureId());
+      // auto rect = boundingRect();
+      // float rect[4 * 2] = {
+      //     rect.left(),  rect.top(),     //
+      //     rect.right(), rect.top(),     //
+      //     rect.right(), rect.bottom(),  //
+      //     rect.left(),  rect.bottom(),  //
+      // };
+      painter->endNativePainting();
+      // QGraphicsPixmapItem::paint(painter, option, widget);
+    }
+  };
+
   class GraphicsView : public QGraphicsView {
     class GraphicsScene : public QGraphicsScene {
       GraphicsView *_parent = nullptr;
       QGraphicsRectItem *_selection_rect = nullptr;
 
-    protected:
+     protected:
       virtual void mousePressEvent(QGraphicsSceneMouseEvent *event) override {
         QGraphicsScene::mousePressEvent(event);
         if (event->button() == Qt::LeftButton) {
@@ -747,7 +804,7 @@ ImageWindow::ImageWindow() {
         }
       }
 
-    public:
+     public:
       GraphicsScene(GraphicsView *parent)
           : QGraphicsScene(parent), _parent(parent) {
         _selection_rect = new QGraphicsRectItem();
@@ -772,15 +829,16 @@ ImageWindow::ImageWindow() {
     std::shared_ptr<MessageBuffer> _buffer;
     GraphicsScene *_scene = nullptr;
     QPixmap _image_pixmap;
+    ImageWindowOptions _image_options;
     ros::Time _pixmap_time;
-    QGraphicsPixmapItem *_image_item = nullptr;
+    GraphicsPixmapItemGL *_image_item = nullptr;
     double windowScale() const {
       return std::min(width() * 1.0 / std::max(1, _image_pixmap.width()),
                       height() * 1.0 / std::max(1, _image_pixmap.height()));
     }
     double zoomFactor() const { return windowScale() * _parent->zoom(); }
 
-  private:
+   private:
     void sync() {
       if (QApplication::instance()->thread() != QThread::currentThread()) {
         throw std::runtime_error("image view sync called on background thread");
@@ -790,6 +848,7 @@ ImageWindow::ImageWindow() {
         scene()->setSceneRect(-s, -s, 2 * s, 2 * s);
       }
       _image_item->setPixmap(_image_pixmap);
+      _image_item->setOptions(_image_options);
       {
         LockScope ws;
         {
@@ -858,13 +917,13 @@ ImageWindow::ImageWindow() {
       update();
     }
 
-  protected:
+   protected:
     virtual void resizeEvent(QResizeEvent *event) override {
       QGraphicsView::resizeEvent(event);
       sync();
     }
 
-  public:
+   public:
     GraphicsView(const std::shared_ptr<MessageBuffer> &buffer,
                  ImageWindow *parent)
         : _buffer(buffer), _parent(parent) {
@@ -879,8 +938,9 @@ ImageWindow::ImageWindow() {
       setFocusPolicy(Qt::ClickFocus);
       setScene(_scene);
       _scene->setBackgroundBrush(Qt::black);
-      _image_item = new QGraphicsPixmapItem();
+      _image_item = new GraphicsPixmapItemGL();
       _image_item->setTransformationMode(Qt::SmoothTransformation);
+      // _image_item->setGraphicsEffect(new QGraphicsShaderEffect());
       _scene->addItem(_image_item);
       buffer->ready.connect(this, [this]() {
         // TODO: is this safe?
@@ -889,7 +949,8 @@ ImageWindow::ImageWindow() {
           //_buffer->fetchPixmap(&_image_pixmap, &_pixmap_time);
           // sync();
           startOnMainThreadAsync([this]() {
-            _buffer->fetchPixmap(&_image_pixmap, &_pixmap_time);
+            _buffer->fetchPixmap(&_image_pixmap, &_pixmap_time,
+                                 &_image_options);
             sync();
           });
         });

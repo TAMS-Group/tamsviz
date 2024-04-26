@@ -28,7 +28,6 @@ ShaderManager &Shader::manager() {
 }
 
 static std::string loadShader(const std::string &url) {
-
   static const std::regex local_include_regex(
       "\\s*\\#include\\s+\\\"([^\\>]*)\\\"(.*)?");
 
@@ -49,9 +48,7 @@ static std::string loadShader(const std::string &url) {
   size_t index = 1;
 
   while (getline(istream, line)) {
-
     if (std::regex_match(line, regex_match, local_include_regex)) {
-
       std::string include_url = url;
 
       {
@@ -70,7 +67,6 @@ static std::string loadShader(const std::string &url) {
       ostream << regex_match[2].str() << "\n";
 
     } else if (std::regex_match(line, regex_match, package_include_regex)) {
-
       std::string include_url = regex_match[1].str();
 
       LOG_INFO("package shader include " << include_url);
@@ -80,7 +76,6 @@ static std::string loadShader(const std::string &url) {
       ostream << regex_match[2].str() << "\n";
 
     } else {
-
       ostream << "#line " << index << "\n";
       ostream << line << "\n";
     }
@@ -92,10 +87,10 @@ static std::string loadShader(const std::string &url) {
 };
 
 void Shader::addShader(GLenum type, const std::string &url) {
-
   LOG_INFO("loading shader " << url);
 
-  std::string source = g_tamsviz_shader_preamble + loadShader(url);
+  std::string source =
+      (use_preamble ? g_tamsviz_shader_preamble : "") + loadShader(url);
   if (source.empty()) {
     throw std::runtime_error("shader file " + url + " is empty");
   }

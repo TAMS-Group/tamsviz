@@ -43,15 +43,17 @@ class Shader : public ResourceBase {
   GLuint _program = 0;
   std::string _vertex_shader_url;
   std::string _fragment_shader_url;
+  bool use_preamble = true;
   void create();
   void destroy();
   void addShader(GLenum type, const std::string &url);
 
-public:
+ public:
   Shader(const std::string &vertex_shader_url,
-         const std::string &fragment_shader_url)
+         const std::string &fragment_shader_url, bool use_preamble = true)
       : _vertex_shader_url(vertex_shader_url),
-        _fragment_shader_url(fragment_shader_url) {}
+        _fragment_shader_url(fragment_shader_url),
+        use_preamble(use_preamble) {}
   ~Shader() { destroy(); }
   int program();
   void use();

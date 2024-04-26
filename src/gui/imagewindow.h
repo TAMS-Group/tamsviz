@@ -24,6 +24,9 @@ AUTO_STRUCT_BEGIN(ImageWindowOptions);
 AUTO_STRUCT_FIELD(bool, normalizeDepth, true);
 AUTO_STRUCT_FIELD(bool, colorMapApply, false);
 AUTO_STRUCT_FIELD(size_t, colorMapType, 9, min = 0);
+AUTO_STRUCT_FIELD(double, brightness, 1);
+AUTO_STRUCT_FIELD(double, saturation, 1);
+AUTO_STRUCT_FIELD(bool, toneMapping, false);
 AUTO_STRUCT_END();
 
 class AnnotationView;
@@ -35,7 +38,7 @@ class ImageWindow : public ContentWindowBase {
   static constexpr double maxZoom() { return 1000000; }
   Watcher _options_watcher;
 
-public:
+ public:
   std::shared_ptr<ImageAnnotationBase> new_annotation;
   std::shared_ptr<AnnotationSpan> new_annotation_span;
   std::shared_ptr<Type> annotation_type;

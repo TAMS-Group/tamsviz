@@ -3,6 +3,7 @@
 
 // #include <package://tamsviz/shaders/common.glsl>
 #include "common.glsl"
+#include "srgb.glsl"
 
 in vec4 position;
 in vec3 normal;
