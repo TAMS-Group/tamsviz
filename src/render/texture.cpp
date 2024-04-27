@@ -35,18 +35,18 @@ GLuint Texture::update(const cv::Mat &img) {
   V_GL(glActiveTexture(GL_TEXTURE0));
   V_GL(glBindTexture(GL_TEXTURE_2D, _id));
   switch (image.elemSize()) {
-  case 1:
-    V_GL(glPixelStorei(GL_UNPACK_ALIGNMENT, 1));
-    break;
-  case 2:
-    V_GL(glPixelStorei(GL_UNPACK_ALIGNMENT, 2));
-    break;
-  case 3:
-    V_GL(glPixelStorei(GL_UNPACK_ALIGNMENT, 1));
-    break;
-  default:
-    V_GL(glPixelStorei(GL_UNPACK_ALIGNMENT, 4));
-    break;
+    case 1:
+      V_GL(glPixelStorei(GL_UNPACK_ALIGNMENT, 1));
+      break;
+    case 2:
+      V_GL(glPixelStorei(GL_UNPACK_ALIGNMENT, 2));
+      break;
+    case 3:
+      V_GL(glPixelStorei(GL_UNPACK_ALIGNMENT, 1));
+      break;
+    default:
+      V_GL(glPixelStorei(GL_UNPACK_ALIGNMENT, 4));
+      break;
   }
   V_GL(glPixelStorei(GL_UNPACK_ROW_LENGTH, image.step / image.elemSize()));
   if (_mipmap) {
@@ -60,53 +60,56 @@ GLuint Texture::update(const cv::Mat &img) {
   V_GL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT));
   if (_type == TextureType::Color) {
     switch (image.channels()) {
-    case 3:
-      V_GL(glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8, image.cols, image.rows, 0,
-                        GL_BGR, GL_UNSIGNED_BYTE, image.data));
-      break;
-    case 4:
-      V_GL(glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8_ALPHA8, image.cols,
-                        image.rows, 0, GL_BGRA, GL_UNSIGNED_BYTE, image.data));
-      break;
-    default:
-      LOG_ERROR("invalid channel count " << image.channels()
-                                         << " for color image " << _url);
+      case 3:
+        V_GL(glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8, image.cols, image.rows, 0,
+                          GL_BGR, GL_UNSIGNED_BYTE, image.data));
+        break;
+      case 4:
+        V_GL(glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8_ALPHA8, image.cols,
+                          image.rows, 0, GL_BGRA, GL_UNSIGNED_BYTE,
+                          image.data));
+        break;
+      default:
+        LOG_ERROR("invalid channel count " << image.channels()
+                                           << " for color image " << _url);
     }
   }
   if (_type == TextureType::Normal) {
     switch (image.channels()) {
-    case 3:
-      V_GL(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, image.cols, image.rows, 0,
-                        GL_BGR, GL_UNSIGNED_BYTE, image.data));
-      break;
-    case 4:
-      V_GL(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, image.cols, image.rows, 0,
-                        GL_BGRA, GL_UNSIGNED_BYTE, image.data));
-      break;
-    default:
-      LOG_ERROR("invalid channel count " << image.channels()
-                                         << " for normal map " << _url);
+      case 3:
+        V_GL(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, image.cols, image.rows, 0,
+                          GL_BGR, GL_UNSIGNED_BYTE, image.data));
+        break;
+      case 4:
+        V_GL(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, image.cols, image.rows, 0,
+                          GL_BGRA, GL_UNSIGNED_BYTE, image.data));
+        break;
+      default:
+        LOG_ERROR("invalid channel count " << image.channels()
+                                           << " for normal map " << _url);
     }
   }
   if (_type == TextureType::Linear) {
     switch (image.channels()) {
-    case 1:
-      V_GL(glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, image.cols, image.rows, 0,
-                        GL_RED, GL_UNSIGNED_BYTE, image.data));
-      break;
-    case 3:
-      V_GL(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, image.cols, image.rows, 0,
-                        GL_BGR, GL_UNSIGNED_BYTE, image.data));
-      break;
-    case 4:
-      V_GL(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, image.cols, image.rows, 0,
-                        GL_BGRA, GL_UNSIGNED_BYTE, image.data));
-      break;
-    default:
-      LOG_ERROR("invalid channel count " << image.channels()
-                                         << " for color image " << _url);
+      case 1:
+        V_GL(glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, image.cols, image.rows, 0,
+                          GL_RED, GL_UNSIGNED_BYTE, image.data));
+        break;
+      case 3:
+        V_GL(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, image.cols, image.rows, 0,
+                          GL_BGR, GL_UNSIGNED_BYTE, image.data));
+        break;
+      case 4:
+        V_GL(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, image.cols, image.rows, 0,
+                          GL_BGRA, GL_UNSIGNED_BYTE, image.data));
+        break;
+      default:
+        LOG_ERROR("invalid channel count " << image.channels()
+                                           << " for color image " << _url);
     }
   }
+  V_GL(glPixelStorei(GL_UNPACK_ROW_LENGTH, 0));
+  V_GL(glPixelStorei(GL_UNPACK_ALIGNMENT, 4));
   if (_mipmap) {
     V_GL(glGenerateMipmap(GL_TEXTURE_2D));
   }

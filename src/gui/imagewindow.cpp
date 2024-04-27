@@ -354,39 +354,42 @@ ImageWindow::ImageWindow() {
     std::shared_ptr<const Message> _image;
     std::condition_variable _put_condition;
     std::thread _worker;
-    QPixmap _pixmap;
+    // QPixmap _pixmap;
     bool _stop = false;
-    ros::Time _image_time, _pixmap_time;
-    ImageWindowOptions _options_in, _options_out;
+    ros::Time _image_time, _out_time;
+    // ImageWindowOptions _options_in, _out_opts;
+    cv::Mat _out_mat;
+    std::string _out_encoding;
 
-    static QImage mat2image(const cv::Mat &mat,
-                            const std::string &img_encoding) {
-      switch (mat.type()) {
-        case CV_8UC1:
-          return QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
-                        QImage::Format_Grayscale8);
-        case CV_8UC2:
-          LOG_WARN_THROTTLE(
-              1, "image format not yet supported " << mat.type() << " CV_8UC2");
-          return QImage();
-        case CV_8UC3:
-          if (img_encoding == "bgr8" || img_encoding == "bgr16") {
-            cv::cvtColor(mat, mat, cv::COLOR_BGR2RGB);
-          }
-          return QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
-                        QImage::Format_RGB888);
-        case CV_8UC4:
-          if (img_encoding == "bgra8" || img_encoding == "bgra16") {
-            cv::cvtColor(mat, mat, cv::COLOR_BGRA2RGBA);
-          }
-          return QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
-                        QImage::Format_RGBA8888);
-          break;
-        default:
-          LOG_WARN_THROTTLE(1, "image format not yet supported " << mat.type());
-          return QImage();
-      }
-    }
+    // static QImage mat2image(const cv::Mat &mat,
+    //                         const std::string &img_encoding) {
+    //   switch (mat.type()) {
+    //     case CV_8UC1:
+    //       return QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
+    //                     QImage::Format_Grayscale8);
+    //     case CV_8UC2:
+    //       LOG_WARN_THROTTLE(
+    //           1, "image format not yet supported " << mat.type() << "
+    //           CV_8UC2");
+    //       return QImage();
+    //     case CV_8UC3:
+    //       if (img_encoding == "bgr8" || img_encoding == "bgr16") {
+    //         cv::cvtColor(mat, mat, cv::COLOR_BGR2RGB);
+    //       }
+    //       return QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
+    //                     QImage::Format_RGB888);
+    //     case CV_8UC4:
+    //       if (img_encoding == "bgra8" || img_encoding == "bgra16") {
+    //         cv::cvtColor(mat, mat, cv::COLOR_BGRA2RGBA);
+    //       }
+    //       return QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
+    //                     QImage::Format_RGBA8888);
+    //       break;
+    //     default:
+    //       LOG_WARN_THROTTLE(1, "image format not yet supported " <<
+    //       mat.type()); return QImage();
+    //   }
+    // }
 
     static void removeNotFinite(cv::Mat &mat) {
       switch (mat.type()) {
@@ -423,37 +426,37 @@ ImageWindow::ImageWindow() {
       }
     }
 
-    static void to8Bit(cv::Mat &mat) {
-      switch (mat.type()) {
-        case CV_16UC1:
-          mat.convertTo(mat, CV_8U, 1.0 / 256);
-          break;
-        case CV_32FC1:
-          mat.convertTo(mat, CV_8U, 255.0);
-          break;
-        case CV_64FC1:
-          mat.convertTo(mat, CV_8U, 255.0);
-          break;
-        case CV_16UC3:
-          mat.convertTo(mat, CV_8UC3, 1.0 / 256.0);
-          break;
-        case CV_32FC3:
-          mat.convertTo(mat, CV_8UC3, 255.0);
-          break;
-        case CV_64FC3:
-          mat.convertTo(mat, CV_8UC3, 255.0);
-          break;
-        case CV_16UC4:
-          mat.convertTo(mat, CV_8UC4, 1.0 / 256.0);
-          break;
-        case CV_32FC4:
-          mat.convertTo(mat, CV_8UC4, 255.0);
-          break;
-        case CV_64FC4:
-          mat.convertTo(mat, CV_8UC4, 255.0);
-          break;
-      }
-    }
+    // static void to8Bit(cv::Mat &mat) {
+    //   switch (mat.type()) {
+    //     case CV_16UC1:
+    //       mat.convertTo(mat, CV_8U, 1.0 / 256);
+    //       break;
+    //     case CV_32FC1:
+    //       mat.convertTo(mat, CV_8U, 255.0);
+    //       break;
+    //     case CV_64FC1:
+    //       mat.convertTo(mat, CV_8U, 255.0);
+    //       break;
+    //     case CV_16UC3:
+    //       mat.convertTo(mat, CV_8UC3, 1.0 / 256.0);
+    //       break;
+    //     case CV_32FC3:
+    //       mat.convertTo(mat, CV_8UC3, 255.0);
+    //       break;
+    //     case CV_64FC3:
+    //       mat.convertTo(mat, CV_8UC3, 255.0);
+    //       break;
+    //     case CV_16UC4:
+    //       mat.convertTo(mat, CV_8UC4, 1.0 / 256.0);
+    //       break;
+    //     case CV_32FC4:
+    //       mat.convertTo(mat, CV_8UC4, 255.0);
+    //       break;
+    //     case CV_64FC4:
+    //       mat.convertTo(mat, CV_8UC4, 255.0);
+    //       break;
+    //   }
+    // }
 
     static bool msg2mat(const std::shared_ptr<const Message> &image,
                         cv::Mat &mat, std::string &encoding) {
@@ -504,7 +507,7 @@ ImageWindow::ImageWindow() {
       _worker = std::thread([this]() {
         while (true) {
           std::shared_ptr<const Message> image;
-          ImageWindowOptions options;
+          // ImageWindowOptions options;
           {
             std::unique_lock<std::mutex> lock(_mutex);
             while (true) {
@@ -514,7 +517,7 @@ ImageWindow::ImageWindow() {
               if (_pending) {
                 _pending = false;
                 image = _image;
-                options = _options_in;
+                // options = _options_in;
                 break;
               }
               _put_condition.wait(lock);
@@ -523,7 +526,9 @@ ImageWindow::ImageWindow() {
           if (image == nullptr) {
             {
               std::unique_lock<std::mutex> lock(_mutex);
-              _pixmap = QPixmap();
+              // _pixmap = QPixmap();
+              _out_mat = cv::Mat();
+              _out_encoding = "";
             }
             continue;
           }
@@ -542,39 +547,45 @@ ImageWindow::ImageWindow() {
 
           removeNotFinite(mat);
 
-          if (options.normalizeDepth) {
-            switch (mat.type()) {
-              case CV_16UC1:
-                cv::normalize(mat, mat, 0x0000, 0xffff, cv::NORM_MINMAX);
-                break;
-              case CV_32FC1:
-              case CV_64FC1:
-                cv::normalize(mat, mat, 0.0, 1.0, cv::NORM_MINMAX);
-                break;
-            }
-          }
+          // if (options.normalizeDepth) {
+          //   switch (mat.type()) {
+          //     case CV_16UC1:
+          //       cv::normalize(mat, mat, 0x0000, 0xffff, cv::NORM_MINMAX);
+          //       break;
+          //     case CV_32FC1:
+          //     case CV_64FC1:
+          //       cv::normalize(mat, mat, 0.0, 1.0, cv::NORM_MINMAX);
+          //       break;
+          //   }
+          // }
 
-          to8Bit(mat);
+          // to8Bit(mat);
 
-          if (options.colorMapApply &&
-              (mat.type() == CV_8UC1 || mat.type() == CV_8UC3)) {
-            try {
-              cv::applyColorMap(mat, mat, options.colorMapType);
-            } catch (const cv::Exception &ex) {
-              LOG_ERROR_THROTTLE(1.0, "Failed to apply color map: " + ex.msg);
-            }
-          }
+          // if (options.colorMapApply &&
+          //     (mat.type() == CV_8UC1 || mat.type() == CV_8UC3)) {
+          //   try {
+          //     cv::applyColorMap(mat, mat, options.colorMapType);
+          //   } catch (const cv::Exception &ex) {
+          //     LOG_ERROR_THROTTLE(1.0, "Failed to apply color map: " +
+          //     ex.msg);
+          //   }
+          // }
 
-          auto pixmap = QPixmap::fromImage(mat2image(mat, encoding));
+          // auto pixmap = QPixmap::fromImage(mat2image(mat, encoding));
           {
             std::unique_lock<std::mutex> lock(_mutex);
-            _pixmap = pixmap;
-            _pixmap_time = _image_time;
-            _options_out = options;
+            // _pixmap = pixmap;
+            _out_mat = mat;
+            _out_time = _image_time;
+            // _out_opts = options;
+            _out_encoding = encoding;
           }
 
+          // LOG_DEBUG("imagewindow processing finished, image size "
+          //           << pixmap.width() << " x " << pixmap.height());
+
           LOG_DEBUG("imagewindow processing finished, image size "
-                    << pixmap.width() << " x " << pixmap.height());
+                    << mat.cols << " x " << mat.rows);
 
           ready();
         }
@@ -600,38 +611,50 @@ ImageWindow::ImageWindow() {
       }
       _put_condition.notify_one();
     }
-    void refresh(const ImageWindowOptions &options) {
-      LOG_DEBUG("imagewindow queue refresh");
-      std::unique_lock<std::mutex> lock(_mutex);
-      _options_in = options;
-      _pending = true;
-      _put_condition.notify_one();
-    }
-    void fetchPixmap(QPixmap *pixmap, ros::Time *time,
-                     ImageWindowOptions *options) {
+    // void refresh(const ImageWindowOptions &options) {
+    //   LOG_DEBUG("imagewindow queue refresh");
+    //   std::unique_lock<std::mutex> lock(_mutex);
+    //   _options_in = options;
+    //   _pending = true;
+    //   _put_condition.notify_one();
+    // }
+    // void fetchPixmap(QPixmap *pixmap, ros::Time *time,
+    //                  ImageWindowOptions *options) {
+    //   LOG_DEBUG("imagewindow queue fetch");
+    //   std::unique_lock<std::mutex> lock(_mutex);
+    //   *pixmap = _pixmap;
+    //   *time = _pixmap_time;
+    //   *options = _options_out;
+    // }
+    void pull(cv::Mat *mat, ros::Time *time,  // ImageWindowOptions *options,
+              std::string *encoding) {
       LOG_DEBUG("imagewindow queue fetch");
       std::unique_lock<std::mutex> lock(_mutex);
-      *pixmap = _pixmap;
-      *time = _pixmap_time;
-      *options = _options_out;
+      *mat = _out_mat;
+      *time = _out_time;
+      // *options = _out_opts;
+      *encoding = _out_encoding;
     }
   };
   std::shared_ptr<MessageBuffer> buffer = std::make_shared<MessageBuffer>();
 
-  _refresh_callback = [buffer](const ImageWindowOptions &options) {
-    buffer->refresh(options);
-  };
+  // _refresh_callback = [buffer](const ImageWindowOptions &options) {
+  //   // buffer->refresh(options);
+  // };
 
   {
     auto *button = new FlatButton();
     button->setIcon(MATERIAL_ICON("photo_camera", 0.0));
     button->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
     connect(button, &QPushButton::clicked, this, [this, buffer]() {
-      QPixmap screenshot;
+      // QPixmap screenshot;
+      cv::Mat screenshot;
       ros::Time time;
       ImageWindowOptions opts;
-      buffer->fetchPixmap(&screenshot, &time, &opts);
-      if (!screenshot) {
+      std::string encoding;
+      // buffer->pull(&screenshot, &time, &opts, &encoding);
+      buffer->pull(&screenshot, &time, &encoding);
+      if (screenshot.empty()) {
         QMessageBox::warning(nullptr, "Error",
                              "No image received. Select image topic.");
         return;
@@ -679,7 +702,8 @@ ImageWindow::ImageWindow() {
           }
           file_name += "png";
         }
-        if (screenshot.save(file_name)) {
+        // if (screenshot.save(file_name)) {
+        if (cv::imwrite(file_name.toStdString().c_str(), screenshot)) {
           LOG_SUCCESS("screenshot saved: " << file_name.toStdString());
         } else {
           LOG_ERROR("failed to save screenshot: " << file_name.toStdString());
@@ -704,18 +728,52 @@ ImageWindow::ImageWindow() {
     addToolWidgetRight(button);
   }
 
-  class GraphicsPixmapItemGL : public QGraphicsPixmapItem {
-    std::unique_ptr<Shader> _shader;
-    std::unique_ptr<QOpenGLTexture> _texture;
+  class GraphicsPixmapItemGL : public QGraphicsRectItem {
+    // std::unique_ptr<Shader> _shader;
+    // std::unique_ptr<QOpenGLTexture> _texture;
+    std::unique_ptr<Texture> _texture;
+    cv::Mat _mat;
     ImageWindowOptions _options;
+    std::string _encoding;
+    bool _dirty = true;
 
    public:
-    void setOptions(const ImageWindowOptions &options) { _options = options; }
+    void setImage(const cv::Mat &mat, const std::string &encoding) {
+      _mat = mat;
+      _encoding = encoding;
+      _dirty = true;
+      auto r = rect();
+      r.setWidth(mat.cols);
+      r.setHeight(mat.rows);
+      setRect(r);
+    }
+    void setOptions(const ImageWindowOptions &options) {
+      _options = options;
+      update();
+    }
     virtual void paint(QPainter *painter,
                        const QStyleOptionGraphicsItem *option,
                        QWidget *widget) override {
+      if (_mat.empty()) {
+        return;
+      }
+
+      // return;
+
       // LOG_INFO(typeid(painter->device()).name());
       painter->beginNativePainting();
+
+      bool texture_2d_was_enabled = false;
+      V_GL(texture_2d_was_enabled = glIsEnabled(GL_TEXTURE_2D));
+      V_GL(glEnable(GL_TEXTURE_2D));
+
+      GLint old_texture = 0;
+      V_GL(glGetIntegerv(GL_TEXTURE_BINDING_2D, &old_texture));
+
+      GLint old_program = 0;
+      V_GL(glGetIntegerv(GL_CURRENT_PROGRAM, &old_program));
+
+      static std::unique_ptr<Shader> _shader;
       if (!_shader) {
         _shader.reset(new Shader(
             "package://" ROS_PACKAGE_NAME "/shaders/image_vert.glsl",
@@ -724,19 +782,80 @@ ImageWindow::ImageWindow() {
       // glClearColor(1, 0, 0, 1);
       // glClear(GL_COLOR_BUFFER_BIT);
       if (!_texture) {
-        _texture.reset(new QOpenGLTexture(QOpenGLTexture::Target2D));
+        _texture.reset(new Texture(TextureType::Linear));
       }
       // QOpenGLTexture tex(pixmap().toImage());
-      _shader->use();
-      _texture->setData(pixmap().toImage());
-      glUniform1f(glGetUniformLocation(_shader->program(), "brightness"),
-                  _options.brightness);
-      glUniform1f(glGetUniformLocation(_shader->program(), "saturation"),
-                  _options.saturation);
-      glUniform1i(glGetUniformLocation(_shader->program(), "tonemapping"),
-                  (int)_options.toneMapping);
+
+      // _texture->update(_mat);
+      if (_dirty) {
+        _dirty = false;
+        LOG_WARN("uploading image");
+        V_GL(glActiveTexture(GL_TEXTURE0));
+        V_GL(glBindTexture(GL_TEXTURE_2D, _texture->id()));
+        V_GL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR));
+        V_GL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
+        V_GL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP));
+        V_GL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP));
+        switch (_mat.elemSize()) {
+          case 1:
+            V_GL(glPixelStorei(GL_UNPACK_ALIGNMENT, 1));
+            break;
+          case 2:
+            V_GL(glPixelStorei(GL_UNPACK_ALIGNMENT, 2));
+            break;
+          case 3:
+            V_GL(glPixelStorei(GL_UNPACK_ALIGNMENT, 1));
+            break;
+          default:
+            V_GL(glPixelStorei(GL_UNPACK_ALIGNMENT, 4));
+            break;
+        }
+        V_GL(glPixelStorei(GL_UNPACK_ROW_LENGTH, _mat.step / _mat.elemSize()));
+        if (_encoding == sensor_msgs::image_encodings::RGB8) {
+          V_GL(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, _mat.cols, _mat.rows, 0,
+                            GL_RGB, GL_UNSIGNED_BYTE, _mat.data));
+        } else if (_encoding == sensor_msgs::image_encodings::TYPE_8UC1) {
+          V_GL(glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, _mat.cols, _mat.rows, 0,
+                            GL_RED, GL_UNSIGNED_BYTE, _mat.data));
+        } else if (_encoding == sensor_msgs::image_encodings::TYPE_8UC2) {
+          V_GL(glTexImage2D(GL_TEXTURE_2D, 0, GL_RG8, _mat.cols, _mat.rows, 0,
+                            GL_RG, GL_UNSIGNED_BYTE, _mat.data));
+        } else if (_encoding == sensor_msgs::image_encodings::TYPE_8UC3) {
+          V_GL(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, _mat.cols, _mat.rows, 0,
+                            GL_RGB, GL_UNSIGNED_BYTE, _mat.data));
+        } else {
+          LOG_ERROR_THROTTLE(1, "unsupported image format " << _encoding);
+        }
+        V_GL(glPixelStorei(GL_UNPACK_ROW_LENGTH, 0));
+        V_GL(glPixelStorei(GL_UNPACK_ALIGNMENT, 4));
+      } else {
+        LOG_SUCCESS("keeping image texture");
+      }
+
+#if 1
+
+      {
+        _shader->use();
+        V_GL(glUniform1f(glGetUniformLocation(_shader->program(), "brightness"),
+                         _options.brightness));
+        V_GL(glUniform1f(glGetUniformLocation(_shader->program(), "saturation"),
+                         _options.saturation));
+        V_GL(
+            glUniform1i(glGetUniformLocation(_shader->program(), "tonemapping"),
+                        (int)_options.toneMapping));
+        V_GL(glUniform1i(glGetUniformLocation(_shader->program(), "channels"),
+                         (int)_mat.channels()));
+      }
+
+      auto rect = boundingRect();
+      LOG_INFO(rect.left() << " " << rect.top() << " " << rect.right() << " "
+                           << rect.bottom());
       ((QGLContext *)QGLContext::currentContext())
-          ->drawTexture(boundingRect(), _texture->textureId());
+          ->drawTexture(rect, _texture->id());
+      V_GL(glBindTexture(GL_TEXTURE_2D, 0));
+
+#endif
+
       // auto rect = boundingRect();
       // float rect[4 * 2] = {
       //     rect.left(),  rect.top(),     //
@@ -744,7 +863,14 @@ ImageWindow::ImageWindow() {
       //     rect.right(), rect.bottom(),  //
       //     rect.left(),  rect.bottom(),  //
       // };
+
+      V_GL(glBindTexture(GL_TEXTURE_2D, old_texture));
+      if (!texture_2d_was_enabled) V_GL(glDisable(GL_TEXTURE_2D));
+
+      V_GL(glUseProgram(old_program));
+
       painter->endNativePainting();
+
       // QGraphicsPixmapItem::paint(painter, option, widget);
     }
   };
@@ -828,13 +954,15 @@ ImageWindow::ImageWindow() {
     ImageWindow *_parent = nullptr;
     std::shared_ptr<MessageBuffer> _buffer;
     GraphicsScene *_scene = nullptr;
-    QPixmap _image_pixmap;
-    ImageWindowOptions _image_options;
-    ros::Time _pixmap_time;
+    // QPixmap _image_pixmap;
+    cv::Mat _image_mat;
+    // ImageWindowOptions _image_options;
+    ros::Time _image_time;
+    std::string _image_encoding;
     GraphicsPixmapItemGL *_image_item = nullptr;
     double windowScale() const {
-      return std::min(width() * 1.0 / std::max(1, _image_pixmap.width()),
-                      height() * 1.0 / std::max(1, _image_pixmap.height()));
+      return std::min(width() * 1.0 / std::max(1, _image_mat.cols),
+                      height() * 1.0 / std::max(1, _image_mat.rows));
     }
     double zoomFactor() const { return windowScale() * _parent->zoom(); }
 
@@ -847,16 +975,16 @@ ImageWindow::ImageWindow() {
         double s = 1000000;
         scene()->setSceneRect(-s, -s, 2 * s, 2 * s);
       }
-      _image_item->setPixmap(_image_pixmap);
-      _image_item->setOptions(_image_options);
+      // _image_item->update(_image_mat, _image_options, _image_encoding);
       {
         LockScope ws;
+        _image_item->setOptions(_parent->options());
         {
           resetTransform();
           double zoom = zoomFactor();
           scale(zoom, zoom);
-          centerOn(_parent->center().x() * _image_pixmap.width(),
-                   _parent->center().y() * _image_pixmap.height());
+          centerOn(_parent->center().x() * _image_mat.cols,
+                   _parent->center().y() * _image_mat.rows);
         }
         for (auto &pair : _parent->annotation_views) {
           pair.second->ok = false;
@@ -864,7 +992,7 @@ ImageWindow::ImageWindow() {
         if (ws->player) {
           if (auto timeline = ws->document()->timeline()) {
             double current_time =
-                (_pixmap_time - ws->player->startTime()).toSec() + 1e-6;
+                (_image_time - ws->player->startTime()).toSec() + 1e-6;
             for (auto &track_base : timeline->tracks()) {
               if (auto track =
                       std::dynamic_pointer_cast<AnnotationTrack>(track_base)) {
@@ -939,7 +1067,7 @@ ImageWindow::ImageWindow() {
       setScene(_scene);
       _scene->setBackgroundBrush(Qt::black);
       _image_item = new GraphicsPixmapItemGL();
-      _image_item->setTransformationMode(Qt::SmoothTransformation);
+      // _image_item->setTransformationMode(Qt::SmoothTransformation);
       // _image_item->setGraphicsEffect(new QGraphicsShaderEffect());
       _scene->addItem(_image_item);
       buffer->ready.connect(this, [this]() {
@@ -949,8 +1077,9 @@ ImageWindow::ImageWindow() {
           //_buffer->fetchPixmap(&_image_pixmap, &_pixmap_time);
           // sync();
           startOnMainThreadAsync([this]() {
-            _buffer->fetchPixmap(&_image_pixmap, &_pixmap_time,
-                                 &_image_options);
+            _buffer->pull(&_image_mat, &_image_time,  // &_image_options,
+                          &_image_encoding);
+            _image_item->setImage(_image_mat, _image_encoding);
             sync();
           });
         });
@@ -977,8 +1106,8 @@ ImageWindow::ImageWindow() {
             std::min(maxZoom(), std::max(minZoom(), _parent->zoom()));
         sync();
         auto d = (mouse_pos - mapToScene(_last_mouse_pos));
-        _parent->center().x() += d.x() / std::max(1, _image_pixmap.width());
-        _parent->center().y() += d.y() / std::max(1, _image_pixmap.height());
+        _parent->center().x() += d.x() / std::max(1, _image_mat.cols);
+        _parent->center().y() += d.y() / std::max(1, _image_mat.rows);
         ws->modified();
       }
     }
@@ -1012,10 +1141,8 @@ ImageWindow::ImageWindow() {
           event->buttons() == Qt::MiddleButton) {
         LockScope ws;
         auto d = mapToScene(event->pos()) - mapToScene(_last_mouse_pos);
-        _parent->center().x() -=
-            d.x() * 1.0 / std::max(1, _image_pixmap.width());
-        _parent->center().y() -=
-            d.y() * 1.0 / std::max(1, _image_pixmap.height());
+        _parent->center().x() -= d.x() * 1.0 / std::max(1, _image_mat.cols);
+        _parent->center().y() -= d.y() * 1.0 / std::max(1, _image_mat.rows);
         ws->modified();
       }
 
@@ -1045,7 +1172,7 @@ ImageWindow::ImageWindow() {
             if (_parent->annotation_type) {
               ActionScope ws("Annotate");
               double current_time =
-                  (_pixmap_time - ws->player->startTime()).toSec() + 1e-6;
+                  (_image_time - ws->player->startTime()).toSec() + 1e-6;
               std::shared_ptr<AnnotationTrack> current_track =
                   ws->currentAnnotationTrack().resolve(ws());
               if (!current_track) {

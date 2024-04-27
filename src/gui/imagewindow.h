@@ -32,7 +32,7 @@ AUTO_STRUCT_END();
 class AnnotationView;
 
 class ImageWindow : public ContentWindowBase {
-  std::function<void(const ImageWindowOptions &)> _refresh_callback;
+  // std::function<void(const ImageWindowOptions &)> _refresh_callback;
   std::shared_ptr<Subscriber<Message>> subscriber;
   static constexpr double minZoom() { return 0.01; }
   static constexpr double maxZoom() { return 1000000; }
@@ -50,12 +50,14 @@ class ImageWindow : public ContentWindowBase {
   PROPERTY(double, zoom, 1.0, min = minZoom(), max = maxZoom());
   PROPERTY(ImageWindowOptions, options);
   virtual void refresh() override {
+    LOG_DEBUG("refresh");
     ContentWindowBase::refresh();
-    if (_options_watcher.changed(options())) {
-      if (_refresh_callback) {
-        _refresh_callback(options());
-      }
-    }
+    this->window()->update();
+    // if (_options_watcher.changed(options())) {
+    //   if (_refresh_callback) {
+    //     _refresh_callback(options());
+    //   }
+    // }
   }
 };
 DECLARE_TYPE(ImageWindow, ContentWindowBase);
