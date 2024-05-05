@@ -30,8 +30,18 @@
 
 // #include <QGraphicsShaderEffect>
 
-struct AnnotationView : QGraphicsItem {
+struct AnnotationViewBase : QGraphicsItem {
   bool ok = false;
+  virtual void sync(const std::shared_ptr<Workspace> &ws, double zoom_factor) {}
+};
+
+// struct SpanAnnotationView : AnnotationViewBase {
+//   QGraphicsTextItem text;
+//   SpanAnnotationView(const std::string &label)
+//       : text(QString::fromStdString(label), this) {}
+// };
+
+struct ImageAnnotationView : AnnotationViewBase {
   ImageWindow *_window = nullptr;
   std::shared_ptr<AnnotationTrack> _track;
   std::shared_ptr<AnnotationSpan> _span;
@@ -43,9 +53,9 @@ struct AnnotationView : QGraphicsItem {
   double _zoom_factor = 1.0;
 
   struct ControlPointHandle : QGraphicsEllipseItem {
-    AnnotationView *_parent = nullptr;
+    ImageAnnotationView *_parent = nullptr;
     size_t _control_point_index = 0;
-    ControlPointHandle(AnnotationView *parent, size_t control_point_index)
+    ControlPointHandle(ImageAnnotationView *parent, size_t control_point_index)
         : QGraphicsEllipseItem(parent),
           _parent(parent),
           _control_point_index(control_point_index) {
@@ -106,10 +116,10 @@ struct AnnotationView : QGraphicsItem {
   };
   std::vector<ControlPointHandle *> control_point_handles;
 
-  AnnotationView(ImageWindow *window, const std::shared_ptr<Workspace> &ws,
-                 const std::shared_ptr<AnnotationTrack> &track,
-                 const std::shared_ptr<AnnotationSpan> &span,
-                 const std::shared_ptr<ImageAnnotationBase> &annotation) {
+  ImageAnnotationView(ImageWindow *window, const std::shared_ptr<Workspace> &ws,
+                      const std::shared_ptr<AnnotationTrack> &track,
+                      const std::shared_ptr<AnnotationSpan> &span,
+                      const std::shared_ptr<ImageAnnotationBase> &annotation) {
     _window = window;
     _track = track;
     _span = span;
@@ -136,7 +146,8 @@ struct AnnotationView : QGraphicsItem {
       _collider = _visual;
     }
   }
-  virtual void sync(const std::shared_ptr<Workspace> &ws, double zoom_factor) {
+  virtual void sync(const std::shared_ptr<Workspace> &ws,
+                    double zoom_factor) override {
     _zoom_factor = zoom_factor;
 
     updateShape();
@@ -237,10 +248,11 @@ struct AnnotationView : QGraphicsItem {
     }
     if (event->buttons() == Qt::LeftButton) {
       for (auto &p : _window->annotation_views) {
-        auto *view = p.second;
-        if (view->_selected) {
-          view->setPos(view->pos() +
-                       (event->scenePos() - event->lastScenePos()));
+        if (auto *view = dynamic_cast<ImageAnnotationView *>(p.second)) {
+          if (view->_selected) {
+            view->setPos(view->pos() +
+                         (event->scenePos() - event->lastScenePos()));
+          }
         }
       }
     }
@@ -255,12 +267,13 @@ struct AnnotationView : QGraphicsItem {
         auto delta =
             (event->scenePos() - event->buttonDownScenePos(Qt::LeftButton));
         for (auto &p : _window->annotation_views) {
-          auto *view = p.second;
-          if (view->_selected) {
-            auto annotation = p.first;
-            for (auto &point : annotation->controlPoints()) {
-              point.x() += delta.x();
-              point.y() += delta.y();
+          if (auto *view = dynamic_cast<ImageAnnotationView *>(p.second)) {
+            if (view->_selected) {
+              auto annotation = p.first;
+              for (auto &point : annotation->controlPoints()) {
+                point.x() += delta.x();
+                point.y() += delta.y();
+              }
             }
           }
         }
@@ -533,9 +546,9 @@ ImageWindow::ImageWindow() {
             continue;
           }
 
-          PROFILER();
+          PROFILER("image processing thread");
 
-          LOG_DEBUG("imagewindow start processing");
+          // LOG_DEBUG("imagewindow start processing");
 
           cv::Mat mat;
           std::string encoding;
@@ -573,6 +586,7 @@ ImageWindow::ImageWindow() {
 
           // auto pixmap = QPixmap::fromImage(mat2image(mat, encoding));
           {
+            PROFILER("image processing sync");
             std::unique_lock<std::mutex> lock(_mutex);
             // _pixmap = pixmap;
             _out_mat = mat;
@@ -584,10 +598,13 @@ ImageWindow::ImageWindow() {
           // LOG_DEBUG("imagewindow processing finished, image size "
           //           << pixmap.width() << " x " << pixmap.height());
 
-          LOG_DEBUG("imagewindow processing finished, image size "
-                    << mat.cols << " x " << mat.rows);
+          // LOG_DEBUG("imagewindow processing finished, image size "
+          //           << mat.cols << " x " << mat.rows);
 
-          ready();
+          {
+            PROFILER("image processing ready");
+            ready();
+          }
         }
       });
     }
@@ -600,7 +617,8 @@ ImageWindow::ImageWindow() {
       _worker.join();
     }
     void putImage(const std::shared_ptr<const Message> &msg) {
-      LOG_DEBUG("imagewindow queue put");
+      // LOG_DEBUG("imagewindow queue put");
+      PROFILER();
       std::unique_lock<std::mutex> lock(_mutex);
       _pending = true;
       _image = nullptr;
@@ -628,7 +646,8 @@ ImageWindow::ImageWindow() {
     // }
     void pull(cv::Mat *mat, ros::Time *time,  // ImageWindowOptions *options,
               std::string *encoding) {
-      LOG_DEBUG("imagewindow queue fetch");
+      // LOG_DEBUG("imagewindow queue fetch");
+      PROFILER();
       std::unique_lock<std::mutex> lock(_mutex);
       *mat = _out_mat;
       *time = _out_time;
@@ -739,6 +758,7 @@ ImageWindow::ImageWindow() {
 
    public:
     void setImage(const cv::Mat &mat, const std::string &encoding) {
+      // return;
       _mat = mat;
       _encoding = encoding;
       _dirty = true;
@@ -749,14 +769,20 @@ ImageWindow::ImageWindow() {
     }
     void setOptions(const ImageWindowOptions &options) {
       _options = options;
-      update();
+      // update();
     }
     virtual void paint(QPainter *painter,
                        const QStyleOptionGraphicsItem *option,
                        QWidget *widget) override {
+      // return;
+
+      PROFILER();
+
       if (_mat.empty()) {
         return;
       }
+
+      // LOG_DEBUG("paint image " << this << " begin");
 
       // return;
 
@@ -789,7 +815,7 @@ ImageWindow::ImageWindow() {
       // _texture->update(_mat);
       if (_dirty) {
         _dirty = false;
-        LOG_WARN("uploading image");
+        // LOG_WARN("uploading image");
         V_GL(glActiveTexture(GL_TEXTURE0));
         V_GL(glBindTexture(GL_TEXTURE_2D, _texture->id()));
         V_GL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR));
@@ -814,6 +840,9 @@ ImageWindow::ImageWindow() {
         if (_encoding == sensor_msgs::image_encodings::RGB8) {
           V_GL(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, _mat.cols, _mat.rows, 0,
                             GL_RGB, GL_UNSIGNED_BYTE, _mat.data));
+        } else if (_encoding == sensor_msgs::image_encodings::BGR8) {
+          V_GL(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, _mat.cols, _mat.rows, 0,
+                            GL_BGR, GL_UNSIGNED_BYTE, _mat.data));
         } else if (_encoding == sensor_msgs::image_encodings::TYPE_8UC1) {
           V_GL(glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, _mat.cols, _mat.rows, 0,
                             GL_RED, GL_UNSIGNED_BYTE, _mat.data));
@@ -829,7 +858,7 @@ ImageWindow::ImageWindow() {
         V_GL(glPixelStorei(GL_UNPACK_ROW_LENGTH, 0));
         V_GL(glPixelStorei(GL_UNPACK_ALIGNMENT, 4));
       } else {
-        LOG_SUCCESS("keeping image texture");
+        // LOG_SUCCESS("keeping image texture");
       }
 
 #if 1
@@ -848,8 +877,8 @@ ImageWindow::ImageWindow() {
       }
 
       auto rect = boundingRect();
-      LOG_INFO(rect.left() << " " << rect.top() << " " << rect.right() << " "
-                           << rect.bottom());
+      // LOG_INFO(rect.left() << " " << rect.top() << " " << rect.right() << " "
+      //                      << rect.bottom());
       ((QGLContext *)QGLContext::currentContext())
           ->drawTexture(rect, _texture->id());
       V_GL(glBindTexture(GL_TEXTURE_2D, 0));
@@ -872,6 +901,8 @@ ImageWindow::ImageWindow() {
       painter->endNativePainting();
 
       // QGraphicsPixmapItem::paint(painter, option, widget);
+
+      // LOG_DEBUG("paint image " << this << " ready");
     }
   };
 
@@ -943,11 +974,25 @@ ImageWindow::ImageWindow() {
 
       virtual void drawForeground(QPainter *painter,
                                   const QRectF &rect) override {
+        PROFILER();
         QGraphicsScene::drawForeground(painter, rect);
         painter->save();
         painter->resetTransform();
         _parent->_parent->paintAnnotationHUD(painter,
                                              _parent->_parent->annotation_type);
+        {
+          auto &text = _parent->_annotation_span_text;
+          if (!text.isEmpty()) {
+            auto rect = QRect(QPoint(0, 0), painter->window().size());
+            rect = rect.marginsRemoved(QMargins(0, 0, 0, 7));
+            auto flags = Qt::AlignBottom | Qt::AlignHCenter;
+            auto trect = painter->fontMetrics().boundingRect(rect, flags, text);
+            trect = trect.marginsAdded(QMargins(5, 2, 5, 2));
+            painter->fillRect(trect, QBrush(QColor(0, 0, 0, 150)));
+            painter->setPen(QPen(QBrush(Qt::white), 0));
+            painter->drawText(rect, flags, text);
+          }
+        }
         painter->restore();
       }
     };
@@ -959,6 +1004,7 @@ ImageWindow::ImageWindow() {
     // ImageWindowOptions _image_options;
     ros::Time _image_time;
     std::string _image_encoding;
+    QString _annotation_span_text;
     GraphicsPixmapItemGL *_image_item = nullptr;
     double windowScale() const {
       return std::min(width() * 1.0 / std::max(1, _image_mat.cols),
@@ -968,6 +1014,8 @@ ImageWindow::ImageWindow() {
 
    private:
     void sync() {
+      // LOG_DEBUG("image sync begin");
+      PROFILER();
       if (QApplication::instance()->thread() != QThread::currentThread()) {
         throw std::runtime_error("image view sync called on background thread");
       }
@@ -976,6 +1024,7 @@ ImageWindow::ImageWindow() {
         scene()->setSceneRect(-s, -s, 2 * s, 2 * s);
       }
       // _image_item->update(_image_mat, _image_options, _image_encoding);
+      _annotation_span_text.clear();
       {
         LockScope ws;
         _image_item->setOptions(_parent->options());
@@ -1002,6 +1051,12 @@ ImageWindow::ImageWindow() {
                         span->start() + span->duration() <= current_time) {
                       continue;
                     }
+                    if (!_annotation_span_text.isEmpty()) {
+                      _annotation_span_text += ", ";
+                    }
+                    _annotation_span_text += QString::fromStdString(
+                        (span->label().empty() ? track->label()
+                                               : span->label()));
                     for (auto &annotation_base : span->annotations()) {
                       if (auto annotation =
                               std::dynamic_pointer_cast<ImageAnnotationBase>(
@@ -1011,8 +1066,8 @@ ImageWindow::ImageWindow() {
                         }
                         auto &view = _parent->annotation_views[annotation];
                         if (view == nullptr) {
-                          view = new AnnotationView(_parent, ws(), track, span,
-                                                    annotation);
+                          view = new ImageAnnotationView(_parent, ws(), track,
+                                                         span, annotation);
                           scene()->addItem(view);
                         }
                         view->ok = true;
@@ -1043,6 +1098,7 @@ ImageWindow::ImageWindow() {
         }
       }
       update();
+      // LOG_DEBUG("image sync ready");
     }
 
    protected:
@@ -1071,12 +1127,15 @@ ImageWindow::ImageWindow() {
       // _image_item->setGraphicsEffect(new QGraphicsShaderEffect());
       _scene->addItem(_image_item);
       buffer->ready.connect(this, [this]() {
+        PROFILER("image window buffer->ready");
         // TODO: is this safe?
         QObject o;
         QObject::connect(&o, &QObject::destroyed, this, [this](QObject *o) {
           //_buffer->fetchPixmap(&_image_pixmap, &_pixmap_time);
           // sync();
+          PROFILER("image window buffer->ready 2");
           startOnMainThreadAsync([this]() {
+            PROFILER("buffer->ready 3");
             _buffer->pull(&_image_mat, &_image_time,  // &_image_options,
                           &_image_encoding);
             _image_item->setImage(_image_mat, _image_encoding);
@@ -1086,7 +1145,11 @@ ImageWindow::ImageWindow() {
       });
       LockScope()->modified.connect(this, [this]() {
         // sync();
-        startOnMainThreadAsync([this]() { sync(); });
+        PROFILER("image window document modified");
+        startOnMainThreadAsync([this]() {
+          PROFILER("image window document modified sync");
+          sync();
+        });
       });
     }
     void focusOutEvent(QFocusEvent *event) {
@@ -1145,7 +1208,6 @@ ImageWindow::ImageWindow() {
         _parent->center().y() -= d.y() * 1.0 / std::max(1, _image_mat.rows);
         ws->modified();
       }
-
       _last_mouse_pos = event->pos();
     }
 
@@ -1247,9 +1309,9 @@ ImageWindow::ImageWindow() {
                 _parent->new_annotation->constrain();
                 _parent->new_annotation->render();
                 auto &view = _parent->annotation_views[_parent->new_annotation];
-                view =
-                    new AnnotationView(_parent, ws(), current_track,
-                                       current_span, _parent->new_annotation);
+                view = new ImageAnnotationView(_parent, ws(), current_track,
+                                               current_span,
+                                               _parent->new_annotation);
                 scene()->addItem(view);
               }
               if (_parent->new_annotation->complete) {
@@ -1286,7 +1348,7 @@ ImageWindow::ImageWindow() {
             double distance =
                 (mapFromScene(a.x(), a.y()) - mapFromScene(b.x(), b.y()))
                     .manhattanLength();
-            LOG_DEBUG("diagonal " << distance);
+            // LOG_DEBUG("diagonal " << distance);
             if (distance > 15) {
               ActionScope ws("New Annotation");
               _parent->new_annotation_span->annotations().push_back(

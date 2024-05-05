@@ -56,7 +56,7 @@ static std::shared_ptr<TrackBase> trackAt(const std::shared_ptr<Workspace> &ws,
 class ItemBase : public QObject {
   bool ok = true;
 
-public:
+ public:
   virtual void sync(const std::shared_ptr<Workspace> &ws) {}
   ItemBase() {
     LockScope()->modified.connect(this, [this]() {
@@ -84,7 +84,7 @@ class EditableText : public QGraphicsRectItem, public QObject {
   Qt::Alignment _alignment = (Qt::AlignLeft | Qt::AlignVCenter);
   QFont _font = QApplication::font();
 
-public:
+ public:
   EditableText(QGraphicsItem *parent = nullptr) : QGraphicsRectItem(parent) {
     setPen(QPen(Qt::NoPen));
   }
@@ -153,14 +153,13 @@ public:
 };
 
 class AnnotationSpanItem : public EditableText {
-
   class ResizeHandle : public QGraphicsRectItem {
     AnnotationSpanItem *_parent = nullptr;
     int _side = 0;
     double _drag_offset = 0.0;
     QRectF _drag_start_rect;
 
-  public:
+   public:
     double timeToPosition(double t) {
       LockScope ws;
       double bag_duration = _parent->bag_duration;
@@ -283,7 +282,8 @@ class AnnotationSpanItem : public EditableText {
       return span != _annotation;
     });
   }
-  template <class F> bool snap(double &x, const F &filter) {
+  template <class F>
+  bool snap(double &x, const F &filter) {
     double snap_position = 0;
     bool snapped = false;
     LockScope ws;
@@ -335,9 +335,8 @@ class AnnotationSpanItem : public EditableText {
     return &s;
   }();
 
-public:
+ public:
   AnnotationSpanItem() {
-
     setTextAlignment(Qt::AlignHCenter | Qt::AlignVCenter);
 
     setTextPen(QPen(QBrush(QColor(0, 0, 0)), 1));
@@ -365,7 +364,6 @@ public:
       LockScope ws;
       size_t itrack = std::max(0.0, std::round(y / track_height) - 1.0);
       if (auto track = trackAt(ws(), itrack)) {
-
         setTextPen(QPen(QBrush(QColor(0, 0, 0)), 1));
         QFont font = QApplication::font();
         if (_annotation->label().empty()) {
@@ -668,12 +666,11 @@ public:
 };
 
 class TrackViewBase : public QGraphicsRectItem, public QObject {
-
   class LabelItem : public EditableText {
     TrackViewBase *_parent = nullptr;
     QGraphicsRectItem *_reorder_marker = new QGraphicsRectItem(this);
 
-  protected:
+   protected:
     virtual void mousePressEvent(QGraphicsSceneMouseEvent *event) override {
       static std::weak_ptr<TrackBase> last_clicked_track;
       EditableText::mousePressEvent(event);
@@ -767,7 +764,7 @@ class TrackViewBase : public QGraphicsRectItem, public QObject {
       }
     }
 
-  public:
+   public:
     LabelItem(TrackViewBase *parent) : EditableText(parent), _parent(parent) {}
     virtual void paint(QPainter *painter,
                        const QStyleOptionGraphicsItem *option,
@@ -783,21 +780,20 @@ class TrackViewBase : public QGraphicsRectItem, public QObject {
   std::shared_ptr<TrackBase> _track;
   bool _selected = false;
 
-private:
+ private:
   double scrollPositionX() const {
     auto *view = scene()->views().first();
     QPointF p = view->mapToScene(view->viewport()->rect().topLeft());
     return p.x();
   }
 
-protected:
+ protected:
   const size_t _track_index = 0;
 
-public:
+ public:
   std::shared_ptr<TrackBase> track() const { return _track; }
   TrackViewBase(size_t track_index, std::shared_ptr<TrackBase> track)
       : _track(track), _track_index(track_index) {
-
     setBrush(QBrush(Qt::transparent));
     setPen(QPen(Qt::NoPen));
 
@@ -820,14 +816,12 @@ public:
     setZValue(ws->selection().contains(_track) ? 2 : 1);
     _text->setText(_track->label().c_str());
     if (_selected = ws->selection().contains(_track)) {
-
       _text->setZValue(100002);
       _text->setBrush(QBrush(QColor::fromHsvF(_track->color(), 0.8, 0.6)));
       _text->setPen(QPen(QApplication::palette().brush(QPalette::Mid), 1));
       _text->setTextPen(QPen(QBrush(Qt::white), 1));
 
     } else {
-
       _text->setBrush(QBrush(QColor::fromHsvF(_track->color(), 0.2, 1)));
       _text->setTextPen(QPen(QBrush(Qt::black), 1));
       _text->setPen(QPen(QApplication::palette().brush(QPalette::Mid), 1));
@@ -861,14 +855,14 @@ class GraphTree {
   };
   std::shared_ptr<Data> _data;
 
-public:
+ public:
   struct Sample {
     double x = 0;
     double ymin = 0;
     double ymax = 0;
   };
 
-private:
+ private:
   void sample(size_t ilevel, size_t iitem, double xmin, double xmax,
               double xstep, std::vector<Sample> &samples) {
     auto &item = _data->levels[ilevel].items[iitem];
@@ -898,7 +892,7 @@ private:
     }
   }
 
-public:
+ public:
   void clear() { _data.reset(); }
   void push(double x, double y) {
     // LOG_DEBUG("push " << x << " " << y);
@@ -1044,9 +1038,10 @@ class GraphTrackView : public TrackViewBase {
     }
   }};
 
-public:
+ public:
   GraphTrackView(size_t track_index, std::shared_ptr<GraphTrack> track)
-      : TrackViewBase(track_index, track), _track_height(track_index),
+      : TrackViewBase(track_index, track),
+        _track_height(track_index),
         _track(track) {}
   ~GraphTrackView() {
     LOG_DEBUG("stop");
@@ -1178,7 +1173,7 @@ class AnnotationTrackView : public TrackViewBase {
   std::vector<AnnotationSpanItem *> _span_items;
   QGraphicsRectItem *_clip_rect = new QGraphicsRectItem(this);
 
-private:
+ private:
   void updateItemPrototype(QGraphicsSceneMouseEvent *event) {
     LockScope ws;
     double track_length =
@@ -1207,7 +1202,7 @@ private:
     _item_prototype->setRect(x0, rect().y(), x1 - x0, rect().height());
   }
 
-protected:
+ protected:
   virtual void mousePressEvent(QGraphicsSceneMouseEvent *event) override {
     QGraphicsItem::mousePressEvent(event);
     LockScope ws;
@@ -1273,11 +1268,10 @@ protected:
     }
   }
 
-public:
+ public:
   AnnotationTrackView(size_t track_index,
                       std::shared_ptr<AnnotationTrack> track)
       : TrackViewBase(track_index, track), _track(track) {
-
     // setBrush(QApplication::palette().brush(QPalette::Dark));
     setBrush(QBrush(Qt::transparent));
     setPen(QPen(Qt::NoPen));
@@ -1336,7 +1330,7 @@ class Scene : public QGraphicsScene, public ItemBase {
   bool _enabled = false;
   std::vector<TrackViewBase *> _tracks;
 
-private:
+ private:
   TrackViewBase *createTrackView(size_t index,
                                  const std::shared_ptr<TrackBase> &track) {
     if (auto t = std::dynamic_pointer_cast<AnnotationTrack>(track)) {
@@ -1348,7 +1342,7 @@ private:
     throw std::runtime_error("unknown track type");
   }
 
-public:
+ public:
   virtual void sync(const std::shared_ptr<Workspace> &ws) override {
     //_enabled = (ws->player != nullptr);
     _enabled = true;
@@ -1502,7 +1496,7 @@ public:
 };
 
 class TimeBar : public QGraphicsRectItem, public ItemBase {
-public:
+ public:
   TimeBar() {
     setBrush(QBrush(Qt::transparent));
     setPen(QPen(Qt::NoPen));
@@ -1518,7 +1512,7 @@ public:
 class ScaleItem : public QGraphicsItem, public ItemBase {
   double _duration = 0.001;
 
-public:
+ public:
   ScaleItem() {}
   virtual void sync(const std::shared_ptr<Workspace> &ws) override {
     _duration = timelineDuration(ws);
@@ -1581,9 +1575,9 @@ public:
       {
         painter->save();
         painter->setPen(
-            QPen(QApplication::palette().brush(isEnabled() ? QPalette::Normal
-                                                           : QPalette::Disabled,
-                                               QPalette::ButtonText),
+            QPen(QApplication::palette().brush(
+                     isEnabled() ? QPalette::Normal : QPalette::Disabled,
+                     QPalette::ButtonText),
                  1.0));
         painter->drawLine(rect.x(), track_height, rect.x() + rect.width(),
                           track_height);
@@ -1599,9 +1593,9 @@ public:
                       clip.height());
 
     painter->setPen(
-        QPen(QApplication::palette().brush(isEnabled() ? QPalette::Normal
-                                                       : QPalette::Disabled,
-                                           QPalette::ButtonText),
+        QPen(QApplication::palette().brush(
+                 isEnabled() ? QPalette::Normal : QPalette::Disabled,
+                 QPalette::ButtonText),
              1.0));
 
     double min_width = QFontMetrics(painter->font()).width("     00:00:00.000");
@@ -1638,14 +1632,14 @@ public:
       }
     }
 
-    double t0 = std::max(0.0, std::round(positionToTime(clip.x()) / time_step) *
-                                      time_step -
-                                  time_step);
-    double tn =
-        std::min(_duration, std::round(positionToTime(clip.x() + clip.width()) /
-                                       time_step) *
-                                    time_step +
-                                time_step);
+    double t0 = std::max(
+        0.0, std::round(positionToTime(clip.x()) / time_step) * time_step -
+                 time_step);
+    double tn = std::min(
+        _duration,
+        std::round(positionToTime(clip.x() + clip.width()) / time_step) *
+                time_step +
+            time_step);
     for (double t = t0; t == t0 || t < tn; t += tick_step) {
       drawTick(painter, t);
     }
@@ -1664,7 +1658,7 @@ class SeekHead : public QGraphicsRectItem, public ItemBase {
   double _drag_offset = 0.0;
   QTimer *timer = new QTimer((ItemBase *)this);
 
-public:
+ public:
   SeekHead() {
     setRect(0, -1, 11, track_height);
     auto brush = QBrush(QColor(255, 0, 0));
@@ -1744,7 +1738,6 @@ public:
 };
 
 TimelineWidget::TimelineWidget() : QDockWidget("Timeline") {
-
   LockScope ws;
 
   QWidget *content_widget = new QWidget();
@@ -1982,13 +1975,117 @@ TimelineWidget::TimelineWidget() : QDockWidget("Timeline") {
     auto *button = new FlatButton("Export");
     QMenu *menu = new QMenu(this);
     connect(
+        menu->addAction("Segments"), &QAction::triggered, this,
+        [this](bool checked) {
+          try {
+            LockScope ws;
+            auto player = ws->player;
+            if (!player) {
+              throw std::runtime_error("No bag opened");
+            }
+            std::vector<std::pair<std::shared_ptr<AnnotationTrack>,
+                                  std::shared_ptr<AnnotationBranch>>>
+                tracks_branches;
+            for (auto &track : ws->document()->timeline()->tracks()) {
+              if (auto annotation_track =
+                      std::dynamic_pointer_cast<AnnotationTrack>(track)) {
+                if (annotation_track->segmentExport()) {
+                  if (annotation_track->segmentPath().empty()) {
+                    throw std::runtime_error("No segment export path");
+                  }
+                  for (auto &branch : annotation_track->branches()) {
+                    if (branch->name() == player->fileName()) {
+                      tracks_branches.emplace_back(annotation_track, branch);
+                    }
+                  }
+                }
+              }
+            }
+            std::string src_path(player->path());
+            QProgressDialog *progress = new QProgressDialog(
+                tr("Writing bag segments..."), QString(), 0, 0, this);
+            progress->setModal(true);
+            progress->setWindowFlags(Qt::Window | Qt::WindowTitleHint |
+                                     Qt::CustomizeWindowHint);
+            progress->show();
+            std::string src_name = player->fileName();
+            // volatile bool finished = false;
+            std::thread([src_path, tracks_branches, progress, src_name]() {
+              rosbag::Bag src_bag(src_path, rosbag::bagmode::Read);
+              rosbag::View src_view(src_bag);
+              ros::Time bag_start = src_view.getBeginTime();
+              for (auto &track_branch : tracks_branches) {
+                auto &track = track_branch.first;
+                auto &branch = track_branch.second;
+                std::vector<std::shared_ptr<AnnotationSpan>> spans;
+                {
+                  LockScope ws;
+                  spans = branch->spans();
+                }
+                for (auto &span : spans) {
+                  ros::Time span_start, span_end;
+                  std::string dst_path, segment_path;
+                  {
+                    LockScope ws;
+                    segment_path = track->segmentPath();
+                    span_start = bag_start + ros::Duration(span->start());
+                    span_end = bag_start +
+                               ros::Duration(span->start() + span->duration());
+                    std::string dst_name = src_name;
+                    {
+                      std::string ext = ".bag";
+                      if (dst_name.size() >= ext.size() &&
+                          dst_name.substr(dst_name.size() - ext.size()) ==
+                              ext) {
+                        dst_name.resize(dst_name.size() - ext.size());
+                      }
+                    }
+                    for (auto &c : dst_name)
+                      if (c == '.') c = '_';
+                    dst_path =
+                        track->segmentPath() + "/" + dst_name + "_" +
+                        std::to_string(int(std::round(span->start() * 1000))) +
+                        "_" +
+                        std::to_string(
+                            int(std::round(span->duration() * 1000))) +
+                        ".bag";
+                    LOG_INFO("write bag " << dst_path << " " << span->start()
+                                          << " " << span->duration());
+                  }
+                  QDir().mkpath(QString::fromStdString(segment_path));
+                  rosbag::View span_view(src_bag, span_start, span_end);
+                  startOnMainThreadAsync([progress, dst_path]() {
+                    progress->setLabelText(tr("Writing bag segment: ") + " " +
+                                           QString::fromStdString(dst_path));
+                  });
+                  rosbag::Bag dst_bag(dst_path, rosbag::bagmode::Write);
+                  for (auto &msg : span_view) {
+                    LOG_INFO("write message " << dst_path << " "
+                                              << msg.getTime());
+                    dst_bag.write(msg.getTopic(), msg.getTime(),
+                                  msg.instantiate<Message>());
+                  }
+                }
+              }
+              startOnMainThreadAsync([progress]() { progress->deleteLater(); });
+            }).detach();
+            // while (!finished) {
+            //   QThread::msleep(10);
+            //   QApplication::processEvents();
+            // }
+            // thread.join();
+          } catch (const std::exception &ex) {
+            QMessageBox::critical(nullptr, "Error", ex.what());
+          }
+        });
+    connect(
         menu->addAction("Annotated Bag"), &QAction::triggered, this,
         [this](bool checked) {
           try {
             LockScope ws;
             auto player = ws->player;
             if (!player) {
-              throw std::runtime_error("No bag player");
+              throw std::runtime_error("No bag opened");
             }
             std::string src_path(player->path());
             std::string dst_path(src_path + ".annotated.bag");
@@ -1999,7 +2096,6 @@ TimelineWidget::TimelineWidget() : QDockWidget("Timeline") {
             rosbag::Bag src_bag(src_path, rosbag::bagmode::Read);
             rosbag::Bag dst_bag(dst_path, rosbag::bagmode::Append);
             rosbag::View view(src_bag);
-
             for (auto &message : view) {
               double t = (message.getTime() - view.getBeginTime()).toSec();
               if (message.getDataType() == "sensor_msgs/Image") {
@@ -2129,6 +2225,34 @@ TimelineWidget::TimelineWidget() : QDockWidget("Timeline") {
             [this]() { MainWindow::instance()->closeBag(); });
     playback_bar_left->addWidget(close_button);
   }
+
+  // {
+  //   auto *button = new FlatButton("1x");
+  //   QMenu *menu = new QMenu(this);
+  //   connect(menu, &QMenu::aboutToShow, [menu, this]() {
+  //     LOG_DEBUG("update speed menu");
+  //     menu->clear();
+  //     for (double speed : {
+  //              0.25,
+  //              0.5,
+  //              1.0,
+  //              2.0,
+  //              4.0,
+  //              8.0,
+  //          }) {
+  //       auto *action = menu->addAction(QString::number(speed) + "x");
+  //       connect(action, &QAction::triggered, this, [this, speed](bool
+  //       checked) {
+  //       });
+  //       action->setCheckable(true);
+  //       if (auto player = ws->player) {
+  //         action->setChecked(branch == ws->player->fileName());
+  //       }
+  //     }
+  //   });
+  //   button->setMenu(menu);
+  //   playback_bar_left->addWidget(button);
+  // }
 
   playback_bar_left->addStretch(1);
 
@@ -2277,8 +2401,7 @@ TimelineWidget::TimelineWidget() : QDockWidget("Timeline") {
   scene->addItem(seek_head);
 
   class GraphicsView : public QGraphicsView {
-
-  protected:
+   protected:
     virtual void mouseMoveEvent(QMouseEvent *event) override {
       QGraphicsView::mouseMoveEvent(event);
     }
@@ -2293,7 +2416,7 @@ TimelineWidget::TimelineWidget() : QDockWidget("Timeline") {
       LockScope()->modified();
     }
 
-  public:
+   public:
     GraphicsView() { setMouseTracking(true); }
   };
 

@@ -32,8 +32,8 @@ bool Selection::contains(const std::shared_ptr<Object> &o) const {
   }
   return false;
 }
-std::vector<std::shared_ptr<Object>>
-Selection::resolve(const std::shared_ptr<Object> &root) const {
+std::vector<std::shared_ptr<Object>> Selection::resolve(
+    const std::shared_ptr<Object> &root) const {
   std::vector<std::shared_ptr<Object>> ret;
   root->recurseObjects([&](const std::shared_ptr<Object> &o) {
     for (auto id : _objects) {
@@ -91,7 +91,6 @@ bool operator==(const Selection &a, const Selection &b) {
 bool operator!=(const Selection &a, const Selection &b) { return !(a == b); }
 
 Workspace::Workspace() {
-
   history = std::make_shared<History<std::shared_ptr<Workspace>>>();
 
   if (0) {
@@ -113,14 +112,20 @@ Workspace::Workspace() {
 }
 Workspace::~Workspace() { object_ptr_test.clear(); }
 std::vector<std::string> Workspace::listTopics(const std::string &type_name) {
-  if (player) {
-    return player->listTopics(type_name);
-  } else {
-    return TopicManager::instance()->listTopics(type_name);
-  }
+  // if (player) {
+  //   return player->listTopics(type_name);
+  // } else {
+  //   return TopicManager::instance()->listTopics(type_name);
+  // }
+  auto ret = TopicManager::instance()->listTopics(type_name);
+  if (player)
+    for (auto &t : player->listTopics(type_name)) ret.push_back(t);
+  std::sort(ret.begin(), ret.end());
+  ret.erase(std::unique(ret.begin(), ret.end()), ret.end());
+  return ret;
 }
-std::vector<std::string>
-Workspace::listTopics(const std::initializer_list<std::string> &type_names) {
+std::vector<std::string> Workspace::listTopics(
+    const std::initializer_list<std::string> &type_names) {
   std::set<std::string> ret;
   for (auto &type_name : type_names) {
     for (auto &v : listTopics(type_name)) {

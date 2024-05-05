@@ -23,7 +23,7 @@ void main() {
         c[i] = srgb2linear(c[i]);
 
     c.xyz *= brightness;
-    c.xyz = mix(vec3(dot(c.xyz, vec3(1.0 / 3.0))), c, saturation);
+    c.xyz = mix(vec3(dot(c.xyz, vec3(1.0 / 3.0))), c.xyz, saturation);
 
     c = max(c, vec4(0.0));
 

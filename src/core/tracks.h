@@ -26,6 +26,8 @@ DECLARE_TYPE(AnnotationBranch, Object);
 struct AnnotationTrack : TrackBase {
   PROPERTY(std::vector<std::shared_ptr<AnnotationBranch>>, branches, {},
            hidden = true);
+  PROPERTY(bool, segmentExport, false);
+  PROPERTY(std::string, segmentPath, "");
   std::shared_ptr<AnnotationBranch> branch(const std::shared_ptr<Workspace> &ws,
                                            bool create = false);
 };
@@ -38,7 +40,7 @@ class GraphTrack : public TrackBase {
   };
   std::shared_ptr<Data> _data = std::make_shared<Data>();
 
-public:
+ public:
   PROPERTY(TopicProperty<Message>, topic);
   PROPERTY(MessageQueryProperty, query/*, [this]() {
     LOG_DEBUG(topic().subscriber()->message());

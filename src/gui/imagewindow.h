@@ -29,7 +29,7 @@ AUTO_STRUCT_FIELD(double, saturation, 1);
 AUTO_STRUCT_FIELD(bool, toneMapping, false);
 AUTO_STRUCT_END();
 
-class AnnotationView;
+class AnnotationViewBase;
 
 class ImageWindow : public ContentWindowBase {
   // std::function<void(const ImageWindowOptions &)> _refresh_callback;
@@ -42,7 +42,7 @@ class ImageWindow : public ContentWindowBase {
   std::shared_ptr<ImageAnnotationBase> new_annotation;
   std::shared_ptr<AnnotationSpan> new_annotation_span;
   std::shared_ptr<Type> annotation_type;
-  std::unordered_map<std::shared_ptr<ImageAnnotationBase>, AnnotationView *>
+  std::unordered_map<std::shared_ptr<ImageAnnotationBase>, AnnotationViewBase *>
       annotation_views;
   ImageWindow();
   PROPERTY(std::string, topic, "");

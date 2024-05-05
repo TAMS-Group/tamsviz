@@ -1,5 +1,5 @@
 // TAMSVIZ
-// (c) 2020-2023 Philipp Ruppel
+// (c) 2020-2024 Philipp Ruppel
 
 #include "profiler.h"
 
@@ -20,8 +20,8 @@ std::shared_ptr<Profiler> Profiler::instance() {
   return instance;
 }
 
-std::shared_ptr<ProfilerTrack>
-Profiler::track(const std::shared_ptr<ProfilerTrack> &track) {
+std::shared_ptr<ProfilerTrack> Profiler::track(
+    const std::shared_ptr<ProfilerTrack> &track) {
   if (track) {
     std::unique_lock<std::mutex> lock(_mutex);
     _tracks.emplace_back(track);
@@ -45,6 +45,7 @@ std::vector<std::shared_ptr<ProfilerTrack>> Profiler::tracks() const {
 
 ProfilerTrack::ProfilerTrack(const std::string &name) : _name(name) {
   _time = 0;
+  _count = 0;
 }
 
 ProfilerTrack::~ProfilerTrack() {}
