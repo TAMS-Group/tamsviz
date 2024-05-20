@@ -136,21 +136,20 @@ struct RenderViewsAsyncContext {
 class Interaction;
 
 struct Display : Object {
-
   static void _dummyVoid() {}
 
-protected:
+ protected:
   Display();
   virtual ~Display() {}
 
-public:
+ public:
   // PROPERTY(std::string, name, "Display", hidden = true);
   PROPERTY(std::string, name,
-           "Display"); // more intuitive e.g. for plot objects
+           "Display");  // more intuitive e.g. for plot objects
   template <class F>
-  auto recurseDisplays(const F &f)
-      -> decltype(f(std::shared_ptr<Display>(), std::shared_ptr<Display>()),
-                  _dummyVoid()) {
+  auto recurseDisplays(const F &f) -> decltype(f(std::shared_ptr<Display>(),
+                                                 std::shared_ptr<Display>()),
+                                               _dummyVoid()) {
     forEachObject(
         (void *)&f,
         [](void *context, const Object *parent, const Object *child) {
@@ -166,19 +165,19 @@ public:
         nullptr, this);
   }
   template <class F>
-  auto recurseDisplays(const F &f)
-      -> decltype(f(std::shared_ptr<Display>()), _dummyVoid()) {
-    forEachObject((void *)&f,
-                  [](void *context, const Object *parent, const Object *child) {
-                    auto *f = (F *)context;
-                    if (auto c =
-                            child ? std::dynamic_pointer_cast<Display>(
-                                        ((Object *)child)->shared_from_this())
-                                  : nullptr) {
-                      (*(F *)context)(c);
-                    }
-                  },
-                  nullptr, this);
+  auto recurseDisplays(const F &f) -> decltype(f(std::shared_ptr<Display>()),
+                                               _dummyVoid()) {
+    forEachObject(
+        (void *)&f,
+        [](void *context, const Object *parent, const Object *child) {
+          auto *f = (F *)context;
+          if (auto c = child ? std::dynamic_pointer_cast<Display>(
+                                   ((Object *)child)->shared_from_this())
+                             : nullptr) {
+            (*(F *)context)(c);
+          }
+        },
+        nullptr, this);
   }
   virtual void renderSyncRecursive(const RenderSyncContext &context) {
     renderSync(context);
@@ -194,10 +193,10 @@ public:
 DECLARE_TYPE(Display, Object);
 
 struct DisplayGroupBase : Display {
-protected:
+ protected:
   DisplayGroupBase() {}
 
-public:
+ public:
   PROPERTY(std::vector<std::shared_ptr<Display>>, displays,
            std::vector<std::shared_ptr<Display>>(), hidden = true);
   virtual void renderSyncRecursive(const RenderSyncContext &context) override;
@@ -206,10 +205,10 @@ public:
 DECLARE_TYPE(DisplayGroupBase, Display);
 
 struct Window : Object {
-protected:
+ protected:
   Window() {}
 
-public:
+ public:
   PROPERTY(std::string, name, "Window");
   virtual void refreshRecursive();
   virtual void refresh();
@@ -218,17 +217,18 @@ DECLARE_TYPE(Window, Object);
 
 class Transformer;
 struct WorldDisplay : DisplayGroupBase {
-private:
+ private:
   static std::vector<std::string> _listFrames(const Property &);
   std::vector<std::shared_ptr<Component>> _components_refresh,
       _components_render;
 
-public:
+ public:
   std::shared_ptr<Transformer> transformer;
   PROPERTY(std::string, fixedFrame, "world", list = &WorldDisplay::_listFrames);
   PROPERTY(std::shared_ptr<Component>, rendering, nullptr);
   PROPERTY(std::shared_ptr<Component>, environment, nullptr);
   PROPERTY(bool, republish, true);
+  PROPERTY(bool, publishInputEvents, false);
   virtual void renderSync(const RenderSyncContext &context) override;
   virtual void renderAsync(const RenderAsyncContext &context) override;
   virtual void refresh() override;
@@ -237,19 +237,19 @@ public:
 DECLARE_TYPE(WorldDisplay, DisplayGroupBase);
 
 struct AnnotationBase : Object {
-protected:
+ protected:
   AnnotationBase() {}
 
-public:
+ public:
   PROPERTY(std::string, label, "");
 };
 DECLARE_TYPE(AnnotationBase, Object);
 
 struct TrackBase : Object {
-protected:
+ protected:
   TrackBase();
 
-public:
+ public:
   PROPERTY(double, color, 0.0, min = 0.0, max = 1.0, wrap = true);
   PROPERTY(std::string, label, "Label");
 };

@@ -11,7 +11,7 @@ float linear2srgb(float v) {
 
 float srgb2linear(float srgb) {
   if (srgb < 0.04045) {
-    return srgb * (25.0 / 232.0);
+    return srgb * (1.0 / 12.92);
   } else {
     return pow((200.0 * srgb + 11.0) * (1.0 / 211.0), 12.0 / 5.0);
   }

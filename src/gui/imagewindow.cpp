@@ -14,6 +14,7 @@
 #include <cv_bridge/cv_bridge.h>
 #include <sensor_msgs/CompressedImage.h>
 #include <sensor_msgs/Image.h>
+#include <tamsviz/InputEvent.h>
 
 #include <QGraphicsScene>
 #include <QGraphicsView>
@@ -283,6 +284,307 @@ struct ImageAnnotationView : AnnotationViewBase {
   }
 };
 
+class ImageWindowMessageBuffer {
+  std::mutex _mutex;
+  bool _pending = false;
+  std::shared_ptr<const Message> _image;
+  std::condition_variable _put_condition;
+  std::thread _worker;
+  // QPixmap _pixmap;
+  bool _stop = false;
+  ros::Time _image_time, _out_time;
+  // ImageWindowOptions _options_in, _out_opts;
+  cv::Mat _out_mat;
+  std::string _out_encoding;
+  std_msgs::Header _out_header;
+
+  // static QImage mat2image(const cv::Mat &mat,
+  //                         const std::string &img_encoding) {
+  //   switch (mat.type()) {
+  //     case CV_8UC1:
+  //       return QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
+  //                     QImage::Format_Grayscale8);
+  //     case CV_8UC2:
+  //       LOG_WARN_THROTTLE(
+  //           1, "image format not yet supported " << mat.type() << "
+  //           CV_8UC2");
+  //       return QImage();
+  //     case CV_8UC3:
+  //       if (img_encoding == "bgr8" || img_encoding == "bgr16") {
+  //         cv::cvtColor(mat, mat, cv::COLOR_BGR2RGB);
+  //       }
+  //       return QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
+  //                     QImage::Format_RGB888);
+  //     case CV_8UC4:
+  //       if (img_encoding == "bgra8" || img_encoding == "bgra16") {
+  //         cv::cvtColor(mat, mat, cv::COLOR_BGRA2RGBA);
+  //       }
+  //       return QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
+  //                     QImage::Format_RGBA8888);
+  //       break;
+  //     default:
+  //       LOG_WARN_THROTTLE(1, "image format not yet supported " <<
+  //       mat.type()); return QImage();
+  //   }
+  // }
+
+  static void removeNotFinite(cv::Mat &mat) {
+    switch (mat.type()) {
+      case CV_32FC1:
+      case CV_32FC2:
+      case CV_32FC3:
+      case CV_32FC4:
+        for (size_t y = 0; y < mat.rows; y++) {
+          auto *pixel = mat.ptr<float>(y);
+          size_t n = mat.cols * mat.channels();
+          for (size_t x = 0; x < n; x++) {
+            if (!std::isfinite(*pixel)) {
+              *pixel = 0;
+            }
+            pixel++;
+          }
+        }
+        break;
+      case CV_64FC1:
+      case CV_64FC2:
+      case CV_64FC3:
+      case CV_64FC4:
+        for (size_t y = 0; y < mat.rows; y++) {
+          auto *pixel = mat.ptr<double>(y);
+          size_t n = mat.cols * mat.channels();
+          for (size_t x = 0; x < n; x++) {
+            if (!std::isfinite(*pixel)) {
+              *pixel = 0;
+            }
+            pixel++;
+          }
+        }
+        break;
+    }
+  }
+
+  // static void to8Bit(cv::Mat &mat) {
+  //   switch (mat.type()) {
+  //     case CV_16UC1:
+  //       mat.convertTo(mat, CV_8U, 1.0 / 256);
+  //       break;
+  //     case CV_32FC1:
+  //       mat.convertTo(mat, CV_8U, 255.0);
+  //       break;
+  //     case CV_64FC1:
+  //       mat.convertTo(mat, CV_8U, 255.0);
+  //       break;
+  //     case CV_16UC3:
+  //       mat.convertTo(mat, CV_8UC3, 1.0 / 256.0);
+  //       break;
+  //     case CV_32FC3:
+  //       mat.convertTo(mat, CV_8UC3, 255.0);
+  //       break;
+  //     case CV_64FC3:
+  //       mat.convertTo(mat, CV_8UC3, 255.0);
+  //       break;
+  //     case CV_16UC4:
+  //       mat.convertTo(mat, CV_8UC4, 1.0 / 256.0);
+  //       break;
+  //     case CV_32FC4:
+  //       mat.convertTo(mat, CV_8UC4, 255.0);
+  //       break;
+  //     case CV_64FC4:
+  //       mat.convertTo(mat, CV_8UC4, 255.0);
+  //       break;
+  //   }
+  // }
+
+  static bool msg2mat(const std::shared_ptr<const Message> &image, cv::Mat &mat,
+                      std::string &encoding, std_msgs::Header &header) {
+    if (auto img = image->instantiate<sensor_msgs::Image>()) {
+      header = img->header;
+      if (sensor_msgs::image_encodings::isBayer(img->encoding) ||
+          img->encoding == sensor_msgs::image_encodings::YUV422) {
+        try {
+          cv_bridge::CvImageConstPtr cv_ptr =
+              cv_bridge::toCvCopy(*img, sensor_msgs::image_encodings::RGB8);
+          mat = cv_ptr->image;
+          encoding = cv_ptr->encoding;
+          return true;
+        } catch (cv_bridge::Exception &e) {
+          LOG_ERROR("cv_bridge exception: " << e.what());
+        }
+      }
+      try {
+        cv_bridge::CvImageConstPtr cv_ptr = cv_bridge::toCvCopy(*img);
+        mat = cv_ptr->image;
+        encoding = cv_ptr->encoding;
+        return true;
+      } catch (cv_bridge::Exception &e) {
+        LOG_ERROR("cv_bridge exception: " << e.what());
+      }
+    } else if (auto img = image->instantiate<sensor_msgs::CompressedImage>()) {
+      header = img->header;
+      try {
+        cv_bridge::CvImageConstPtr cv_ptr =
+            cv_bridge::toCvCopy(*img, sensor_msgs::image_encodings::RGB8);
+        mat = cv_ptr->image;
+        encoding = cv_ptr->encoding;
+        return true;
+      } catch (cv_bridge::Exception &e) {
+        LOG_ERROR("cv_bridge exception: " << e.what());
+      }
+    } else {
+      LOG_WARN("unsupported image message type" << image->type()->name());
+    }
+    if (mat.empty()) {
+      LOG_WARN("failed to decode image");
+    }
+    header = std_msgs::Header();
+    return false;
+  }
+
+ public:
+  Event<void()> ready;
+  ImageWindowMessageBuffer() {
+    _worker = std::thread([this]() {
+      while (true) {
+        std::shared_ptr<const Message> image;
+        // ImageWindowOptions options;
+        {
+          std::unique_lock<std::mutex> lock(_mutex);
+          while (true) {
+            if (_stop) {
+              return;
+            }
+            if (_pending) {
+              _pending = false;
+              image = _image;
+              // options = _options_in;
+              break;
+            }
+            _put_condition.wait(lock);
+          }
+        }
+        if (image == nullptr) {
+          {
+            std::unique_lock<std::mutex> lock(_mutex);
+            // _pixmap = QPixmap();
+            _out_mat = cv::Mat();
+            _out_encoding = "";
+            _out_header = std_msgs::Header();
+          }
+          continue;
+        }
+
+        PROFILER("image processing thread");
+
+        // LOG_DEBUG("imagewindow start processing");
+
+        cv::Mat mat;
+        std::string encoding;
+        std_msgs::Header header;
+        bool ok = msg2mat(image, mat, encoding, header);
+        if (!ok) {
+          LOG_WARN_THROTTLE(1, "failed to convert image");
+          continue;
+        }
+
+        removeNotFinite(mat);
+
+        // if (options.normalizeDepth) {
+        //   switch (mat.type()) {
+        //     case CV_16UC1:
+        //       cv::normalize(mat, mat, 0x0000, 0xffff, cv::NORM_MINMAX);
+        //       break;
+        //     case CV_32FC1:
+        //     case CV_64FC1:
+        //       cv::normalize(mat, mat, 0.0, 1.0, cv::NORM_MINMAX);
+        //       break;
+        //   }
+        // }
+
+        // to8Bit(mat);
+
+        // if (options.colorMapApply &&
+        //     (mat.type() == CV_8UC1 || mat.type() == CV_8UC3)) {
+        //   try {
+        //     cv::applyColorMap(mat, mat, options.colorMapType);
+        //   } catch (const cv::Exception &ex) {
+        //     LOG_ERROR_THROTTLE(1.0, "Failed to apply color map: " +
+        //     ex.msg);
+        //   }
+        // }
+
+        // auto pixmap = QPixmap::fromImage(mat2image(mat, encoding));
+        {
+          PROFILER("image processing sync");
+          std::unique_lock<std::mutex> lock(_mutex);
+          // _pixmap = pixmap;
+          _out_mat = mat;
+          _out_time = _image_time;
+          // _out_opts = options;
+          _out_encoding = encoding;
+          _out_header = header;
+        }
+
+        // LOG_DEBUG("imagewindow processing finished, image size "
+        //           << pixmap.width() << " x " << pixmap.height());
+
+        // LOG_DEBUG("imagewindow processing finished, image size "
+        //           << mat.cols << " x " << mat.rows);
+
+        {
+          PROFILER("image processing ready");
+          ready();
+        }
+      }
+    });
+  }
+  ~ImageWindowMessageBuffer() {
+    {
+      std::unique_lock<std::mutex> lock(_mutex);
+      _stop = true;
+      _put_condition.notify_one();
+    }
+    _worker.join();
+  }
+  void putImage(const std::shared_ptr<const Message> &msg) {
+    // LOG_DEBUG("imagewindow queue put");
+    PROFILER();
+    std::unique_lock<std::mutex> lock(_mutex);
+    _pending = true;
+    _image = nullptr;
+    _image_time = ros::Time();
+    if (msg) {
+      _image = msg;
+      _image_time = msg->time();
+    }
+    _put_condition.notify_one();
+  }
+  // void refresh(const ImageWindowOptions &options) {
+  //   LOG_DEBUG("imagewindow queue refresh");
+  //   std::unique_lock<std::mutex> lock(_mutex);
+  //   _options_in = options;
+  //   _pending = true;
+  //   _put_condition.notify_one();
+  // }
+  // void fetchPixmap(QPixmap *pixmap, ros::Time *time,
+  //                  ImageWindowOptions *options) {
+  //   LOG_DEBUG("imagewindow queue fetch");
+  //   std::unique_lock<std::mutex> lock(_mutex);
+  //   *pixmap = _pixmap;
+  //   *time = _pixmap_time;
+  //   *options = _options_out;
+  // }
+  void pull(cv::Mat *mat, ros::Time *time,  // ImageWindowOptions *options,
+            std::string *encoding, std_msgs::Header *header) {
+    // LOG_DEBUG("imagewindow queue fetch");
+    PROFILER();
+    std::unique_lock<std::mutex> lock(_mutex);
+    if (mat) *mat = _out_mat;
+    if (time) *time = _out_time;
+    if (encoding) *encoding = _out_encoding;
+    if (header) *header = _out_header;
+  }
+};
+
 ImageWindow::ImageWindow() {
   {
     auto *button = new FlatButton();
@@ -335,11 +637,24 @@ ImageWindow::ImageWindow() {
     button->setMenu(menu);
     addToolWidget(button);
     {
+      QString label = "Interact";
+      button->setText(label);
+      connect(menu->addAction(label), &QAction::triggered, this,
+              [label, button, this](bool checked) {
+                LockScope ws;
+                annotation_mode = false;
+                annotation_type = nullptr;
+                button->setText(label);
+                ws->modified();
+              });
+    }
+    {
       QString label = "Select / Edit";
       button->setText(label);
       connect(menu->addAction(label), &QAction::triggered, this,
               [label, button, this](bool checked) {
                 LockScope ws;
+                annotation_mode = true;
                 annotation_type = nullptr;
                 button->setText(label);
                 ws->modified();
@@ -354,6 +669,7 @@ ImageWindow::ImageWindow() {
       connect(menu->addAction(label), &QAction::triggered, this,
               [type, label, button, this](bool checked) {
                 LockScope ws;
+                annotation_mode = true;
                 annotation_type = type;
                 button->setText(label);
                 ws->modified();
@@ -361,301 +677,10 @@ ImageWindow::ImageWindow() {
     }
   }
 
-  class MessageBuffer {
-    std::mutex _mutex;
-    bool _pending = false;
-    std::shared_ptr<const Message> _image;
-    std::condition_variable _put_condition;
-    std::thread _worker;
-    // QPixmap _pixmap;
-    bool _stop = false;
-    ros::Time _image_time, _out_time;
-    // ImageWindowOptions _options_in, _out_opts;
-    cv::Mat _out_mat;
-    std::string _out_encoding;
+  std::shared_ptr<ImageWindowMessageBuffer> buffer =
+      std::make_shared<ImageWindowMessageBuffer>();
 
-    // static QImage mat2image(const cv::Mat &mat,
-    //                         const std::string &img_encoding) {
-    //   switch (mat.type()) {
-    //     case CV_8UC1:
-    //       return QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
-    //                     QImage::Format_Grayscale8);
-    //     case CV_8UC2:
-    //       LOG_WARN_THROTTLE(
-    //           1, "image format not yet supported " << mat.type() << "
-    //           CV_8UC2");
-    //       return QImage();
-    //     case CV_8UC3:
-    //       if (img_encoding == "bgr8" || img_encoding == "bgr16") {
-    //         cv::cvtColor(mat, mat, cv::COLOR_BGR2RGB);
-    //       }
-    //       return QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
-    //                     QImage::Format_RGB888);
-    //     case CV_8UC4:
-    //       if (img_encoding == "bgra8" || img_encoding == "bgra16") {
-    //         cv::cvtColor(mat, mat, cv::COLOR_BGRA2RGBA);
-    //       }
-    //       return QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
-    //                     QImage::Format_RGBA8888);
-    //       break;
-    //     default:
-    //       LOG_WARN_THROTTLE(1, "image format not yet supported " <<
-    //       mat.type()); return QImage();
-    //   }
-    // }
-
-    static void removeNotFinite(cv::Mat &mat) {
-      switch (mat.type()) {
-        case CV_32FC1:
-        case CV_32FC2:
-        case CV_32FC3:
-        case CV_32FC4:
-          for (size_t y = 0; y < mat.rows; y++) {
-            auto *pixel = mat.ptr<float>(y);
-            size_t n = mat.cols * mat.channels();
-            for (size_t x = 0; x < n; x++) {
-              if (!std::isfinite(*pixel)) {
-                *pixel = 0;
-              }
-              pixel++;
-            }
-          }
-          break;
-        case CV_64FC1:
-        case CV_64FC2:
-        case CV_64FC3:
-        case CV_64FC4:
-          for (size_t y = 0; y < mat.rows; y++) {
-            auto *pixel = mat.ptr<double>(y);
-            size_t n = mat.cols * mat.channels();
-            for (size_t x = 0; x < n; x++) {
-              if (!std::isfinite(*pixel)) {
-                *pixel = 0;
-              }
-              pixel++;
-            }
-          }
-          break;
-      }
-    }
-
-    // static void to8Bit(cv::Mat &mat) {
-    //   switch (mat.type()) {
-    //     case CV_16UC1:
-    //       mat.convertTo(mat, CV_8U, 1.0 / 256);
-    //       break;
-    //     case CV_32FC1:
-    //       mat.convertTo(mat, CV_8U, 255.0);
-    //       break;
-    //     case CV_64FC1:
-    //       mat.convertTo(mat, CV_8U, 255.0);
-    //       break;
-    //     case CV_16UC3:
-    //       mat.convertTo(mat, CV_8UC3, 1.0 / 256.0);
-    //       break;
-    //     case CV_32FC3:
-    //       mat.convertTo(mat, CV_8UC3, 255.0);
-    //       break;
-    //     case CV_64FC3:
-    //       mat.convertTo(mat, CV_8UC3, 255.0);
-    //       break;
-    //     case CV_16UC4:
-    //       mat.convertTo(mat, CV_8UC4, 1.0 / 256.0);
-    //       break;
-    //     case CV_32FC4:
-    //       mat.convertTo(mat, CV_8UC4, 255.0);
-    //       break;
-    //     case CV_64FC4:
-    //       mat.convertTo(mat, CV_8UC4, 255.0);
-    //       break;
-    //   }
-    // }
-
-    static bool msg2mat(const std::shared_ptr<const Message> &image,
-                        cv::Mat &mat, std::string &encoding) {
-      if (auto img = image->instantiate<sensor_msgs::Image>()) {
-        if (sensor_msgs::image_encodings::isBayer(img->encoding) ||
-            img->encoding == sensor_msgs::image_encodings::YUV422) {
-          try {
-            cv_bridge::CvImageConstPtr cv_ptr =
-                cv_bridge::toCvCopy(*img, sensor_msgs::image_encodings::RGB8);
-            mat = cv_ptr->image;
-            encoding = cv_ptr->encoding;
-            return true;
-          } catch (cv_bridge::Exception &e) {
-            LOG_ERROR("cv_bridge exception: " << e.what());
-          }
-        }
-        try {
-          cv_bridge::CvImageConstPtr cv_ptr = cv_bridge::toCvCopy(*img);
-          mat = cv_ptr->image;
-          encoding = cv_ptr->encoding;
-          return true;
-        } catch (cv_bridge::Exception &e) {
-          LOG_ERROR("cv_bridge exception: " << e.what());
-        }
-      } else if (auto img =
-                     image->instantiate<sensor_msgs::CompressedImage>()) {
-        try {
-          cv_bridge::CvImageConstPtr cv_ptr =
-              cv_bridge::toCvCopy(*img, sensor_msgs::image_encodings::RGB8);
-          mat = cv_ptr->image;
-          encoding = cv_ptr->encoding;
-          return true;
-        } catch (cv_bridge::Exception &e) {
-          LOG_ERROR("cv_bridge exception: " << e.what());
-        }
-      } else {
-        LOG_WARN("unsupported image message type" << image->type()->name());
-      }
-      if (mat.empty()) {
-        LOG_WARN("failed to decode image");
-      }
-      return false;
-    }
-
-   public:
-    Event<void()> ready;
-    MessageBuffer() {
-      _worker = std::thread([this]() {
-        while (true) {
-          std::shared_ptr<const Message> image;
-          // ImageWindowOptions options;
-          {
-            std::unique_lock<std::mutex> lock(_mutex);
-            while (true) {
-              if (_stop) {
-                return;
-              }
-              if (_pending) {
-                _pending = false;
-                image = _image;
-                // options = _options_in;
-                break;
-              }
-              _put_condition.wait(lock);
-            }
-          }
-          if (image == nullptr) {
-            {
-              std::unique_lock<std::mutex> lock(_mutex);
-              // _pixmap = QPixmap();
-              _out_mat = cv::Mat();
-              _out_encoding = "";
-            }
-            continue;
-          }
-
-          PROFILER("image processing thread");
-
-          // LOG_DEBUG("imagewindow start processing");
-
-          cv::Mat mat;
-          std::string encoding;
-          bool ok = msg2mat(image, mat, encoding);
-          if (!ok) {
-            LOG_WARN_THROTTLE(1, "failed to convert image");
-            continue;
-          }
-
-          removeNotFinite(mat);
-
-          // if (options.normalizeDepth) {
-          //   switch (mat.type()) {
-          //     case CV_16UC1:
-          //       cv::normalize(mat, mat, 0x0000, 0xffff, cv::NORM_MINMAX);
-          //       break;
-          //     case CV_32FC1:
-          //     case CV_64FC1:
-          //       cv::normalize(mat, mat, 0.0, 1.0, cv::NORM_MINMAX);
-          //       break;
-          //   }
-          // }
-
-          // to8Bit(mat);
-
-          // if (options.colorMapApply &&
-          //     (mat.type() == CV_8UC1 || mat.type() == CV_8UC3)) {
-          //   try {
-          //     cv::applyColorMap(mat, mat, options.colorMapType);
-          //   } catch (const cv::Exception &ex) {
-          //     LOG_ERROR_THROTTLE(1.0, "Failed to apply color map: " +
-          //     ex.msg);
-          //   }
-          // }
-
-          // auto pixmap = QPixmap::fromImage(mat2image(mat, encoding));
-          {
-            PROFILER("image processing sync");
-            std::unique_lock<std::mutex> lock(_mutex);
-            // _pixmap = pixmap;
-            _out_mat = mat;
-            _out_time = _image_time;
-            // _out_opts = options;
-            _out_encoding = encoding;
-          }
-
-          // LOG_DEBUG("imagewindow processing finished, image size "
-          //           << pixmap.width() << " x " << pixmap.height());
-
-          // LOG_DEBUG("imagewindow processing finished, image size "
-          //           << mat.cols << " x " << mat.rows);
-
-          {
-            PROFILER("image processing ready");
-            ready();
-          }
-        }
-      });
-    }
-    ~MessageBuffer() {
-      {
-        std::unique_lock<std::mutex> lock(_mutex);
-        _stop = true;
-        _put_condition.notify_one();
-      }
-      _worker.join();
-    }
-    void putImage(const std::shared_ptr<const Message> &msg) {
-      // LOG_DEBUG("imagewindow queue put");
-      PROFILER();
-      std::unique_lock<std::mutex> lock(_mutex);
-      _pending = true;
-      _image = nullptr;
-      _image_time = ros::Time();
-      if (msg) {
-        _image = msg;
-        _image_time = msg->time();
-      }
-      _put_condition.notify_one();
-    }
-    // void refresh(const ImageWindowOptions &options) {
-    //   LOG_DEBUG("imagewindow queue refresh");
-    //   std::unique_lock<std::mutex> lock(_mutex);
-    //   _options_in = options;
-    //   _pending = true;
-    //   _put_condition.notify_one();
-    // }
-    // void fetchPixmap(QPixmap *pixmap, ros::Time *time,
-    //                  ImageWindowOptions *options) {
-    //   LOG_DEBUG("imagewindow queue fetch");
-    //   std::unique_lock<std::mutex> lock(_mutex);
-    //   *pixmap = _pixmap;
-    //   *time = _pixmap_time;
-    //   *options = _options_out;
-    // }
-    void pull(cv::Mat *mat, ros::Time *time,  // ImageWindowOptions *options,
-              std::string *encoding) {
-      // LOG_DEBUG("imagewindow queue fetch");
-      PROFILER();
-      std::unique_lock<std::mutex> lock(_mutex);
-      *mat = _out_mat;
-      *time = _out_time;
-      // *options = _out_opts;
-      *encoding = _out_encoding;
-    }
-  };
-  std::shared_ptr<MessageBuffer> buffer = std::make_shared<MessageBuffer>();
+  _message_buffer = buffer;
 
   // _refresh_callback = [buffer](const ImageWindowOptions &options) {
   //   // buffer->refresh(options);
@@ -671,8 +696,7 @@ ImageWindow::ImageWindow() {
       ros::Time time;
       ImageWindowOptions opts;
       std::string encoding;
-      // buffer->pull(&screenshot, &time, &opts, &encoding);
-      buffer->pull(&screenshot, &time, &encoding);
+      buffer->pull(&screenshot, &time, &encoding, nullptr);
       if (screenshot.empty()) {
         QMessageBox::warning(nullptr, "Error",
                              "No image received. Select image topic.");
@@ -757,6 +781,8 @@ ImageWindow::ImageWindow() {
     bool _dirty = true;
 
    public:
+    size_t width() const { return _mat.cols; }
+    size_t height() const { return _mat.rows; }
     void setImage(const cv::Mat &mat, const std::string &encoding) {
       // return;
       _mat = mat;
@@ -837,24 +863,35 @@ ImageWindow::ImageWindow() {
             break;
         }
         V_GL(glPixelStorei(GL_UNPACK_ROW_LENGTH, _mat.step / _mat.elemSize()));
+
         if (_encoding == sensor_msgs::image_encodings::RGB8) {
           V_GL(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, _mat.cols, _mat.rows, 0,
                             GL_RGB, GL_UNSIGNED_BYTE, _mat.data));
+
         } else if (_encoding == sensor_msgs::image_encodings::BGR8) {
           V_GL(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, _mat.cols, _mat.rows, 0,
                             GL_BGR, GL_UNSIGNED_BYTE, _mat.data));
+
         } else if (_encoding == sensor_msgs::image_encodings::TYPE_8UC1) {
           V_GL(glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, _mat.cols, _mat.rows, 0,
                             GL_RED, GL_UNSIGNED_BYTE, _mat.data));
+
         } else if (_encoding == sensor_msgs::image_encodings::TYPE_8UC2) {
           V_GL(glTexImage2D(GL_TEXTURE_2D, 0, GL_RG8, _mat.cols, _mat.rows, 0,
                             GL_RG, GL_UNSIGNED_BYTE, _mat.data));
+
         } else if (_encoding == sensor_msgs::image_encodings::TYPE_8UC3) {
           V_GL(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, _mat.cols, _mat.rows, 0,
                             GL_RGB, GL_UNSIGNED_BYTE, _mat.data));
+
+        } else if (_encoding == sensor_msgs::image_encodings::TYPE_32FC1) {
+          V_GL(glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, _mat.cols, _mat.rows, 0,
+                            GL_RED, GL_FLOAT, _mat.data));
+
         } else {
           LOG_ERROR_THROTTLE(1, "unsupported image format " << _encoding);
         }
+
         V_GL(glPixelStorei(GL_UNPACK_ROW_LENGTH, 0));
         V_GL(glPixelStorei(GL_UNPACK_ALIGNMENT, 4));
       } else {
@@ -925,7 +962,8 @@ ImageWindow::ImageWindow() {
       }
       virtual void mouseMoveEvent(QGraphicsSceneMouseEvent *event) override {
         QGraphicsScene::mouseMoveEvent(event);
-        if (_parent->_parent->annotation_type == nullptr) {
+        if (_parent->_parent->annotation_mode &&
+            _parent->_parent->annotation_type == nullptr) {
           if (event->buttons() == Qt::LeftButton && !event->isAccepted()) {
             event->accept();
             auto a = event->buttonDownScenePos(Qt::LeftButton);
@@ -997,11 +1035,10 @@ ImageWindow::ImageWindow() {
       }
     };
     ImageWindow *_parent = nullptr;
-    std::shared_ptr<MessageBuffer> _buffer;
+    std::shared_ptr<ImageWindowMessageBuffer> _buffer;
     GraphicsScene *_scene = nullptr;
-    // QPixmap _image_pixmap;
     cv::Mat _image_mat;
-    // ImageWindowOptions _image_options;
+    std_msgs::Header _image_header;
     ros::Time _image_time;
     std::string _image_encoding;
     QString _annotation_span_text;
@@ -1108,9 +1145,8 @@ ImageWindow::ImageWindow() {
     }
 
    public:
-    GraphicsView(const std::shared_ptr<MessageBuffer> &buffer,
-                 ImageWindow *parent)
-        : _buffer(buffer), _parent(parent) {
+    GraphicsView(ImageWindow *parent)
+        : _buffer(parent->_message_buffer), _parent(parent) {
       _scene = new GraphicsScene(this);
       setViewport(new QOpenGLWidget(this));
       setCacheMode(QGraphicsView::CacheNone);
@@ -1126,7 +1162,7 @@ ImageWindow::ImageWindow() {
       // _image_item->setTransformationMode(Qt::SmoothTransformation);
       // _image_item->setGraphicsEffect(new QGraphicsShaderEffect());
       _scene->addItem(_image_item);
-      buffer->ready.connect(this, [this]() {
+      parent->_message_buffer->ready.connect(this, [this]() {
         PROFILER("image window buffer->ready");
         // TODO: is this safe?
         QObject o;
@@ -1137,7 +1173,7 @@ ImageWindow::ImageWindow() {
           startOnMainThreadAsync([this]() {
             PROFILER("buffer->ready 3");
             _buffer->pull(&_image_mat, &_image_time,  // &_image_options,
-                          &_image_encoding);
+                          &_image_encoding, &_image_header);
             _image_item->setImage(_image_mat, _image_encoding);
             sync();
           });
@@ -1151,6 +1187,7 @@ ImageWindow::ImageWindow() {
           sync();
         });
       });
+      viewport()->setMouseTracking(true);
     }
     void focusOutEvent(QFocusEvent *event) {
       QGraphicsView::focusOutEvent(event);
@@ -1188,6 +1225,79 @@ ImageWindow::ImageWindow() {
       auto q = mapToScene(p);
       return Eigen::Vector2d(q.x(), q.y());
     }
+    uint8_t convertMouseButtons(int qt) {
+      uint8_t ret = 0;
+      if (qt & Qt::LeftButton) ret |= tamsviz::InputEvent::LEFT_BUTTON;
+      if (qt & Qt::RightButton) ret |= tamsviz::InputEvent::RIGHT_BUTTON;
+      if (qt & Qt::MiddleButton) ret |= tamsviz::InputEvent::MIDDLE_BUTTON;
+      return ret;
+    }
+    bool publishEvent(QEvent *event) {
+      LockScope ws;
+      if (_parent->annotation_mode) return false;
+      if (!_parent->_event_publisher) return false;
+      if (_parent->_event_publisher.getNumSubscribers() == 0) return false;
+      std::string t;
+      switch (event->type()) {
+        case QEvent::MouseButtonPress:
+          t = tamsviz::InputEvent::MOUSE_PRESS;
+          break;
+        case QEvent::MouseButtonRelease:
+          t = tamsviz::InputEvent::MOUSE_RELEASE;
+          break;
+        case QEvent::MouseMove:
+          t = tamsviz::InputEvent::MOUSE_MOVE;
+          break;
+        case QEvent::MouseButtonDblClick:
+          t = tamsviz::InputEvent::DOUBLE_CLICK;
+          break;
+        case QEvent::Enter:
+          t = tamsviz::InputEvent::MOUSE_ENTER;
+          break;
+        case QEvent::Leave:
+          t = tamsviz::InputEvent::MOUSE_LEAVE;
+          break;
+        default:
+          LOG_DEBUG("unidentified event " << event->type());
+          return false;
+      }
+      // event->accept();
+      tamsviz::InputEvent m;
+      m.event_type = t;
+      m.image_topic = _parent->topic();
+      m.window_name = _parent->name();
+      if (auto *mouse_event = dynamic_cast<QMouseEvent *>(event)) {
+        m.buttons_pressed = convertMouseButtons(mouse_event->buttons());
+        m.event_button = convertMouseButtons(mouse_event->button());
+        m.window_point.x = mouse_event->x();
+        m.window_point.y = mouse_event->y();
+        auto p = mapToScene(mouse_event->pos());
+        m.image_point.x = p.x();
+        m.image_point.y = p.y();
+      }
+      m.window_size.width = _parent->width();
+      m.window_size.height = _parent->height();
+      m.image_size.width = _image_item->width();
+      m.image_size.height = _image_item->height();
+      m.header.frame_id = _image_header.frame_id;
+      m.header.stamp = ros::Time::now();
+      m.image_stamp = _image_header.stamp;
+      LOG_DEBUG("publishing mouse event for " << _parent->name() << " "
+                                              << _parent->topic());
+      _parent->_event_publisher.publish(m);
+      return true;
+    }
+    // virtual bool event(QEvent *event) override {
+    //   bool ret = QGraphicsView::event(event);
+    //   if (publishEvent(event)) ret = true;
+    //   event->accept();
+    //   ret = true;
+    //   return ret;
+    // }
+    virtual void mouseDoubleClickEvent(QMouseEvent *event) override {
+      QGraphicsView::mouseDoubleClickEvent(event);
+      publishEvent(event);
+    }
     virtual void mouseMoveEvent(QMouseEvent *event) override {
       if (_parent->new_annotation) {
         event->accept();
@@ -1209,6 +1319,7 @@ ImageWindow::ImageWindow() {
         ws->modified();
       }
       _last_mouse_pos = event->pos();
+      publishEvent(event);
     }
 
     virtual void mousePressEvent(QMouseEvent *event) override {
@@ -1335,6 +1446,7 @@ ImageWindow::ImageWindow() {
         }
       }
       _last_mouse_pos = event->pos();
+      publishEvent(event);
     }
     virtual void mouseReleaseEvent(QMouseEvent *event) override {
       if (_parent->new_annotation) {
@@ -1364,31 +1476,71 @@ ImageWindow::ImageWindow() {
       QGraphicsView::mouseReleaseEvent(event);
       event->accept();
       _last_mouse_pos = event->pos();
+      publishEvent(event);
+    }
+    virtual void leaveEvent(QEvent *event) override {
+      QGraphicsView::leaveEvent(event);
+      publishEvent(event);
+    }
+    virtual void enterEvent(QEvent *event) override {
+      QGraphicsView::enterEvent(event);
+      publishEvent(event);
     }
   };
 
-  auto *view = new GraphicsView(buffer, this);
+  auto *view = new GraphicsView(this);
   setContentWidget(view);
+}
 
-  {
-    LockScope ws;
-    ws->modified.connect(this, [this, buffer]() {
-      LockScope ws;
-      if (topic().empty()) {
-        subscriber = nullptr;
-        buffer->putImage(nullptr);
-      } else {
-        if (!subscriber || subscriber->topic()->name() != topic()) {
-          buffer->putImage(nullptr);
-          subscriber = std::make_shared<Subscriber<Message>>(
-              topic(), shared_from_this(),
-              [buffer](const std::shared_ptr<const Message> &msg) {
-                // LOG_DEBUG("image " << msg->time());
-                buffer->putImage(msg);
-              },
-              false);
-        }
-      }
-    });
+void ImageWindow::refresh() {
+  LOG_DEBUG("refresh");
+  ContentWindowBase::refresh();
+  this->window()->update();
+  // if (_options_watcher.changed(options())) {
+  //   if (_refresh_callback) {
+  //     _refresh_callback(options());
+  //   }
+  // }
+  if (topic().empty()) {
+    subscriber = nullptr;
+    _message_buffer->putImage(nullptr);
+  } else {
+    if (!subscriber || subscriber->topic()->name() != topic()) {
+      _message_buffer->putImage(nullptr);
+      auto buffer = _message_buffer;
+      subscriber = std::make_shared<Subscriber<Message>>(
+          topic(), shared_from_this(),
+          [buffer](const std::shared_ptr<const Message> &msg) {
+            buffer->putImage(msg);
+          },
+          false);
+    }
+  }
+  // if (_event_publishing_watcher.changed(enableEventPublishing(),
+  //                                       mouseEventSuffix(), topic())) {
+  //   if (enableEventPublishing() && topic() != "" && mouseEventSuffix() != "")
+  //   {
+  //     std::string topic_name = topic() + mouseEventSuffix();
+  //     LOG_DEBUG("advertising mouse event topic " << topic_name);
+  //     ros::NodeHandle node_handle("~");
+  //     _event_publisher =
+  //         node_handle.advertise<tamsviz::InputEvent>(topic_name, 100, false);
+  //   } else {
+  //     LOG_DEBUG("mouse event publishing disabled");
+  //     _event_publisher = ros::Publisher();
+  //   }
+  // }
+  LockScope ws;
+  if (_event_publishing_watcher.changed(
+          ws->document()->display()->publishInputEvents())) {
+    if (ws->document()->display()->publishInputEvents()) {
+      LOG_DEBUG("advertising event topic");
+      ros::NodeHandle node_handle;
+      _event_publisher = node_handle.advertise<tamsviz::InputEvent>(
+          "/tamsviz/input", 100, false);
+    } else {
+      LOG_DEBUG("mouse event publishing disabled");
+      _event_publisher = ros::Publisher();
+    }
   }
 }

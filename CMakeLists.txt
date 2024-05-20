@@ -36,6 +36,22 @@ find_package(catkin REQUIRED COMPONENTS
     tf
     image_transport
     pybind11_catkin
+    message_generation
+    message_runtime
+)
+
+add_message_files(
+  DIRECTORY msg
+  FILES
+  InputEvent.msg
+  Point2d.msg
+  Point2i.msg
+  Size2i.msg
+)
+
+generate_messages(
+  DEPENDENCIES
+  std_msgs
 )
 
 catkin_package(
@@ -55,6 +71,8 @@ catkin_package(
         eigen_conversions
         laser_geometry
         pybind11_catkin
+        message_generation
+        message_runtime
 )
 
 include_directories(

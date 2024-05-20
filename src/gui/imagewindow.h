@@ -31,16 +31,22 @@ AUTO_STRUCT_END();
 
 class AnnotationViewBase;
 
+class ImageWindowMessageBuffer;
+
 class ImageWindow : public ContentWindowBase {
   // std::function<void(const ImageWindowOptions &)> _refresh_callback;
   std::shared_ptr<Subscriber<Message>> subscriber;
   static constexpr double minZoom() { return 0.01; }
   static constexpr double maxZoom() { return 1000000; }
   Watcher _options_watcher;
+  std::shared_ptr<ImageWindowMessageBuffer> _message_buffer;
+  Watcher _event_publishing_watcher;
+  ros::Publisher _event_publisher;
 
  public:
   std::shared_ptr<ImageAnnotationBase> new_annotation;
   std::shared_ptr<AnnotationSpan> new_annotation_span;
+  bool annotation_mode = false;
   std::shared_ptr<Type> annotation_type;
   std::unordered_map<std::shared_ptr<ImageAnnotationBase>, AnnotationViewBase *>
       annotation_views;
@@ -49,15 +55,8 @@ class ImageWindow : public ContentWindowBase {
   PROPERTY(ClampedVector2d, center, Eigen::Vector2d(0.5, 0.5));
   PROPERTY(double, zoom, 1.0, min = minZoom(), max = maxZoom());
   PROPERTY(ImageWindowOptions, options);
-  virtual void refresh() override {
-    LOG_DEBUG("refresh");
-    ContentWindowBase::refresh();
-    this->window()->update();
-    // if (_options_watcher.changed(options())) {
-    //   if (_refresh_callback) {
-    //     _refresh_callback(options());
-    //   }
-    // }
-  }
+  // PROPERTY(bool, enableEventPublishing, false);
+  // PROPERTY(std::string, mouseEventSuffix, "/mouse")
+  virtual void refresh() override;
 };
 DECLARE_TYPE(ImageWindow, ContentWindowBase);
