@@ -245,7 +245,7 @@ void Mesh::destroy() {
 
 Mesh::~Mesh() {
   if (_destructed) {
-    throw std::runtime_error("mesh already destructed");
+    []() { throw std::runtime_error("mesh already destructed"); }();
   }
   _destructed = true;
   destroy();
