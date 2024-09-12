@@ -7,23 +7,39 @@
 
 #include <QPainterPath>
 #include <QTransform>
+#include <QPainter>
 
-struct PointImageAnnotation : ImageAnnotationBase {
-  virtual void render() override {
-    if (controlPoints().empty()) {
-      shape = nullptr;
-      complete = false;
-    } else {
-      shape = std::make_shared<QPainterPath>();
-      shape->addPolygon(QPolygonF(QRectF(-10, -2, 20, 4))
-                            .united(QPolygonF(QRectF(-2, -10, 4, 20))));
-      shape->translate(controlPoints().front().x(),
-                       controlPoints().front().y());
-      complete = true;
-    }
+void ImageAnnotationBase::heatmap(QPainter &painter, const QColor &color) {
+  render();
+  if (shape) {
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(color);
+    painter.drawPath(*shape);
   }
-};
-DECLARE_TYPE(PointImageAnnotation, ImageAnnotationBase);
+}
+
+void PointImageAnnotation::render() {
+  if (controlPoints().empty()) {
+    shape = nullptr;
+    complete = false;
+  } else {
+    shape = std::make_shared<QPainterPath>();
+    shape->addPolygon(QPolygonF(QRectF(-10, -2, 20, 4))
+                          .united(QPolygonF(QRectF(-2, -10, 4, 20))));
+    shape->translate(controlPoints().front().x(), controlPoints().front().y());
+    complete = true;
+  }
+}
+
+void PointImageAnnotation::heatmap(QPainter &painter, const QColor &color) {
+  if (!controlPoints().empty()) {
+    auto p = controlPoints().at(0);
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(color);
+    // painter.drawPoint(QPointF(p[0], p[1]));
+    painter.drawEllipse(QPointF(p[0], p[1]), 3.0, 3.0);
+  }
+}
 
 struct RectangleImageAnnotation : ImageAnnotationBase {
   virtual void render() override {

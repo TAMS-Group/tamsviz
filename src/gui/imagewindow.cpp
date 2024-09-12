@@ -8,12 +8,13 @@
 #include "../core/bagplayer.h"
 #include "../core/log.h"
 #include "../core/workspace.h"
+#include "../core/image.h"
 
 #include "../render/shader.h"
 
-#include <cv_bridge/cv_bridge.h>
 #include <sensor_msgs/CompressedImage.h>
 #include <sensor_msgs/Image.h>
+#include <sensor_msgs/image_encodings.h>
 #include <tamsviz/InputEvent.h>
 
 #include <QGraphicsScene>
@@ -298,36 +299,6 @@ class ImageWindowMessageBuffer {
   std::string _out_encoding;
   std_msgs::Header _out_header;
 
-  // static QImage mat2image(const cv::Mat &mat,
-  //                         const std::string &img_encoding) {
-  //   switch (mat.type()) {
-  //     case CV_8UC1:
-  //       return QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
-  //                     QImage::Format_Grayscale8);
-  //     case CV_8UC2:
-  //       LOG_WARN_THROTTLE(
-  //           1, "image format not yet supported " << mat.type() << "
-  //           CV_8UC2");
-  //       return QImage();
-  //     case CV_8UC3:
-  //       if (img_encoding == "bgr8" || img_encoding == "bgr16") {
-  //         cv::cvtColor(mat, mat, cv::COLOR_BGR2RGB);
-  //       }
-  //       return QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
-  //                     QImage::Format_RGB888);
-  //     case CV_8UC4:
-  //       if (img_encoding == "bgra8" || img_encoding == "bgra16") {
-  //         cv::cvtColor(mat, mat, cv::COLOR_BGRA2RGBA);
-  //       }
-  //       return QImage((uchar *)mat.data, mat.cols, mat.rows, mat.step,
-  //                     QImage::Format_RGBA8888);
-  //       break;
-  //     default:
-  //       LOG_WARN_THROTTLE(1, "image format not yet supported " <<
-  //       mat.type()); return QImage();
-  //   }
-  // }
-
   static void removeNotFinite(cv::Mat &mat) {
     switch (mat.type()) {
       case CV_32FC1:
@@ -363,82 +334,52 @@ class ImageWindowMessageBuffer {
     }
   }
 
-  // static void to8Bit(cv::Mat &mat) {
-  //   switch (mat.type()) {
-  //     case CV_16UC1:
-  //       mat.convertTo(mat, CV_8U, 1.0 / 256);
-  //       break;
-  //     case CV_32FC1:
-  //       mat.convertTo(mat, CV_8U, 255.0);
-  //       break;
-  //     case CV_64FC1:
-  //       mat.convertTo(mat, CV_8U, 255.0);
-  //       break;
-  //     case CV_16UC3:
-  //       mat.convertTo(mat, CV_8UC3, 1.0 / 256.0);
-  //       break;
-  //     case CV_32FC3:
-  //       mat.convertTo(mat, CV_8UC3, 255.0);
-  //       break;
-  //     case CV_64FC3:
-  //       mat.convertTo(mat, CV_8UC3, 255.0);
-  //       break;
-  //     case CV_16UC4:
-  //       mat.convertTo(mat, CV_8UC4, 1.0 / 256.0);
-  //       break;
-  //     case CV_32FC4:
-  //       mat.convertTo(mat, CV_8UC4, 255.0);
-  //       break;
-  //     case CV_64FC4:
-  //       mat.convertTo(mat, CV_8UC4, 255.0);
-  //       break;
+  // static bool msg2mat(const std::shared_ptr<const Message> &image, cv::Mat
+  // &mat,
+  //                     std::string &encoding, std_msgs::Header &header) {
+  //   if (auto img = image->instantiate<sensor_msgs::Image>()) {
+  //     header = img->header;
+  //     if (sensor_msgs::image_encodings::isBayer(img->encoding) ||
+  //         img->encoding == sensor_msgs::image_encodings::YUV422) {
+  //       try {
+  //         cv_bridge::CvImageConstPtr cv_ptr =
+  //             cv_bridge::toCvCopy(*img, sensor_msgs::image_encodings::RGB8);
+  //         mat = cv_ptr->image;
+  //         encoding = cv_ptr->encoding;
+  //         return true;
+  //       } catch (cv_bridge::Exception &e) {
+  //         LOG_ERROR("cv_bridge exception: " << e.what());
+  //       }
+  //     }
+  //     try {
+  //       cv_bridge::CvImageConstPtr cv_ptr = cv_bridge::toCvCopy(*img);
+  //       mat = cv_ptr->image;
+  //       encoding = cv_ptr->encoding;
+  //       return true;
+  //     } catch (cv_bridge::Exception &e) {
+  //       LOG_ERROR("cv_bridge exception: " << e.what());
+  //     }
+  //   } else if (auto img = image->instantiate<sensor_msgs::CompressedImage>())
+  //   {
+  //     header = img->header;
+  //     try {
+  //       cv_bridge::CvImageConstPtr cv_ptr =
+  //           cv_bridge::toCvCopy(*img, sensor_msgs::image_encodings::RGB8);
+  //       mat = cv_ptr->image;
+  //       encoding = cv_ptr->encoding;
+  //       return true;
+  //     } catch (cv_bridge::Exception &e) {
+  //       LOG_ERROR("cv_bridge exception: " << e.what());
+  //     }
+  //   } else {
+  //     LOG_WARN("unsupported image message type" << image->type()->name());
   //   }
+  //   if (mat.empty()) {
+  //     LOG_WARN("failed to decode image");
+  //   }
+  //   header = std_msgs::Header();
+  //   return false;
   // }
-
-  static bool msg2mat(const std::shared_ptr<const Message> &image, cv::Mat &mat,
-                      std::string &encoding, std_msgs::Header &header) {
-    if (auto img = image->instantiate<sensor_msgs::Image>()) {
-      header = img->header;
-      if (sensor_msgs::image_encodings::isBayer(img->encoding) ||
-          img->encoding == sensor_msgs::image_encodings::YUV422) {
-        try {
-          cv_bridge::CvImageConstPtr cv_ptr =
-              cv_bridge::toCvCopy(*img, sensor_msgs::image_encodings::RGB8);
-          mat = cv_ptr->image;
-          encoding = cv_ptr->encoding;
-          return true;
-        } catch (cv_bridge::Exception &e) {
-          LOG_ERROR("cv_bridge exception: " << e.what());
-        }
-      }
-      try {
-        cv_bridge::CvImageConstPtr cv_ptr = cv_bridge::toCvCopy(*img);
-        mat = cv_ptr->image;
-        encoding = cv_ptr->encoding;
-        return true;
-      } catch (cv_bridge::Exception &e) {
-        LOG_ERROR("cv_bridge exception: " << e.what());
-      }
-    } else if (auto img = image->instantiate<sensor_msgs::CompressedImage>()) {
-      header = img->header;
-      try {
-        cv_bridge::CvImageConstPtr cv_ptr =
-            cv_bridge::toCvCopy(*img, sensor_msgs::image_encodings::RGB8);
-        mat = cv_ptr->image;
-        encoding = cv_ptr->encoding;
-        return true;
-      } catch (cv_bridge::Exception &e) {
-        LOG_ERROR("cv_bridge exception: " << e.what());
-      }
-    } else {
-      LOG_WARN("unsupported image message type" << image->type()->name());
-    }
-    if (mat.empty()) {
-      LOG_WARN("failed to decode image");
-    }
-    header = std_msgs::Header();
-    return false;
-  }
 
  public:
   Event<void()> ready;
@@ -480,37 +421,13 @@ class ImageWindowMessageBuffer {
         cv::Mat mat;
         std::string encoding;
         std_msgs::Header header;
-        bool ok = msg2mat(image, mat, encoding, header);
+        bool ok = tryConvertImageMessageToMat(*image, mat, encoding, header);
         if (!ok) {
           LOG_WARN_THROTTLE(1, "failed to convert image");
           continue;
         }
 
         removeNotFinite(mat);
-
-        // if (options.normalizeDepth) {
-        //   switch (mat.type()) {
-        //     case CV_16UC1:
-        //       cv::normalize(mat, mat, 0x0000, 0xffff, cv::NORM_MINMAX);
-        //       break;
-        //     case CV_32FC1:
-        //     case CV_64FC1:
-        //       cv::normalize(mat, mat, 0.0, 1.0, cv::NORM_MINMAX);
-        //       break;
-        //   }
-        // }
-
-        // to8Bit(mat);
-
-        // if (options.colorMapApply &&
-        //     (mat.type() == CV_8UC1 || mat.type() == CV_8UC3)) {
-        //   try {
-        //     cv::applyColorMap(mat, mat, options.colorMapType);
-        //   } catch (const cv::Exception &ex) {
-        //     LOG_ERROR_THROTTLE(1.0, "Failed to apply color map: " +
-        //     ex.msg);
-        //   }
-        // }
 
         // auto pixmap = QPixmap::fromImage(mat2image(mat, encoding));
         {

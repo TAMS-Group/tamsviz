@@ -21,7 +21,6 @@
 namespace py = pybind11;
 
 PYBIND11_MODULE(pytamsviz, m) {
-
   static std::shared_ptr<QApplication> app;
   static std::shared_ptr<ros::NodeHandle> node;
   static std::shared_ptr<MainWindow> main_window;
@@ -39,9 +38,9 @@ PYBIND11_MODULE(pytamsviz, m) {
     QSurfaceFormat::setDefaultFormat(format);
   }
 
-  ros::init(argc, argv, ROS_PACKAGE_NAME,
-            ros::init_options::AnonymousName |
-                ros::init_options::NoSigintHandler);
+  ros::init(
+      argc, argv, ROS_PACKAGE_NAME,
+      ros::init_options::AnonymousName | ros::init_options::NoSigintHandler);
 
   app = std::make_shared<QApplication>(argc, argv);
   app->setOrganizationName("TAMS");

@@ -93,6 +93,7 @@ add_library(${LIBRARY_NAME}
     src/core/event.cpp
     src/core/handle.cpp
     src/core/history.cpp
+    src/core/image.cpp
     src/core/interaction.cpp
     src/core/loader.cpp
     src/core/log.cpp

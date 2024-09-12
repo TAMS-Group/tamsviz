@@ -9,12 +9,17 @@
 #include "../core/topic.h"
 #include "../core/tracks.h"
 #include "../core/workspace.h"
+#include "../core/image.h"
+#include "../core/destructor.h"
+
 #include "mainwindow.h"
 
 #include <fstream>
 #include <rosbag/bag.h>
 #include <rosbag/view.h>
+#include <sensor_msgs/CompressedImage.h>
 #include <sensor_msgs/Image.h>
+#include <sensor_msgs/image_encodings.h>
 #include <std_msgs/Float64.h>
 
 static const double track_height = 42;
@@ -2081,59 +2086,95 @@ TimelineWidget::TimelineWidget() : QDockWidget("Timeline") {
     connect(
         menu->addAction("Annotated Bag"), &QAction::triggered, this,
         [this](bool checked) {
-          try {
-            LockScope ws;
-            auto player = ws->player;
-            if (!player) {
-              throw std::runtime_error("No bag opened");
-            }
-            std::string src_path(player->path());
-            std::string dst_path(src_path + ".annotated.bag");
-            QFile::remove(dst_path.c_str());
-            if (!QFile::copy(src_path.c_str(), dst_path.c_str())) {
-              throw std::runtime_error("Failed to copy bag file");
-            }
-            rosbag::Bag src_bag(src_path, rosbag::bagmode::Read);
-            rosbag::Bag dst_bag(dst_path, rosbag::bagmode::Append);
-            rosbag::View view(src_bag);
-            for (auto &message : view) {
-              double t = (message.getTime() - view.getBeginTime()).toSec();
-              if (message.getDataType() == "sensor_msgs/Image") {
-                if (auto image_message =
-                        message.instantiate<sensor_msgs::Image>()) {
-                  QImage annotation_image(image_message->width,
-                                          image_message->height,
-                                          QImage::Format_Grayscale8);
-                  annotation_image.fill(Qt::black);
-                  QPainter annotation_painter(&annotation_image);
-                  for (auto &track : ws->document()->timeline()->tracks()) {
-                    if (auto annotation_track =
-                            std::dynamic_pointer_cast<AnnotationTrack>(track)) {
-                      for (auto &branch : annotation_track->branches()) {
-                        if (branch->name() == player->fileName()) {
-                          for (auto &span : branch->spans()) {
-                            for (auto &annotation : span->annotations()) {
-                              if (auto image_annotation =
-                                      std::dynamic_pointer_cast<
-                                          ImageAnnotationBase>(annotation)) {
-                                if (image_annotation->topic() ==
-                                    message.getTopic()) {
-                                  if (span->start() <= t + 1e-6 &&
-                                      span->start() + span->duration() >
-                                          t + 1e-6) {
-                                    auto label = span->label().empty()
-                                                     ? track->label()
-                                                     : span->label();
-                                    LOG_DEBUG("annotation span "
-                                              << label << " "
-                                              << image_annotation->topic()
-                                              << " " << span->start() << " "
-                                              << span->duration());
-                                    image_annotation->render();
-                                    if (auto &shape = image_annotation->shape) {
-                                      annotation_painter.setPen(Qt::NoPen);
-                                      annotation_painter.setBrush(Qt::white);
-                                      annotation_painter.drawPath(*shape);
+          QProgressDialog *progress = new QProgressDialog(
+              tr("Writing annotated bag..."), QString(), 0, 1000, this);
+          progress->setModal(true);
+          progress->setWindowFlags(Qt::Window | Qt::WindowTitleHint |
+                                   Qt::CustomizeWindowHint);
+          progress->show();
+          auto stop_flag = std::make_shared<volatile bool>(0);
+          connect(progress, &QProgressDialog::canceled,
+                  [stop_flag]() { *stop_flag = true; });
+          LockScope ws;
+          auto player = ws->player;
+          if (!player) {
+            throw std::runtime_error("No bag opened");
+          }
+          std::string src_path(player->path());
+          std::string dst_path(src_path + ".annotated.bag");
+          std::string player_file_name = player->fileName();
+          QFile::remove(dst_path.c_str());
+          std::string src_name = player->fileName();
+          // volatile bool finished = false;
+          std::thread([src_path, player_file_name, dst_path, progress, src_name,
+                       stop_flag]() {
+            Destructor progress_destructor([progress]() {
+              startOnMainThreadAsync([progress]() { progress->deleteLater(); });
+            });
+            try {
+              {
+                rosbag::Bag src_bag(src_path, rosbag::bagmode::Read);
+                rosbag::Bag dst_bag(dst_path, rosbag::bagmode::Write);
+                LOG_INFO("export annotated bag " << dst_path);
+                rosbag::View view(src_bag);
+                // double t = 0.0;
+                auto out_time = view.getBeginTime();
+                ros::Time in_time;
+                for (auto &message : view) {
+                  if (*stop_flag) {
+                    LOG_WARN("annotated bag creating stopped");
+                    return;
+                  }
+                  double t = (message.getTime() - view.getBeginTime()).toSec();
+                  {
+                    // double t =
+                    //     (message.getTime() - view.getBeginTime()).toSec();
+                    double tf =
+                        t / (view.getEndTime() - view.getBeginTime()).toSec();
+                    LOG_DEBUG_THROTTLE(
+                        0.2, "writing annotated bag " << tf * 100 << " %");
+                    startOnMainThreadAsync([progress, tf]() {
+                      progress->setValue(int(tf * 1000));
+                    });
+                  }
+                  // auto out_time = message.getTime();
+                  // out_time += ros::Duration(0.5);
+                  if (isImageMessageTypeName(message.getDataType())) {
+                    // auto message_instance = message.instantiate<Message>();
+                    // dst_bag.write(message.getTopic(), message.getTime(),
+                    //               message_instance);
+                    std::map<std::string,
+                             std::vector<std::tuple<
+                                 std::shared_ptr<AnnotationTrack>,
+                                 std::shared_ptr<AnnotationSpan>,
+                                 std::shared_ptr<ImageAnnotationBase>>>>
+                        annotation_map;
+                    {
+                      LockScope ws;
+                      for (auto &track : ws->document()->timeline()->tracks()) {
+                        if (auto annotation_track =
+                                std::dynamic_pointer_cast<AnnotationTrack>(
+                                    track)) {
+                          for (auto &branch : annotation_track->branches()) {
+                            if (branch->name() == player_file_name) {
+                              for (auto &span : branch->spans()) {
+                                for (auto &annotation : span->annotations()) {
+                                  if (auto image_annotation =
+                                          std::dynamic_pointer_cast<
+                                              ImageAnnotationBase>(
+                                              annotation)) {
+                                    if (image_annotation->topic() ==
+                                        message.getTopic()) {
+                                      if (span->start() <= t + 1e-6 &&
+                                          span->start() + span->duration() >
+                                              t + 1e-6) {
+                                        annotation_map[span->label().empty()
+                                                           ? track->label()
+                                                           : span->label()]
+                                            .emplace_back(annotation_track,
+                                                          span,
+                                                          image_annotation);
+                                      }
                                     }
                                   }
                                 }
@@ -2143,36 +2184,172 @@ TimelineWidget::TimelineWidget() : QDockWidget("Timeline") {
                         }
                       }
                     }
-                  }
-                  annotation_painter.end();
-                  sensor_msgs::Image annotation_message;
-                  annotation_message.header = image_message->header;
-                  annotation_message.width = annotation_image.width();
-                  annotation_message.height = annotation_image.height();
-                  annotation_message.step = annotation_message.width;
-                  annotation_message.encoding = "mono8";
-                  for (size_t y = 0; y < annotation_message.height; y++) {
-                    auto *line = annotation_image.constScanLine(y);
-                    for (size_t x = 0; x < annotation_message.width; x++) {
-                      annotation_message.data.push_back(line[x]);
+                    if (!annotation_map.empty()) {
+                      if (message.getTime() != in_time) {
+                        in_time = message.getTime();
+                        out_time += ros::Duration(0.3);
+                      }
+                      auto message_instance = message.instantiate<Message>();
+                      dst_bag.write(message.getTopic(), out_time,
+                                    message_instance);
+                      if (isImageMessageTypeName(message.getDataType())) {
+                        cv::Mat image_mat;
+                        std::string image_encoding;
+                        std_msgs::Header image_header;
+                        if (tryConvertImageMessageToMat(
+                                *message_instance, image_mat, image_encoding,
+                                image_header)) {
+                          // image_header.stamp = out_time;
+                          LOG_DEBUG("image_encoding " << image_encoding);
+                          QImage multi_annotation_image(image_mat.cols,
+                                                        image_mat.rows,
+                                                        QImage::Format_RGB32);
+                          multi_annotation_image.fill(Qt::black);
+                          tryConvertMatToImage(image_mat / 2, image_encoding,
+                                               multi_annotation_image);
+                          // multi_annotation_image.fill(QColor(0, 0, 0, 128));
+                          QPainter multi_annotation_painter(
+                              &multi_annotation_image);
+                          multi_annotation_painter.setCompositionMode(
+                              QPainter::CompositionMode_Screen);
+                          multi_annotation_painter.setRenderHint(
+                              QPainter::Antialiasing, true);
+                          for (auto &annotation_pair : annotation_map) {
+                            auto &matching_annotations = annotation_pair.second;
+                            QImage annotation_image(image_mat.cols,
+                                                    image_mat.rows,
+                                                    QImage::Format_Grayscale8);
+                            {
+                              annotation_image.fill(Qt::black);
+                              QPainter annotation_painter(&annotation_image);
+                              annotation_painter.setRenderHint(
+                                  QPainter::Antialiasing, true);
+                              {
+                                LockScope ws;
+                                for (auto &annotation_tuple :
+                                     matching_annotations) {
+                                  auto &track = std::get<0>(annotation_tuple);
+                                  auto &span = std::get<1>(annotation_tuple);
+                                  auto &image_annotation =
+                                      std::get<2>(annotation_tuple);
+                                  auto label = span->label().empty()
+                                                   ? track->label()
+                                                   : span->label();
+                                  LOG_DEBUG("annotation span "
+                                            << label << " "
+                                            << image_annotation->topic() << " "
+                                            << span->start() << " "
+                                            << span->duration());
+                                  image_annotation->heatmap(annotation_painter,
+                                                            Qt::white);
+                                  // image_annotation->render();
+                                  // if (auto &shape = image_annotation->shape)
+                                  // {
+                                  //   annotation_painter.setPen(Qt::NoPen);
+                                  //   annotation_painter.setBrush(Qt::white);
+                                  //   annotation_painter.drawPath(*shape);
+                                  // }
+                                  image_annotation->heatmap(
+                                      multi_annotation_painter,
+                                      QColor::fromHsvF(track->color(), 1, 1,
+                                                       0.5));
+                                }
+                              }
+                              annotation_painter.end();
+                            }
+                            //
+                            // sensor_msgs::Image annotation_message;
+                            // annotation_message.header = image_header;
+                            // annotation_message.width =
+                            // annotation_image.width();
+                            // annotation_message.height =
+                            //     annotation_image.height();
+                            // annotation_message.step =
+                            // annotation_message.width;
+                            // annotation_message.encoding =
+                            //     sensor_msgs::image_encodings::TYPE_8UC1;
+                            // for (size_t y = 0; y < annotation_message.height;
+                            //      y++) {
+                            //   auto *line = annotation_image.constScanLine(y);
+                            //   for (size_t x = 0; x <
+                            //   annotation_message.width;
+                            //        x++) {
+                            //     annotation_message.data.push_back(line[x]);
+                            //   }
+                            // }
+                            //
+                            {
+                              sensor_msgs::CompressedImage annotation_message;
+                              {
+                                QByteArray data;
+                                {
+                                  QBuffer buf(&data);
+                                  annotation_image.save(&buf, "PNG");
+                                }
+                                annotation_message.header = image_header;
+                                annotation_message.data.assign(data.begin(),
+                                                               data.end());
+                              }
+                              //
+                              std::string annotation_topic = message.getTopic();
+                              if (!annotation_topic.empty() &&
+                                  annotation_topic[0] != '/') {
+                                annotation_topic = "/" + annotation_topic;
+                              }
+                              annotation_topic = annotation_topic + "/" +
+                                                 annotation_pair.first;
+                              LOG_DEBUG("annotation_topic "
+                                        << annotation_topic);
+                              dst_bag.write(annotation_topic, out_time,
+                                            annotation_message);
+                            }
+                            // {
+                            //   cv::Mat channel_map(annotation_image.height(),
+                            //                       annotation_image.width(),
+                            //                       CV_8UC1,
+                            //                       annotation_image.scanLine(0));
+                            //   cv::cvtColor(channel_map, channel_map,
+                            //                COLOR_GRAY2RGB);
+                            // }
+                          }
+                          {
+                            sensor_msgs::CompressedImage annotation_message;
+                            {
+                              QByteArray data;
+                              {
+                                QBuffer buf(&data);
+                                multi_annotation_image.save(&buf, "JPEG");
+                              }
+                              annotation_message.header = image_header;
+                              annotation_message.data.assign(data.begin(),
+                                                             data.end());
+                            }
+                            //
+                            std::string annotation_topic = message.getTopic();
+                            if (!annotation_topic.empty() &&
+                                annotation_topic[0] != '/') {
+                              annotation_topic = "/" + annotation_topic;
+                            }
+                            annotation_topic =
+                                annotation_topic + "/annotations";
+                            LOG_DEBUG("annotation_topic " << annotation_topic);
+                            dst_bag.write(annotation_topic, out_time,
+                                          annotation_message);
+                          }
+                        }
+                      }
                     }
                   }
-                  std::string annotation_topic = message.getTopic();
-                  if (!annotation_topic.empty() && annotation_topic[0] != '/') {
-                    annotation_topic = "/" + annotation_topic;
-                  }
-                  annotation_topic = "/annotations" + annotation_topic;
-                  LOG_DEBUG("annotation_topic " << annotation_topic);
-                  dst_bag.write(annotation_topic, message.getTime(),
-                                annotation_message);
+                  // t += 0.5;
                 }
+                src_bag.close();
+                dst_bag.close();
               }
+              LOG_SUCCESS("annotated bag written");
+            } catch (const std::exception &ex) {
+              QMessageBox::critical(nullptr, "Error", ex.what());
             }
-            src_bag.close();
-            dst_bag.close();
-          } catch (const std::exception &ex) {
-            QMessageBox::critical(nullptr, "Error", ex.what());
-          }
+          }).detach();
         });
     connect(menu->addAction("Time Spans / CSV"), &QAction::triggered, this,
             [this](bool checked) {
