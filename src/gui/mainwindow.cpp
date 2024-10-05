@@ -236,6 +236,11 @@ void MainWindow::openBag(const QString &path) {
   progress.setWindowFlags(Qt::Window | Qt::WindowTitleHint |
                           Qt::CustomizeWindowHint);
   progress.show();
+  {
+    LockScope ws;
+    ws->player.reset();
+    ws->modified();
+  }
   std::string error;
   volatile bool finished = false;
   std::shared_ptr<BagPlayer> player;
@@ -623,6 +628,85 @@ MainWindow::MainWindow(bool embedded) {
             return !ws()->selection().empty();
           })
           ->setShortcut(QKeySequence(Qt::Key_Escape));
+      createMenuItem(menu, "Select next annotation", [this]() {
+        ActionScope ws("Select next annotation track");
+        LOG_DEBUG("selecting next annotation track");
+        auto curr = ws->currentAnnotationTrack().resolve(ws());
+        size_t j = 0;
+        auto &tt = ws->document()->timeline()->tracks();
+        for (size_t i = 0; i < tt.size(); i++) {
+          if (tt[i] == curr) {
+            j = (i + 1) % tt.size();
+          }
+        }
+        LOG_DEBUG("selecting annotation track j");
+        for (size_t i = 0; i < tt.size(); i++) {
+          auto t = tt[j];
+          if (std::dynamic_pointer_cast<AnnotationTrack>(t)) {
+            break;
+          }
+          j++;
+        }
+        auto t = tt[j];
+        auto &selection = ws->selection();
+        selection.clear();
+        selection.add(t);
+        ws->currentAnnotationTrack() =
+            std::dynamic_pointer_cast<AnnotationTrack>(t);
+        ws->modified();
+        //     selection.add(ws->document()->timeline()->tracks()[jtrack]);
+        // ActionScope ws("Select annotation track");
+        // LOG_DEBUG("select next annotation");
+        // if (!ws->document()->timeline()->tracks().empty()) {
+        //   // auto selection_list =
+        //   //     ws->selection().resolve(ws->document()->timeline());
+        //   // for (auto selected : selection_list) {
+        //   //   while (true) {
+        //   //     if (auto track =
+        //   // std::dynamic_pointer_cast<AnnotationTrack>(selected)) {
+        //   //     }
+        //   //     if (auto track =
+        //   // std::dynamic_pointer_cast<AnnotationTrack>(selected)) {
+        //   //     }
+        //   //     break;
+        //   //   }
+        //   // }
+        //   auto &selection = ws->selection();
+        //   size_t jtrack = 0;
+        //   for (size_t itrack = 0;
+        //        itrack < ws->document()->timeline()->tracks().size();
+        //        itrack++) {
+        //     auto &track = ws->document()->timeline()->tracks()[itrack];
+        //     if (selection.contains(track)) {
+        //       jtrack = itrack + 1;
+        //     }
+        //     if (auto annotation_track =
+        //             std::dynamic_pointer_cast<AnnotationTrack>(track)) {
+        //       for (auto &branch : annotation_track->branches()) {
+        //         for (auto &span : branch->spans()) {
+        //           if (selection.contains(span)) {
+        //             jtrack = itrack + 1;
+        //           }
+        //           for (auto &annotation : span->annotations()) {
+        //             if (selection.contains(annotation)) {
+        //               jtrack = itrack + 1;
+        //             }
+        //           }
+        //         }
+        //       }
+        //     }
+        //   }
+        //   jtrack = (jtrack % ws->document()->timeline()->tracks().size());
+        //   {
+        //     LOG_DEBUG("selecting annotation track " << jtrack);
+        //     selection.clear();
+        //     selection.add(ws->document()->timeline()->tracks()[jtrack]);
+        //   }
+        // } else {
+        //   LOG_DEBUG("no annotation tracks");
+        // }
+        // ws->modified();
+      })->setShortcut(QKeySequence(Qt::Key_Tab));
       /*createMenuItem(menu, "Reload",
                      [this]() { ResourceEvents::instance().reload(); })
           ->setShortcut(QKeySequence(Qt::Key_F5));*/

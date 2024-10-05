@@ -14,7 +14,7 @@
 #include <chrono>
 
 class RosBagViewBase {
-protected:
+ protected:
   rosbag::Bag _bag;
   RosBagViewBase(const std::string &filename) { _bag.open(filename); }
 };
@@ -24,7 +24,6 @@ struct RosBagTopicInfo {
 };
 
 class RosBagView : protected RosBagViewBase, protected rosbag::View {
-
   std::vector<std::pair<std::string, std::string>> _viz_topic_list;
   std::unordered_map<std::string, std::string> _topic_bag_to_viz;
   std::unordered_map<std::string, std::string> _topic_viz_to_bag;
@@ -41,7 +40,7 @@ class RosBagView : protected RosBagViewBase, protected rosbag::View {
     return m;
   }
 
-public:
+ public:
   RosBagView(const std::string &filename)
       : RosBagViewBase(filename), rosbag::View(_bag) {
     for (auto &conn : getConnections()) {
@@ -72,11 +71,11 @@ public:
     return _viz_topic_list;
   }
 
-  void
-  findMessages(const ros::Time &t,
-               const std::function<void(const std::string &,
-                                        const std::shared_ptr<const Message> &)>
-                   &callback) {
+  void findMessages(
+      const ros::Time &t,
+      const std::function<void(const std::string &,
+                               const std::shared_ptr<const Message> &)>
+          &callback) {
     for (auto *range : ranges_) {
       if (range->begin != range->end) {
         auto iter = std::upper_bound(range->begin, range->end, t,
@@ -130,7 +129,7 @@ public:
                             rosbag::MessageRange *>>
         _iterators;
 
-  public:
+   public:
     Iterator() {}
     Iterator(RosBagView &view) : _view(&view) {
       for (auto *range : _view->ranges_) {
@@ -140,10 +139,10 @@ public:
     }
     Iterator(RosBagView &view, double time_from_start) : _view(&view) {
       for (auto *range : _view->ranges_) {
-        auto iter = std::lower_bound(range->begin, range->end,
-                                     _view->getBeginTime() +
-                                         ros::Duration(time_from_start),
-                                     rosbag::IndexEntryCompare());
+        auto iter = std::lower_bound(
+            range->begin, range->end,
+            _view->getBeginTime() + ros::Duration(time_from_start),
+            rosbag::IndexEntryCompare());
         if (iter != range->end) {
           _iterators.emplace(range->begin->time, std::make_pair(iter, range));
         }
@@ -189,9 +188,25 @@ void BagPlayer::publish(const std::string &topic,
                 << topic
                 << " time:" << (message->time() - _bag_start_time).toSec());
     }
-    _topics[topic]->publish(message);
+    {
+      auto itopic = _topics.find(topic);
+      if (itopic != _topics.end()) {
+        itopic->second->publish(message);
+      } else {
+        LOG_ERROR("bagplayer topic " + topic + " not found");
+      }
+    }
     if (_data->republish) {
-      _republishers[topic].publish(*message);
+      auto ipub = _republishers.find(topic);
+      if (ipub != _republishers.end()) {
+        if (ipub->second) {
+          ipub->second.publish(*message);
+        } else {
+          LOG_ERROR("bagplayer republisher " + topic + " invalid");
+        }
+      } else {
+        LOG_ERROR("bagplayer republisher " + topic + " not found");
+      }
     }
   }
 }
@@ -375,17 +390,16 @@ void BagPlayer::play(const std::vector<double> &notification_times) {
               if (current_time >= playback_start_time +
                                       std::chrono::nanoseconds(
                                           int64_t(*it_notify * 1000000000.0))) {
-
                 it_notify++;
                 break;
               }
             }
             auto wakeup_time = send_time;
             if (it_notify != notification_times.end()) {
-              wakeup_time =
-                  std::min(send_time, playback_start_time +
-                                          std::chrono::nanoseconds(int64_t(
-                                              *it_notify * 1000000000.0)));
+              wakeup_time = std::min(
+                  send_time, playback_start_time +
+                                 std::chrono::nanoseconds(
+                                     int64_t(*it_notify * 1000000000.0)));
             }
             _action_condition.wait_until(lock, wakeup_time);
           }

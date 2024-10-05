@@ -9,7 +9,9 @@
 #include "../render/mesh.h"
 #include "../scene/mesh.h"
 
-MeshData makeAxes(double radius, double length, size_t segments);
+MeshData makeAxes(double length, double radius, size_t segments);
+
+MeshData makeCrossedAxes(double length, double radius, size_t segments);
 
 struct AxesDisplay : FrameDisplayBase {
   std::shared_ptr<MeshRenderer> _mesh_renderer;

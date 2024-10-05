@@ -49,7 +49,7 @@ SplitWindowBase::SplitWindowBase(Qt::Orientation orientation)
     SplitWindowBase *parent = nullptr;
     bool aggregate = false;
 
-  public:
+   public:
     Splitter(SplitWindowBase *parent) : QWidget(parent), parent(parent) {}
     virtual void mousePressEvent(QMouseEvent *event) override {
       event->accept();
@@ -205,10 +205,10 @@ ContentWindowBase::ContentWindowBase() {
     class Spacer : public QWidget {
       ContentWindowBase *_parent = nullptr;
 
-    public:
+     public:
       Spacer(ContentWindowBase *parent) : QWidget(parent), _parent(parent) {}
 
-    protected:
+     protected:
       virtual void mousePressEvent(QMouseEvent *event) override {
         QWidget::mousePressEvent(event);
         LockScope ws;
@@ -300,14 +300,12 @@ ContentWindowBase::ContentWindowBase() {
 void ContentWindowBase::addToolWidget(QWidget *widget) {
   widget->setParent(this);
   bar->insertWidget(bar->indexOf(spacer), widget);
-  if (!g_show_split_window_bars)
-    widget->hide();
+  if (!g_show_split_window_bars) widget->hide();
 }
 void ContentWindowBase::addToolWidgetRight(QWidget *widget) {
   widget->setParent(this);
   bar->insertWidget(bar->indexOf(spacer) + 1, widget);
-  if (!g_show_split_window_bars)
-    widget->hide();
+  if (!g_show_split_window_bars) widget->hide();
 }
 
 void ContentWindowBase::setContentWidget(QWidget *widget) {
@@ -332,6 +330,13 @@ EmptyWindow::EmptyWindow() {
 void ContentWindowBase::paintAnnotationHUD(
     QPainter *painter, const std::shared_ptr<const Type> &type) {
   if (type != nullptr) {
+    paintAnnotationHUD(painter, type->name());
+  }
+}
+
+void ContentWindowBase::paintAnnotationHUD(QPainter *painter,
+                                           const std::string &label) {
+  if (!label.empty()) {
     double color = 0;
     {
       LockScope ws;
@@ -341,19 +346,19 @@ void ContentWindowBase::paintAnnotationHUD(
     }
     QSize size = painter->window().size();
     size = QSize(size.width(), size.height());
-    if (type->name() != _annotation_hud_string) {
-      static auto font = []() {
-        QFont font;
-        font.setPixelSize(32);
-        return font;
-      }();
-      _annotation_hud_string = type->name();
-      /*
-      _annotation_hud_text = QStaticText(_annotation_hud_string.c_str());
-      _annotation_hud_text.setPerformanceHint(QStaticText::AggressiveCaching);
-      _annotation_hud_text.prepare(QTransform(), font);
-      */
-    }
+    // if (type->name() != _annotation_hud_string) {
+    //   static auto font = []() {
+    //     QFont font;
+    //     font.setPixelSize(32);
+    //     return font;
+    //   }();
+    //   _annotation_hud_string = type->name();
+    //   /*
+    //   _annotation_hud_text = QStaticText(_annotation_hud_string.c_str());
+    //   _annotation_hud_text.setPerformanceHint(QStaticText::AggressiveCaching);
+    //   _annotation_hud_text.prepare(QTransform(), font);
+    //   */
+    // }
     int padding_x = 8;
     int padding_y = 4;
     auto c = QColor::fromHsvF(color, 1, 0.7, 0.9);
@@ -361,7 +366,8 @@ void ContentWindowBase::paintAnnotationHUD(
     // double text_right = padding_x * 2 + _annotation_hud_text.size().width();
     // double text_bottom = padding_y * 2 +
     // _annotation_hud_text.size().height();
-    QString str = QString::fromStdString(_annotation_hud_string);
+    // QString str = QString::fromStdString(_annotation_hud_string);
+    QString str = QString::fromStdString(label);
     double text_right =
         padding_x * 2 + painter->fontMetrics().boundingRect(str).width();
     double text_bottom = padding_y * 2 + painter->fontMetrics().height();

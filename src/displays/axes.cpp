@@ -24,6 +24,21 @@ MeshData makeAxes(double length, double radius, size_t segments) {
   return mesh;
 }
 
+MeshData makeCrossedAxes(double length, double radius, size_t segments) {
+  MeshData mesh;
+  mesh += makeCylinder(segments)
+              .colorize(1, 0, 0)
+              .scale(radius, radius, length)
+              .rotate(M_PI * 0.5, Eigen::Vector3f::UnitY());
+  mesh += makeCylinder(segments)
+              .colorize(0, 1, 0)
+              .scale(radius, radius, length)
+              .rotate(M_PI * -0.5, Eigen::Vector3f::UnitX());
+  mesh +=
+      makeCylinder(segments).colorize(0, 0, 1).scale(radius, radius, length);
+  return mesh;
+}
+
 void AxesDisplay::renderSync(const RenderSyncContext &context) {
   if (_watcher.changed(length(), radius())) {
     _mesh_renderer = node()->create<MeshRenderer>(

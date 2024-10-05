@@ -14,12 +14,11 @@
 extern bool g_show_split_window_bars;
 
 class WindowBase : public Window, public QFrame {
-
-protected:
+ protected:
   WindowBase();
   ~WindowBase();
 
-protected:
+ protected:
   void changeEvent(QEvent *event);
 };
 DECLARE_TYPE(WindowBase, Window);
@@ -31,22 +30,23 @@ class ContentWindowBase : public WindowBase {
   QWidget *spacer = nullptr;
   QWidget *content_window = nullptr;
   // QStaticText _annotation_hud_text;
-  std::string _annotation_hud_string;
+  // std::string _annotation_hud_string;
 
-protected:
+ protected:
   ContentWindowBase();
   void setContentWidget(QWidget *widget);
   void addToolWidget(QWidget *widget);
   void addToolWidgetRight(QWidget *widget);
   void replace(const std::shared_ptr<Window> &new_window);
   QWidget *contentWidget() { return content_window; }
+  void paintAnnotationHUD(QPainter *painter, const std::string &label);
   void paintAnnotationHUD(QPainter *painter,
                           const std::shared_ptr<const Type> &type);
 };
 DECLARE_TYPE(ContentWindowBase, WindowBase);
 
 class EmptyWindow : public ContentWindowBase {
-public:
+ public:
   EmptyWindow();
 };
 DECLARE_TYPE(EmptyWindow, ContentWindowBase);
@@ -55,12 +55,12 @@ class SplitWindowBase : public WindowBase {
   Qt::Orientation orientation;
   QWidget *splitter = nullptr;
 
-protected:
+ protected:
   SplitWindowBase(Qt::Orientation orientation);
   ~SplitWindowBase();
   void sync();
 
-public:
+ public:
   PROPERTY(double, position, 0.5);
   PROPERTY(std::shared_ptr<Window>, a, nullptr);
   PROPERTY(std::shared_ptr<Window>, b, nullptr);
@@ -68,13 +68,13 @@ public:
 DECLARE_TYPE(SplitWindowBase, WindowBase);
 
 class SplitWindowHorizontal : public SplitWindowBase {
-public:
+ public:
   SplitWindowHorizontal() : SplitWindowBase(Qt::Horizontal) {}
 };
 DECLARE_TYPE(SplitWindowHorizontal, SplitWindowBase);
 
 class SplitWindowVertical : public SplitWindowBase {
-public:
+ public:
   SplitWindowVertical() : SplitWindowBase(Qt::Vertical) {}
 };
 DECLARE_TYPE(SplitWindowVertical, SplitWindowBase);

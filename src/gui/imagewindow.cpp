@@ -933,8 +933,20 @@ ImageWindow::ImageWindow() {
         QGraphicsScene::drawForeground(painter, rect);
         painter->save();
         painter->resetTransform();
-        _parent->_parent->paintAnnotationHUD(painter,
-                                             _parent->_parent->annotation_type);
+        {
+          if (auto type = _parent->_parent->annotation_type) {
+            std::string str = type->name();
+            {
+              LockScope ws;
+              if (std::shared_ptr<AnnotationTrack> current_track =
+                      ws->currentAnnotationTrack().resolve(ws())) {
+                if (!str.empty()) str += " / ";
+                str += current_track->label();
+              }
+            }
+            _parent->_parent->paintAnnotationHUD(painter, str);
+          }
+        }
         {
           auto &text = _parent->_annotation_span_text;
           if (!text.isEmpty()) {
@@ -995,7 +1007,9 @@ ImageWindow::ImageWindow() {
         if (ws->player) {
           if (auto timeline = ws->document()->timeline()) {
             double current_time =
-                (_image_time - ws->player->startTime()).toSec() + 1e-6;
+                (_image_time - ws->player->startTime()).toSec() + 1e-5;
+            LOG_DEBUG("searching for annotation spans at time "
+                      << std::to_string(current_time));
             for (auto &track_base : timeline->tracks()) {
               if (auto track =
                       std::dynamic_pointer_cast<AnnotationTrack>(track_base)) {
@@ -1005,6 +1019,9 @@ ImageWindow::ImageWindow() {
                         span->start() + span->duration() <= current_time) {
                       continue;
                     }
+                    LOG_DEBUG("annotation span match " << current_time << " "
+                                                       << span->start() << " "
+                                                       << span->duration());
                     if (!_annotation_span_text.isEmpty()) {
                       _annotation_span_text += ", ";
                     }

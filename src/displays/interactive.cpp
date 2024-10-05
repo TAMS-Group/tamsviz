@@ -227,7 +227,7 @@ void InteractiveMarkerArray::init(
   std::lock_guard<std::mutex> lock(_mutex);
   PROFILER();
   auto previous_markers = _markers;
-  _markers.clear();
+  // _markers.clear();
   for (auto &marker : init.markers) {
     auto &m = _markers[marker.name];
     m = previous_markers[marker.name];
