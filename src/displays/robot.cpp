@@ -448,7 +448,7 @@ class RobotStateTimeSeriesListener : public TimeSeriesListener {
       _positions = _temp;
     }
     if (redraw) {
-      LOG_DEBUG("joint states changed");
+      // LOG_DEBUG("joint states changed");
       GlobalEvents::instance()->redraw();
     }
   }
